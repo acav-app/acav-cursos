@@ -1,0 +1,42 @@
+export const DEFAULT_COURSE_SETTINGS = {
+  heroTitle: "Impulsa tu aprendizaje con formacion real.",
+  heroSubtitle:
+    "Portal de cursos virtuales con catalogo publico, panel privado y gestion centralizada de instituciones, cursos e inscripciones.",
+  heroEyebrow: "Formacion profesional",
+  heroImageUrl: "",
+  stats: [
+    { label: "Instituciones activas", value: "0" },
+    { label: "Cursos activos", value: "0" },
+    { label: "Inscripciones", value: "0" },
+    { label: "Otra estadistica", value: "0" },
+  ],
+  aboutTitle: "Que es esta plataforma",
+  aboutText:
+    "Un espacio institucional para publicar cursos, recibir inscripciones y gestionar la oferta formativa de manera ordenada.",
+  howItWorks: [
+    "Publica un curso.",
+    "Recibe inscripciones desde la web publica.",
+    "Gestiona estados, instituciones y notificaciones desde el panel.",
+  ],
+  footerInfo:
+    "Plataforma de cursos preparada para funcionar como base reutilizable para asociaciones, camaras y organizaciones.",
+  contactEmail: "",
+  phone: "",
+  address: "",
+  socialLinks: [],
+  legalLinks: [],
+  adminNotificationEmail: "",
+  emailFrom: "",
+  emailFromName: "",
+  replyTo: "",
+  notifyAdminOnNewCourse: true,
+  notifyAdminOnNewEnrollment: true,
+  notifyInstitutionOnCourseStatusChange: true,
+  notifyInstitutionOnNewEnrollment: true,
+  notifyStudentOnEnrollment: true,
+  notifyAdminOnNewJob: true,
+  notifyAdminOnNewApplication: true,
+  notifyCompanyOnJobStatusChange: true,
+  notifyCompanyOnNewApplication: true,
+  notifyCandidateOnApplication: true,
+};

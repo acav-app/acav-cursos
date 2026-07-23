@@ -1,0 +1,1569 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>ACAV Cursos — Portal de Formación</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+  <style>
+    /* ══════════════════════════════════════════════
+       VARIABLES & RESET
+    ══════════════════════════════════════════════ */
+    :root {
+      --navy:        #00286B;
+      --navy-dark:   #001845;
+      --navy-mid:    #003B8F;
+      --blue:        #0057B8;
+      --blue-light:  #1A7FE8;
+      --gold:        #F0A500;
+      --gold-light:  #FFB820;
+      --gold-pale:   #FFF8E7;
+      --green:       #10B981;
+      --green-pale:  #D1FAE5;
+      --red:         #EF4444;
+      --red-pale:    #FEE2E2;
+      --purple:      #8B5CF6;
+      --purple-pale: #EDE9FE;
+      --white:       #FFFFFF;
+      --gray-50:     #F8FAFC;
+      --gray-100:    #EFF3F8;
+      --gray-200:    #DDE4EF;
+      --gray-300:    #C4CFDF;
+      --gray-400:    #8FA3BF;
+      --gray-500:    #60789A;
+      --gray-600:    #4A6080;
+      --gray-800:    #1E3050;
+      --sidebar-w:   260px;
+      --topbar-h:    64px;
+      --r-sm:  8px;
+      --r-md:  14px;
+      --r-lg:  22px;
+      --sh-sm: 0 2px 8px rgba(0,40,107,.07);
+      --sh-md: 0 6px 24px rgba(0,40,107,.12);
+      --sh-lg: 0 16px 48px rgba(0,40,107,.18);
+      --tr:    .22s cubic-bezier(.4,0,.2,1);
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body { font-family: 'Inter', system-ui, sans-serif; background: var(--gray-50); color: var(--gray-800); line-height: 1.6; overflow-x: hidden; }
+    img  { max-width: 100%; display: block; }
+    a    { text-decoration: none; color: inherit; }
+    ul   { list-style: none; }
+    button { font-family: inherit; cursor: pointer; border: none; }
+
+    /* ══════════════════════════════════════════════
+       VIEWS TOGGLE
+    ══════════════════════════════════════════════ */
+    .view { display: none; }
+    .view.active { display: block; }
+
+    /* ══════════════════════════════════════════════
+       SHARED UTILITIES
+    ══════════════════════════════════════════════ */
+    .btn {
+      display: inline-flex; align-items: center; gap: 7px;
+      padding: 10px 22px; border-radius: 50px;
+      font-size: .85rem; font-weight: 700; transition: var(--tr); cursor: pointer; border: none;
+    }
+    .btn-gold  { background: var(--gold); color: var(--navy-dark); }
+    .btn-gold:hover { background: var(--gold-light); transform: translateY(-1px); box-shadow: var(--sh-md); }
+    .btn-navy  { background: var(--navy); color: var(--white); }
+    .btn-navy:hover { background: var(--navy-dark); transform: translateY(-1px); }
+    .btn-ghost { background: transparent; color: var(--gray-500); border: 1.5px solid var(--gray-200); }
+    .btn-ghost:hover { border-color: var(--navy); color: var(--navy); }
+    .btn-green { background: var(--green); color: var(--white); }
+    .badge {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 3px 10px; border-radius: 50px; font-size: .7rem; font-weight: 700;
+    }
+    .badge-gold   { background: var(--gold-pale); color: #8a5e00; }
+    .badge-blue   { background: #DBEAFE; color: var(--blue); }
+    .badge-green  { background: var(--green-pale); color: #065f46; }
+    .badge-red    { background: var(--red-pale); color: #991b1b; }
+    .badge-purple { background: var(--purple-pale); color: #5b21b6; }
+    .badge-gray   { background: var(--gray-100); color: var(--gray-600); }
+    .progress-bar {
+      height: 6px; border-radius: 3px; background: var(--gray-200); overflow: hidden;
+    }
+    .progress-fill { height: 100%; border-radius: 3px; background: var(--blue); transition: width .6s ease; }
+    .card {
+      background: var(--white); border-radius: var(--r-md);
+      border: 1.5px solid var(--gray-200); overflow: hidden;
+    }
+    .section-label {
+      display: inline-flex; align-items: center; gap: 8px;
+      font-size: .72rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+      color: var(--gold); margin-bottom: 10px;
+    }
+    .section-label::before { content: ''; display: block; width: 24px; height: 2px; background: var(--gold); border-radius: 2px; }
+    .section-title { font-size: 1.6rem; font-weight: 800; color: var(--navy); line-height: 1.2; }
+
+    /* ══════════════════════════════════════════════
+       NAV SWITCHER (demo)
+    ══════════════════════════════════════════════ */
+    .demo-switcher {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 9999;
+      background: var(--navy-dark);
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+      padding: 8px 24px;
+      border-bottom: 1px solid rgba(255,255,255,.08);
+    }
+    .demo-switcher-label {
+      font-size: .7rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+      color: rgba(255,255,255,.35); margin-right: 12px;
+    }
+    .demo-tab {
+      padding: 6px 16px; border-radius: 50px; font-size: .75rem; font-weight: 700;
+      cursor: pointer; transition: var(--tr);
+      color: rgba(255,255,255,.5); background: transparent; border: 1px solid rgba(255,255,255,.1);
+    }
+    .demo-tab:hover { color: var(--white); border-color: rgba(255,255,255,.3); }
+    .demo-tab.active { background: var(--gold); color: var(--navy-dark); border-color: var(--gold); }
+    body { padding-top: 44px; }
+
+
+    /* ══════════════════════════════════════════════
+       ① LANDING — HOME
+    ══════════════════════════════════════════════ */
+
+    /* Topbar */
+    .land-nav {
+      position: sticky; top: 44px; z-index: 100;
+      background: rgba(0,24,69,.94); backdrop-filter: blur(16px);
+      border-bottom: 1px solid rgba(255,255,255,.06);
+    }
+    .land-nav-inner {
+      max-width: 1200px; margin: 0 auto; padding: 0 28px;
+      height: 66px; display: flex; align-items: center; justify-content: space-between; gap: 20px;
+    }
+    .land-nav-brand { display: flex; align-items: center; gap: 10px; }
+    .land-nav-logo  { height: 32px; }
+    .land-nav-divider { width: 1px; height: 22px; background: rgba(255,255,255,.18); }
+    .land-nav-product { font-size: .8rem; font-weight: 800; color: var(--gold); letter-spacing: .08em; text-transform: uppercase; }
+    .land-nav-links { display: flex; align-items: center; gap: 24px; }
+    .land-nav-links a { font-size: .84rem; font-weight: 500; color: rgba(255,255,255,.7); transition: color var(--tr); }
+    .land-nav-links a:hover { color: var(--white); }
+    .land-nav-actions { display: flex; align-items: center; gap: 10px; }
+    .land-nav-login { font-size: .82rem; font-weight: 600; color: rgba(255,255,255,.7); padding: 8px 16px; border-radius: 50px; border: 1px solid rgba(255,255,255,.18); transition: var(--tr); }
+    .land-nav-login:hover { color: var(--white); border-color: rgba(255,255,255,.45); }
+
+    /* Hero */
+    .land-hero {
+      min-height: 88vh;
+      background: linear-gradient(145deg, #001845 0%, #003B8F 55%, #001845 100%);
+      display: flex; align-items: center; position: relative; overflow: hidden;
+    }
+    .land-hero-orb1 {
+      position: absolute; top: -120px; right: -100px;
+      width: 600px; height: 600px; border-radius: 50%;
+      background: radial-gradient(circle, rgba(26,127,232,.25), transparent 70%);
+      pointer-events: none;
+    }
+    .land-hero-orb2 {
+      position: absolute; bottom: -80px; left: -80px;
+      width: 380px; height: 380px; border-radius: 50%;
+      background: radial-gradient(circle, rgba(240,165,0,.12), transparent 70%);
+      pointer-events: none;
+    }
+    .land-hero-grid {
+      max-width: 1200px; margin: 0 auto; padding: 80px 28px;
+      display: grid; grid-template-columns: 1fr 1fr; gap: 64px; align-items: center;
+      position: relative; z-index: 1;
+    }
+    .land-hero-eyebrow {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: rgba(240,165,0,.12); border: 1px solid rgba(240,165,0,.3);
+      padding: 5px 14px; border-radius: 50px;
+      color: var(--gold-light); font-size: .75rem; font-weight: 700; letter-spacing: .06em;
+      margin-bottom: 22px;
+    }
+    .land-hero-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--gold); animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(.75)} }
+    .land-hero h1 { font-size: clamp(2rem, 4vw, 3.2rem); font-weight: 900; color: var(--white); line-height: 1.1; margin-bottom: 18px; }
+    .land-hero h1 span { color: var(--gold); }
+    .land-hero-sub { font-size: .97rem; color: rgba(255,255,255,.7); line-height: 1.7; margin-bottom: 32px; max-width: 480px; }
+    .land-hero-ctas { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 48px; }
+    .land-hero-stats { display: flex; gap: 36px; }
+    .land-hero-stat-val { font-size: 1.7rem; font-weight: 800; color: var(--white); line-height: 1; }
+    .land-hero-stat-lbl { font-size: .73rem; color: rgba(255,255,255,.45); margin-top: 4px; }
+    .land-hero-stat-sep { width: 1px; background: rgba(255,255,255,.12); align-self: stretch; }
+
+    /* Hero visual — course card stack */
+    .land-hero-visual { position: relative; }
+    .hero-main-card {
+      background: var(--white); border-radius: var(--r-lg); overflow: hidden;
+      box-shadow: var(--sh-lg);
+    }
+    .hero-main-card-img {
+      height: 170px;
+      background: linear-gradient(135deg, var(--navy-mid), var(--blue-light));
+      display: flex; align-items: center; justify-content: center; font-size: 4rem;
+    }
+    .hero-main-card-body { padding: 20px; }
+    .hero-main-card-title { font-size: 1rem; font-weight: 800; color: var(--navy); margin-bottom: 6px; }
+    .hero-main-card-meta { font-size: .78rem; color: var(--gray-500); margin-bottom: 12px; }
+    .hero-main-card-progress { margin-bottom: 10px; }
+    .hero-main-card-prog-row { display: flex; justify-content: space-between; font-size: .73rem; color: var(--gray-500); margin-bottom: 5px; }
+    .hero-float-cert {
+      position: absolute; bottom: -18px; right: -18px;
+      background: var(--white); border-radius: var(--r-md); padding: 14px 18px;
+      box-shadow: var(--sh-lg); display: flex; align-items: center; gap: 12px; min-width: 190px;
+    }
+    .hero-float-cert-icon { font-size: 1.8rem; }
+    .hero-float-cert-title { font-size: .82rem; font-weight: 700; color: var(--navy); }
+    .hero-float-cert-sub { font-size: .7rem; color: var(--gray-500); }
+    .hero-float-badge {
+      position: absolute; top: -14px; left: -14px;
+      background: var(--gold); border-radius: var(--r-sm); padding: 10px 14px;
+      box-shadow: var(--sh-md);
+    }
+    .hero-float-badge-num { font-size: 1.4rem; font-weight: 900; color: var(--navy-dark); line-height: 1; }
+    .hero-float-badge-lbl { font-size: .62rem; font-weight: 700; color: var(--navy-dark); }
+
+    /* Course Catalog strip */
+    .land-catalog { max-width: 1200px; margin: 0 auto; padding: 80px 28px; }
+    .land-catalog-head { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 36px; }
+    .land-catalog-filters { display: flex; gap: 8px; flex-wrap: wrap; }
+    .land-filter-pill {
+      padding: 7px 16px; border-radius: 50px; font-size: .78rem; font-weight: 600;
+      border: 1.5px solid var(--gray-200); color: var(--gray-600); cursor: pointer; transition: var(--tr); background: var(--white);
+    }
+    .land-filter-pill.active, .land-filter-pill:hover { border-color: var(--navy); color: var(--navy); background: var(--gray-50); }
+    .land-courses-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 22px; }
+    .course-card {
+      background: var(--white); border-radius: var(--r-md);
+      border: 1.5px solid var(--gray-200); overflow: hidden;
+      cursor: pointer; transition: var(--tr);
+    }
+    .course-card:hover { border-color: var(--navy); box-shadow: var(--sh-md); transform: translateY(-4px); }
+    .course-card-thumb {
+      height: 150px; display: flex; align-items: center; justify-content: center;
+      font-size: 3.2rem; position: relative;
+    }
+    .course-card-thumb-badge {
+      position: absolute; top: 12px; left: 12px;
+    }
+    .course-card-body { padding: 18px; }
+    .course-card-cat { font-size: .7rem; font-weight: 700; color: var(--blue); text-transform: uppercase; letter-spacing: .08em; margin-bottom: 7px; }
+    .course-card-title { font-size: .96rem; font-weight: 700; color: var(--navy); margin-bottom: 6px; line-height: 1.3; }
+    .course-card-instructor { font-size: .78rem; color: var(--gray-500); margin-bottom: 10px; }
+    .course-card-meta { display: flex; align-items: center; gap: 12px; font-size: .73rem; color: var(--gray-500); margin-bottom: 14px; }
+    .course-card-footer { display: flex; align-items: center; justify-content: space-between; padding-top: 14px; border-top: 1px solid var(--gray-100); }
+    .course-card-price { font-size: 1.1rem; font-weight: 800; color: var(--navy); }
+    .course-card-price .price-free { color: var(--green); }
+    .course-card-stars { font-size: .78rem; color: var(--gold); }
+
+    /* Features strip */
+    .land-features { background: var(--navy); padding: 72px 28px; }
+    .land-features-inner { max-width: 1200px; margin: 0 auto; }
+    .land-features-head { text-align: center; margin-bottom: 52px; }
+    .land-features-head .section-title { color: var(--white); }
+    .land-features-head p { color: rgba(255,255,255,.6); margin-top: 10px; }
+    .land-features-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px; }
+    .land-feat-card {
+      background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.08);
+      border-radius: var(--r-md); padding: 28px 22px; text-align: center; transition: var(--tr);
+    }
+    .land-feat-card:hover { background: rgba(255,255,255,.09); }
+    .land-feat-icon { font-size: 2.2rem; margin-bottom: 14px; }
+    .land-feat-title { font-size: .95rem; font-weight: 700; color: var(--white); margin-bottom: 8px; }
+    .land-feat-text  { font-size: .8rem; color: rgba(255,255,255,.5); line-height: 1.6; }
+
+    /* Testimonial */
+    .land-test { max-width: 1200px; margin: 0 auto; padding: 80px 28px; }
+    .land-test-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 22px; margin-top: 36px; }
+    .test-card {
+      background: var(--white); border: 1.5px solid var(--gray-200);
+      border-radius: var(--r-md); padding: 26px;
+    }
+    .test-stars { color: var(--gold); font-size: .9rem; margin-bottom: 12px; }
+    .test-text  { font-size: .85rem; color: var(--gray-600); line-height: 1.65; margin-bottom: 18px; font-style: italic; }
+    .test-author { display: flex; align-items: center; gap: 10px; }
+    .test-avatar { width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1rem; font-weight: 800; color: var(--white); }
+    .test-name  { font-size: .85rem; font-weight: 700; color: var(--navy); }
+    .test-role  { font-size: .72rem; color: var(--gray-500); }
+
+
+    /* ══════════════════════════════════════════════
+       LAYOUT SHELL (dashboard pages)
+    ══════════════════════════════════════════════ */
+    .app-shell {
+      display: flex; min-height: calc(100vh - 44px);
+    }
+
+    /* SIDEBAR */
+    .sidebar {
+      width: var(--sidebar-w); background: var(--navy-dark);
+      display: flex; flex-direction: column;
+      position: sticky; top: 44px; height: calc(100vh - 44px);
+      overflow-y: auto; flex-shrink: 0;
+    }
+    .sidebar-brand {
+      padding: 24px 20px 20px;
+      border-bottom: 1px solid rgba(255,255,255,.07);
+    }
+    .sidebar-brand-top { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+    .sidebar-logo { height: 28px; }
+    .sidebar-badge { font-size: .65rem; font-weight: 800; background: var(--gold); color: var(--navy-dark); padding: 2px 8px; border-radius: 50px; letter-spacing: .06em; }
+    .sidebar-user {
+      display: flex; align-items: center; gap: 10px;
+      background: rgba(255,255,255,.06); border-radius: var(--r-sm);
+      padding: 10px 12px;
+    }
+    .sidebar-user-avatar {
+      width: 36px; height: 36px; border-radius: 50%;
+      background: var(--gold); display: flex; align-items: center; justify-content: center;
+      font-size: .95rem; font-weight: 800; color: var(--navy-dark); flex-shrink: 0;
+    }
+    .sidebar-user-name { font-size: .82rem; font-weight: 700; color: var(--white); }
+    .sidebar-user-role { font-size: .68rem; color: rgba(255,255,255,.4); }
+    .sidebar-nav { flex: 1; padding: 18px 12px; }
+    .sidebar-nav-section { font-size: .62rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: rgba(255,255,255,.25); padding: 0 8px; margin: 16px 0 6px; }
+    .sidebar-nav-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 9px 12px; border-radius: var(--r-sm);
+      font-size: .83rem; font-weight: 500; color: rgba(255,255,255,.6);
+      cursor: pointer; transition: var(--tr); margin-bottom: 2px;
+    }
+    .sidebar-nav-item:hover { background: rgba(255,255,255,.07); color: var(--white); }
+    .sidebar-nav-item.active { background: rgba(26,127,232,.22); color: var(--white); font-weight: 700; }
+    .sidebar-nav-item.active .nav-icon { color: var(--blue-light); }
+    .nav-icon { font-size: 1rem; width: 20px; text-align: center; }
+    .nav-badge { margin-left: auto; background: var(--gold); color: var(--navy-dark); font-size: .62rem; font-weight: 800; padding: 1px 7px; border-radius: 50px; }
+    .sidebar-bottom { padding: 16px 12px; border-top: 1px solid rgba(255,255,255,.07); }
+    .sidebar-notify-card {
+      background: linear-gradient(135deg, rgba(240,165,0,.18), rgba(240,165,0,.06));
+      border: 1px solid rgba(240,165,0,.22); border-radius: var(--r-sm);
+      padding: 14px; text-align: center;
+    }
+    .sidebar-notify-card p { font-size: .74rem; color: rgba(255,255,255,.6); margin-bottom: 10px; line-height: 1.5; }
+
+    /* TOPBAR */
+    .topbar {
+      background: var(--white); border-bottom: 1px solid var(--gray-200);
+      height: var(--topbar-h); display: flex; align-items: center;
+      padding: 0 28px; gap: 16px; position: sticky; top: 44px; z-index: 50;
+    }
+    .topbar-title { font-size: 1.05rem; font-weight: 800; color: var(--navy); flex: 1; }
+    .topbar-search {
+      display: flex; align-items: center; gap: 8px;
+      background: var(--gray-50); border: 1.5px solid var(--gray-200);
+      border-radius: 50px; padding: 7px 16px; width: 280px;
+    }
+    .topbar-search input { background: none; border: none; outline: none; font-size: .83rem; color: var(--gray-800); font-family: inherit; width: 100%; }
+    .topbar-search input::placeholder { color: var(--gray-400); }
+    .topbar-icon-btn {
+      width: 38px; height: 38px; border-radius: 50%;
+      background: var(--gray-50); border: 1.5px solid var(--gray-200);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1rem; cursor: pointer; transition: var(--tr); position: relative;
+    }
+    .topbar-icon-btn:hover { border-color: var(--navy); }
+    .topbar-notif-dot {
+      position: absolute; top: 6px; right: 6px;
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--red); border: 2px solid var(--white);
+    }
+    .topbar-avatar {
+      width: 36px; height: 36px; border-radius: 50%;
+      background: var(--gold); display: flex; align-items: center; justify-content: center;
+      font-size: .85rem; font-weight: 800; color: var(--navy-dark); cursor: pointer;
+    }
+    .main-content { flex: 1; overflow-y: auto; }
+    .page-body { padding: 28px; max-width: 1100px; }
+
+    /* ══════════════════════════════════════════════
+       ② PANEL ALUMNO
+    ══════════════════════════════════════════════ */
+
+    /* Welcome */
+    .alu-welcome {
+      background: linear-gradient(135deg, var(--navy), var(--blue));
+      border-radius: var(--r-lg); padding: 28px 32px; margin-bottom: 28px;
+      display: flex; align-items: center; justify-content: space-between; gap: 20px;
+      position: relative; overflow: hidden;
+    }
+    .alu-welcome::before {
+      content: ''; position: absolute; right: -40px; top: -40px;
+      width: 200px; height: 200px; border-radius: 50%;
+      background: rgba(255,255,255,.05); pointer-events: none;
+    }
+    .alu-welcome-text h2 { font-size: 1.4rem; font-weight: 800; color: var(--white); margin-bottom: 6px; }
+    .alu-welcome-text p  { font-size: .85rem; color: rgba(255,255,255,.65); }
+    .alu-welcome-streak {
+      background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.15);
+      border-radius: var(--r-md); padding: 16px 24px; text-align: center; flex-shrink: 0;
+    }
+    .alu-streak-num { font-size: 2rem; font-weight: 900; color: var(--gold); line-height: 1; }
+    .alu-streak-lbl { font-size: .7rem; color: rgba(255,255,255,.5); margin-top: 4px; }
+
+    /* Stat cards */
+    .alu-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 28px; }
+    .alu-stat-card {
+      background: var(--white); border: 1.5px solid var(--gray-200);
+      border-radius: var(--r-md); padding: 18px 20px;
+      display: flex; flex-direction: column; gap: 8px;
+    }
+    .alu-stat-icon { font-size: 1.5rem; }
+    .alu-stat-val { font-size: 1.6rem; font-weight: 900; color: var(--navy); line-height: 1; }
+    .alu-stat-lbl { font-size: .75rem; color: var(--gray-500); }
+    .alu-stat-delta { font-size: .72rem; color: var(--green); font-weight: 700; }
+
+    /* Two-col layout */
+    .alu-two-col { display: grid; grid-template-columns: 1.55fr 1fr; gap: 22px; margin-bottom: 22px; }
+
+    /* Mis cursos */
+    .panel-card { background: var(--white); border: 1.5px solid var(--gray-200); border-radius: var(--r-md); overflow: hidden; }
+    .panel-card-head { padding: 18px 20px; border-bottom: 1px solid var(--gray-100); display: flex; align-items: center; justify-content: space-between; }
+    .panel-card-title { font-size: .92rem; font-weight: 800; color: var(--navy); }
+    .panel-card-body { padding: 0; }
+
+    .my-course-row {
+      display: flex; align-items: center; gap: 14px;
+      padding: 14px 20px; border-bottom: 1px solid var(--gray-50); transition: var(--tr); cursor: pointer;
+    }
+    .my-course-row:hover { background: var(--gray-50); }
+    .my-course-row:last-child { border-bottom: none; }
+    .my-course-thumb {
+      width: 56px; height: 56px; border-radius: var(--r-sm); flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center; font-size: 1.7rem;
+    }
+    .my-course-info { flex: 1; min-width: 0; }
+    .my-course-title { font-size: .88rem; font-weight: 700; color: var(--navy); margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .my-course-meta  { font-size: .73rem; color: var(--gray-500); margin-bottom: 6px; }
+    .my-course-prog-row { display: flex; align-items: center; gap: 8px; }
+    .my-course-prog-bar { flex: 1; height: 5px; background: var(--gray-200); border-radius: 3px; overflow: hidden; }
+    .my-course-prog-fill { height: 100%; border-radius: 3px; }
+    .my-course-prog-pct { font-size: .7rem; font-weight: 700; color: var(--gray-500); white-space: nowrap; }
+    .my-course-arrow { color: var(--gray-300); font-size: .85rem; }
+
+    /* Calendario */
+    .calendar-widget { }
+    .cal-month { padding: 16px 20px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--gray-100); }
+    .cal-month-title { font-size: .88rem; font-weight: 800; color: var(--navy); }
+    .cal-month-nav { display: flex; gap: 4px; }
+    .cal-nav-btn { width: 28px; height: 28px; border-radius: 50%; background: var(--gray-100); border: none; cursor: pointer; font-size: .75rem; display: flex; align-items: center; justify-content: center; transition: var(--tr); }
+    .cal-nav-btn:hover { background: var(--navy); color: var(--white); }
+    .cal-grid { padding: 12px 16px; }
+    .cal-days-header { display: grid; grid-template-columns: repeat(7,1fr); text-align: center; font-size: .65rem; font-weight: 700; color: var(--gray-400); text-transform: uppercase; margin-bottom: 6px; }
+    .cal-days { display: grid; grid-template-columns: repeat(7,1fr); gap: 2px; }
+    .cal-day {
+      aspect-ratio: 1; display: flex; align-items: center; justify-content: center;
+      font-size: .78rem; border-radius: 50%; cursor: pointer; transition: var(--tr); color: var(--gray-600);
+    }
+    .cal-day:hover { background: var(--gray-100); }
+    .cal-day.other-month { color: var(--gray-300); }
+    .cal-day.today { background: var(--navy); color: var(--white); font-weight: 700; }
+    .cal-day.has-class { position: relative; font-weight: 700; color: var(--blue); }
+    .cal-day.has-class::after { content: ''; position: absolute; bottom: 2px; left: 50%; transform: translateX(-50%); width: 4px; height: 4px; border-radius: 50%; background: var(--gold); }
+    .cal-events { padding: 12px 16px; border-top: 1px solid var(--gray-100); }
+    .cal-event {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 10px; border-radius: var(--r-sm); margin-bottom: 6px;
+      background: var(--gray-50); cursor: pointer; transition: var(--tr);
+    }
+    .cal-event:hover { background: var(--gray-100); }
+    .cal-event-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .cal-event-title { font-size: .78rem; font-weight: 600; color: var(--navy); flex: 1; }
+    .cal-event-time  { font-size: .7rem; color: var(--gray-500); }
+
+    /* Materiales */
+    .material-row {
+      display: flex; align-items: center; gap: 12px;
+      padding: 12px 20px; border-bottom: 1px solid var(--gray-50); cursor: pointer; transition: var(--tr);
+    }
+    .material-row:hover { background: var(--gray-50); }
+    .material-row:last-child { border-bottom: none; }
+    .material-icon { font-size: 1.3rem; }
+    .material-name { font-size: .84rem; font-weight: 600; color: var(--navy); flex: 1; }
+    .material-size  { font-size: .72rem; color: var(--gray-400); }
+    .material-dl { width: 28px; height: 28px; border-radius: 50%; background: var(--gray-100); display: flex; align-items: center; justify-content: center; font-size: .8rem; transition: var(--tr); }
+    .material-dl:hover { background: var(--navy); color: var(--white); }
+
+    /* Certificados */
+    .cert-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; padding: 16px; }
+    .cert-card {
+      border: 2px solid var(--gray-200); border-radius: var(--r-md); padding: 20px;
+      text-align: center; transition: var(--tr); cursor: pointer; background: var(--gray-50);
+    }
+    .cert-card:hover { border-color: var(--gold); background: var(--gold-pale); }
+    .cert-card-icon { font-size: 2.4rem; margin-bottom: 10px; }
+    .cert-card-title { font-size: .84rem; font-weight: 700; color: var(--navy); margin-bottom: 4px; line-height: 1.3; }
+    .cert-card-date  { font-size: .7rem; color: var(--gray-500); margin-bottom: 12px; }
+    .cert-dl-btn { font-size: .75rem; font-weight: 700; color: var(--white); background: var(--navy); padding: 6px 16px; border-radius: 50px; display: inline-block; transition: var(--tr); }
+    .cert-card:hover .cert-dl-btn { background: var(--gold); color: var(--navy-dark); }
+
+    /* Pagos */
+    .payment-row {
+      display: flex; align-items: center; gap: 14px;
+      padding: 14px 20px; border-bottom: 1px solid var(--gray-50);
+    }
+    .payment-row:last-child { border-bottom: none; }
+    .payment-icon { font-size: 1.3rem; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--gray-100); flex-shrink: 0; }
+    .payment-name { font-size: .84rem; font-weight: 600; color: var(--navy); flex: 1; }
+    .payment-date { font-size: .73rem; color: var(--gray-500); }
+    .payment-amount { font-size: .9rem; font-weight: 800; color: var(--navy); }
+    .payment-status { font-size: .7rem; }
+
+
+    /* ══════════════════════════════════════════════
+       ③ PANEL ADMINISTRADOR
+    ══════════════════════════════════════════════ */
+
+    /* KPI cards */
+    .admin-kpis { display: grid; grid-template-columns: repeat(4,1fr); gap: 16px; margin-bottom: 28px; }
+    .admin-kpi {
+      background: var(--white); border: 1.5px solid var(--gray-200); border-radius: var(--r-md);
+      padding: 20px; display: flex; flex-direction: column; gap: 6px;
+    }
+    .admin-kpi-top { display: flex; align-items: center; justify-content: space-between; }
+    .admin-kpi-icon { width: 40px; height: 40px; border-radius: var(--r-sm); display: flex; align-items: center; justify-content: center; font-size: 1.2rem; }
+    .admin-kpi-trend { font-size: .72rem; font-weight: 700; display: flex; align-items: center; gap: 3px; }
+    .trend-up { color: var(--green); }
+    .trend-dn { color: var(--red); }
+    .admin-kpi-val { font-size: 1.9rem; font-weight: 900; color: var(--navy); line-height: 1; }
+    .admin-kpi-lbl { font-size: .75rem; color: var(--gray-500); }
+
+    /* Chart area (fake bars) */
+    .admin-charts { display: grid; grid-template-columns: 1.6fr 1fr; gap: 22px; margin-bottom: 22px; }
+    .chart-box { background: var(--white); border: 1.5px solid var(--gray-200); border-radius: var(--r-md); padding: 22px; }
+    .chart-box-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+    .chart-box-title { font-size: .92rem; font-weight: 800; color: var(--navy); }
+    .fake-bar-chart { display: flex; align-items: flex-end; gap: 8px; height: 140px; }
+    .fake-bar-wrap { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 5px; }
+    .fake-bar { width: 100%; border-radius: 5px 5px 0 0; transition: var(--tr); }
+    .fake-bar-lbl { font-size: .62rem; color: var(--gray-400); }
+    .donut-wrap { display: flex; flex-direction: column; gap: 12px; justify-content: center; }
+    .donut-row { display: flex; align-items: center; gap: 10px; }
+    .donut-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .donut-lbl { font-size: .8rem; color: var(--gray-600); flex: 1; }
+    .donut-val { font-size: .82rem; font-weight: 700; color: var(--navy); }
+    .donut-svg { margin: 0 auto 16px; display: block; }
+
+    /* Tabla alumnos */
+    .admin-table-card { background: var(--white); border: 1.5px solid var(--gray-200); border-radius: var(--r-md); overflow: hidden; margin-bottom: 22px; }
+    .admin-table-head { padding: 16px 22px; border-bottom: 1px solid var(--gray-100); display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .admin-table-search { display: flex; align-items: center; gap: 8px; background: var(--gray-50); border: 1.5px solid var(--gray-200); border-radius: 50px; padding: 6px 14px; font-size: .8rem; color: var(--gray-500); width: 220px; }
+    table { width: 100%; border-collapse: collapse; }
+    thead th { background: var(--gray-50); padding: 10px 18px; text-align: left; font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--gray-500); border-bottom: 1px solid var(--gray-200); }
+    tbody td { padding: 13px 18px; font-size: .83rem; color: var(--gray-700); border-bottom: 1px solid var(--gray-50); vertical-align: middle; }
+    tbody tr:last-child td { border-bottom: none; }
+    tbody tr:hover td { background: var(--gray-50); }
+    .td-avatar { display: flex; align-items: center; gap: 10px; }
+    .td-av-circle { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: .8rem; font-weight: 800; color: var(--white); flex-shrink: 0; }
+    .td-name  { font-weight: 600; color: var(--navy); }
+    .td-email { font-size: .72rem; color: var(--gray-500); }
+    .td-mini-bar { width: 80px; height: 5px; background: var(--gray-200); border-radius: 3px; overflow: hidden; margin-bottom: 2px; }
+    .td-mini-fill { height: 100%; border-radius: 3px; }
+    .td-prog-pct { font-size: .7rem; color: var(--gray-500); }
+    .action-btn { width: 28px; height: 28px; border-radius: 50%; background: var(--gray-100); border: none; cursor: pointer; font-size: .8rem; display: inline-flex; align-items: center; justify-content: center; transition: var(--tr); }
+    .action-btn:hover { background: var(--navy); color: var(--white); }
+
+    /* Notif panel */
+    .notif-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+    .notif-card { background: var(--white); border: 1.5px solid var(--gray-200); border-radius: var(--r-md); overflow: hidden; }
+    .notif-row {
+      display: flex; align-items: flex-start; gap: 12px;
+      padding: 13px 18px; border-bottom: 1px solid var(--gray-50); transition: var(--tr);
+    }
+    .notif-row:last-child { border-bottom: none; }
+    .notif-row:hover { background: var(--gray-50); }
+    .notif-ch-icon { font-size: 1.3rem; flex-shrink: 0; }
+    .notif-ch-name { font-size: .83rem; font-weight: 700; color: var(--navy); }
+    .notif-ch-msg  { font-size: .75rem; color: var(--gray-500); line-height: 1.4; margin-top: 2px; }
+    .notif-ch-time { font-size: .68rem; color: var(--gray-400); margin-top: 4px; }
+    .notif-toggle {
+      margin-left: auto; width: 36px; height: 20px; border-radius: 10px;
+      background: var(--green); position: relative; cursor: pointer; flex-shrink: 0;
+    }
+    .notif-toggle::after { content: ''; position: absolute; top: 3px; right: 3px; width: 14px; height: 14px; border-radius: 50%; background: var(--white); }
+    .notif-toggle.off { background: var(--gray-300); }
+    .notif-toggle.off::after { right: auto; left: 3px; }
+
+    /* ══════════════════════════════════════════════
+       FOOTER
+    ══════════════════════════════════════════════ */
+    .land-footer { background: var(--navy-dark); padding: 48px 28px 24px; }
+    .land-footer-inner { max-width: 1200px; margin: 0 auto; }
+    .land-footer-grid { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 48px; padding-bottom: 40px; border-bottom: 1px solid rgba(255,255,255,.07); margin-bottom: 24px; }
+    .land-footer-brand-logo { height: 32px; margin-bottom: 12px; }
+    .land-footer-desc { font-size: .8rem; color: rgba(255,255,255,.45); line-height: 1.7; margin-bottom: 20px; }
+    .land-footer-col-title { font-size: .72rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: rgba(255,255,255,.35); margin-bottom: 14px; }
+    .land-footer-links { display: flex; flex-direction: column; gap: 8px; }
+    .land-footer-links a { font-size: .8rem; color: rgba(255,255,255,.5); transition: color var(--tr); }
+    .land-footer-links a:hover { color: var(--white); }
+    .land-footer-bottom { display: flex; align-items: center; justify-content: space-between; font-size: .72rem; color: rgba(255,255,255,.3); flex-wrap: wrap; gap: 8px; }
+  </style>
+</head>
+<body>
+
+  <!-- ═══════════════════════════════════════════════════
+       DEMO SWITCHER (navegación entre vistas)
+  ═══════════════════════════════════════════════════ -->
+  <div class="demo-switcher">
+    <span class="demo-switcher-label">📐 Vista:</span>
+    <button class="demo-tab active" onclick="showView('landing')">🏠 Landing / Catálogo</button>
+    <button class="demo-tab" onclick="showView('alumno')">🎓 Panel Alumno</button>
+    <button class="demo-tab" onclick="showView('admin')">⚙️ Panel Admin</button>
+  </div>
+
+
+  <!-- ═══════════════════════════════════════════════════
+       ① LANDING — HOME PÚBLICA
+  ═══════════════════════════════════════════════════ -->
+  <div id="view-landing" class="view active">
+
+    <!-- Navbar -->
+    <nav class="land-nav">
+      <div class="land-nav-inner">
+        <div class="land-nav-brand">
+          <img class="land-nav-logo" src="https://www.acav.com.ar/wp-content/uploads/2022/09/logo-acav-blanco-218x78.png" alt="ACAV"/>
+          <div class="land-nav-divider"></div>
+          <span class="land-nav-product">Cursos</span>
+        </div>
+        <ul class="land-nav-links">
+          <li><a href="#">Catálogo</a></li>
+          <li><a href="#">Amadeus GDS</a></li>
+          <li><a href="#">Certificaciones</a></li>
+          <li><a href="#">Sobre el programa</a></li>
+        </ul>
+        <div class="land-nav-actions">
+          <a href="#" class="land-nav-login" onclick="showView('alumno');return false;">Acceder</a>
+          <a href="#" class="btn btn-gold">Inscribirme</a>
+        </div>
+      </div>
+    </nav>
+
+    <!-- Hero -->
+    <section class="land-hero">
+      <div class="land-hero-orb1"></div>
+      <div class="land-hero-orb2"></div>
+      <div class="land-hero-grid">
+
+        <div class="land-hero-left">
+          <div class="land-hero-eyebrow">
+            <span class="land-hero-dot"></span>
+            PLATAFORMA OFICIAL ACAV · Formación Turística Profesional
+          </div>
+          <h1>Formación de <span>élite</span> para el turismo cordobés</h1>
+          <p class="land-hero-sub">
+            Domina Amadeus GDS, sistemas de reservas y gestión de agencias.
+            Cursos dictados por expertos de la industria, con certificación oficial de ACAV.
+          </p>
+          <div class="land-hero-ctas">
+            <a href="#" class="btn btn-gold" style="font-size:.95rem;padding:13px 28px;">Explorar cursos →</a>
+            <a href="#" class="btn btn-ghost" style="color:rgba(255,255,255,.7);border-color:rgba(255,255,255,.25);font-size:.9rem;">Ver certificaciones</a>
+          </div>
+          <div class="land-hero-stats">
+            <div><div class="land-hero-stat-val">12+</div><div class="land-hero-stat-lbl">Cursos activos</div></div>
+            <div class="land-hero-stat-sep"></div>
+            <div><div class="land-hero-stat-val">480</div><div class="land-hero-stat-lbl">Alumnos formados</div></div>
+            <div class="land-hero-stat-sep"></div>
+            <div><div class="land-hero-stat-val">96%</div><div class="land-hero-stat-lbl">Satisfacción</div></div>
+          </div>
+        </div>
+
+        <div class="land-hero-visual">
+          <div class="hero-float-badge">
+            <div class="hero-float-badge-num">★ 4.9</div>
+            <div class="hero-float-badge-lbl">Rating promedio</div>
+          </div>
+          <div class="hero-main-card">
+            <div class="hero-main-card-img">✈️</div>
+            <div class="hero-main-card-body">
+              <div class="hero-main-card-title">Amadeus Selling Platform Connect</div>
+              <div class="hero-main-card-meta">Dictado por Prof. Marcelo Gutiérrez · 32 clases</div>
+              <div class="hero-main-card-progress">
+                <div class="hero-main-card-prog-row"><span>Tu progreso</span><span style="color:var(--blue);font-weight:700">68%</span></div>
+                <div class="progress-bar"><div class="progress-fill" style="width:68%;background:var(--gold)"></div></div>
+              </div>
+              <span class="badge badge-green">En curso</span>
+            </div>
+          </div>
+          <div class="hero-float-cert">
+            <div class="hero-float-cert-icon">🏆</div>
+            <div>
+              <div class="hero-float-cert-title">Certificado disponible</div>
+              <div class="hero-float-cert-sub">Amadeus Básico · Descargá en PDF</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- Catálogo -->
+    <div class="land-catalog">
+      <div class="land-catalog-head">
+        <div>
+          <div class="section-label">Formación profesional</div>
+          <h2 class="section-title">Catálogo de cursos</h2>
+        </div>
+        <div class="land-catalog-filters">
+          <span class="land-filter-pill active">Todos</span>
+          <span class="land-filter-pill">GDS / Amadeus</span>
+          <span class="land-filter-pill">Ventas</span>
+          <span class="land-filter-pill">Destinos</span>
+          <span class="land-filter-pill">Marketing</span>
+        </div>
+      </div>
+
+      <div class="land-courses-grid">
+
+        <div class="course-card">
+          <div class="course-card-thumb" style="background:linear-gradient(135deg,#003B8F,#1A7FE8)">
+            ✈️
+            <span class="course-card-thumb-badge badge badge-gold">⭐ Destacado</span>
+          </div>
+          <div class="course-card-body">
+            <div class="course-card-cat">GDS · Amadeus</div>
+            <div class="course-card-title">Amadeus Selling Platform — Curso Completo</div>
+            <div class="course-card-instructor">Prof. Marcelo Gutiérrez</div>
+            <div class="course-card-meta">
+              <span>⏱ 40 hs</span>
+              <span>📋 32 clases</span>
+              <span>👥 128 alumnos</span>
+            </div>
+            <div class="course-card-footer">
+              <span class="course-card-price">$18.500</span>
+              <span class="course-card-stars">★★★★★ 4.9</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="course-card">
+          <div class="course-card-thumb" style="background:linear-gradient(135deg,#065f46,#10B981)">🌍</div>
+          <div class="course-card-body">
+            <div class="course-card-cat">Destinos</div>
+            <div class="course-card-title">Turismo Internacional — Circuitos Europeos</div>
+            <div class="course-card-instructor">Lic. Valeria Romero</div>
+            <div class="course-card-meta"><span>⏱ 20 hs</span><span>📋 16 clases</span><span>👥 64 alumnos</span></div>
+            <div class="course-card-footer">
+              <span class="course-card-price">$12.000</span>
+              <span class="course-card-stars">★★★★★ 4.8</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="course-card">
+          <div class="course-card-thumb" style="background:linear-gradient(135deg,#5b21b6,#8B5CF6)">💼</div>
+          <div class="course-card-body">
+            <div class="course-card-cat">Ventas · Agencia</div>
+            <div class="course-card-title">Técnicas de Venta para Agencias de Viajes</div>
+            <div class="course-card-instructor">Lic. Pablo Ferreyra</div>
+            <div class="course-card-meta"><span>⏱ 16 hs</span><span>📋 12 clases</span><span>👥 47 alumnos</span></div>
+            <div class="course-card-footer">
+              <span class="course-card-price">$9.500</span>
+              <span class="course-card-stars">★★★★☆ 4.6</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="course-card">
+          <div class="course-card-thumb" style="background:linear-gradient(135deg,#92400e,#F0A500)">📣
+            <span class="course-card-thumb-badge badge badge-green">🆓 Gratis</span>
+          </div>
+          <div class="course-card-body">
+            <div class="course-card-cat">Marketing Digital</div>
+            <div class="course-card-title">Instagram y Redes Sociales para Turismo</div>
+            <div class="course-card-instructor">Lic. Sofía Navarro</div>
+            <div class="course-card-meta"><span>⏱ 6 hs</span><span>📋 8 clases</span><span>👥 210 alumnos</span></div>
+            <div class="course-card-footer">
+              <span class="course-card-price price-free">GRATIS</span>
+              <span class="course-card-stars">★★★★★ 4.7</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="course-card">
+          <div class="course-card-thumb" style="background:linear-gradient(135deg,#831843,#EC4899)">🤝</div>
+          <div class="course-card-body">
+            <div class="course-card-cat">Receptivo · Guías</div>
+            <div class="course-card-title">Turismo Receptivo e Interpretación Patrimonial</div>
+            <div class="course-card-instructor">Lic. Andrea Sosa</div>
+            <div class="course-card-meta"><span>⏱ 24 hs</span><span>📋 18 clases</span><span>👥 38 alumnos</span></div>
+            <div class="course-card-footer">
+              <span class="course-card-price">$14.000</span>
+              <span class="course-card-stars">★★★★★ 4.9</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="course-card">
+          <div class="course-card-thumb" style="background:linear-gradient(135deg,#0c4a6e,#0ea5e9)">🚀</div>
+          <div class="course-card-body">
+            <div class="course-card-cat">GDS · Amadeus</div>
+            <div class="course-card-title">Amadeus Avanzado — Tarifas y Revenue</div>
+            <div class="course-card-instructor">Prof. Marcelo Gutiérrez</div>
+            <div class="course-card-meta"><span>⏱ 28 hs</span><span>📋 20 clases</span><span>👥 52 alumnos</span></div>
+            <div class="course-card-footer">
+              <span class="course-card-price">$22.000</span>
+              <span class="course-card-stars">★★★★★ 5.0</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Features -->
+    <div class="land-features">
+      <div class="land-features-inner">
+        <div class="land-features-head">
+          <div class="section-label" style="justify-content:center;color:var(--gold)">¿Por qué ACAV Cursos?</div>
+          <h2 class="section-title">Todo lo que necesitás para crecer</h2>
+          <p>La plataforma de formación más completa para profesionales del turismo en Córdoba.</p>
+        </div>
+        <div class="land-features-grid">
+          <div class="land-feat-card">
+            <div class="land-feat-icon">🏆</div>
+            <div class="land-feat-title">Certificación oficial</div>
+            <div class="land-feat-text">Certificados con aval de ACAV y reconocimiento en toda la industria turística.</div>
+          </div>
+          <div class="land-feat-card">
+            <div class="land-feat-icon">📱</div>
+            <div class="land-feat-title">100% online</div>
+            <div class="land-feat-text">Accedé desde cualquier dispositivo, a tu ritmo o en clases en vivo.</div>
+          </div>
+          <div class="land-feat-card">
+            <div class="land-feat-icon">👨‍🏫</div>
+            <div class="land-feat-title">Docentes expertos</div>
+            <div class="land-feat-text">Profesionales activos de la industria de viajes con años de experiencia.</div>
+          </div>
+          <div class="land-feat-card">
+            <div class="land-feat-icon">💳</div>
+            <div class="land-feat-title">Beneficio para socios</div>
+            <div class="land-feat-text">Los socios ACAV acceden a descuentos exclusivos y cuotas sin interés.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Testimonios -->
+    <div class="land-test">
+      <div class="section-label">Lo que dicen nuestros alumnos</div>
+      <h2 class="section-title">Más de 480 profesionales ya se formaron</h2>
+      <div class="land-test-grid">
+        <div class="test-card">
+          <div class="test-stars">★★★★★</div>
+          <div class="test-text">"El curso de Amadeus me permitió conseguir trabajo en 3 meses. La plataforma es muy intuitiva y los docentes responden todas las dudas."</div>
+          <div class="test-author">
+            <div class="test-avatar" style="background:var(--blue)">ML</div>
+            <div><div class="test-name">María Laura Díaz</div><div class="test-role">Agente de Viajes · Córdoba</div></div>
+          </div>
+        </div>
+        <div class="test-card">
+          <div class="test-stars">★★★★★</div>
+          <div class="test-text">"Como socio de ACAV el precio es excelente. El certificado tiene peso real en las entrevistas. Lo recomiendo a todos los del sector."</div>
+          <div class="test-author">
+            <div class="test-avatar" style="background:var(--green)">RC</div>
+            <div><div class="test-name">Roberto Casas</div><div class="test-role">Agente Senior · Villa María</div></div>
+          </div>
+        </div>
+        <div class="test-card">
+          <div class="test-stars">★★★★★</div>
+          <div class="test-text">"La sección de materiales y el calendario de clases en vivo hacen que nunca te pierdas nada. Muy organizado y profesional."</div>
+          <div class="test-author">
+            <div class="test-avatar" style="background:var(--purple)">FC</div>
+            <div><div class="test-name">Florencia Castro</div><div class="test-role">Coordinadora · Río Cuarto</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="land-footer">
+      <div class="land-footer-inner">
+        <div class="land-footer-grid">
+          <div>
+            <img class="land-footer-brand-logo" src="https://www.acav.com.ar/wp-content/uploads/2022/09/logo-acav-blanco-218x78.png" alt="ACAV"/>
+            <p class="land-footer-desc">La plataforma de formación de la Asociación Cordobesa de Agencias de Viajes. Certificaciones reconocidas, docentes expertos y contenido actualizado.</p>
+            <div class="land-footer-col-title">Síguenos</div>
+            <div style="display:flex;gap:8px">
+              <div style="width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;font-size:.85rem;cursor:pointer">📘</div>
+              <div style="width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;font-size:.85rem;cursor:pointer">📸</div>
+            </div>
+          </div>
+          <div>
+            <div class="land-footer-col-title">Cursos</div>
+            <ul class="land-footer-links">
+              <li><a href="#">Amadeus Básico</a></li>
+              <li><a href="#">Amadeus Avanzado</a></li>
+              <li><a href="#">Destinos internacionales</a></li>
+              <li><a href="#">Ventas turísticas</a></li>
+              <li><a href="#">Marketing digital</a></li>
+            </ul>
+          </div>
+          <div>
+            <div class="land-footer-col-title">Plataforma</div>
+            <ul class="land-footer-links">
+              <li><a href="#">Mi panel</a></li>
+              <li><a href="#">Mis certificados</a></li>
+              <li><a href="#">Historial de pagos</a></li>
+              <li><a href="#">Soporte técnico</a></li>
+              <li><a href="#">Ir a acav.com.ar →</a></li>
+            </ul>
+          </div>
+        </div>
+        <div class="land-footer-bottom">
+          <span>© 2026 ACAV · Todos los derechos reservados.</span>
+          <span>Obispo Salguero 169 1º Piso — Córdoba · info@acav.com.ar</span>
+        </div>
+      </div>
+    </footer>
+
+  </div><!-- /view-landing -->
+
+
+  <!-- ═══════════════════════════════════════════════════
+       ② PANEL ALUMNO
+  ═══════════════════════════════════════════════════ -->
+  <div id="view-alumno" class="view">
+    <div class="app-shell">
+
+      <!-- SIDEBAR -->
+      <aside class="sidebar">
+        <div class="sidebar-brand">
+          <div class="sidebar-brand-top">
+            <img class="sidebar-logo" src="https://www.acav.com.ar/wp-content/uploads/2022/09/logo-acav-blanco-218x78.png" alt="ACAV"/>
+            <span class="sidebar-badge">CURSOS</span>
+          </div>
+          <div class="sidebar-user">
+            <div class="sidebar-user-avatar">ML</div>
+            <div>
+              <div class="sidebar-user-name">María Laura D.</div>
+              <div class="sidebar-user-role">Alumna · Socio ACAV</div>
+            </div>
+          </div>
+        </div>
+        <nav class="sidebar-nav">
+          <div class="sidebar-nav-section">Principal</div>
+          <div class="sidebar-nav-item active"><span class="nav-icon">🏠</span> Mi Dashboard</div>
+          <div class="sidebar-nav-item"><span class="nav-icon">📚</span> Mis cursos <span class="nav-badge">3</span></div>
+          <div class="sidebar-nav-item"><span class="nav-icon">📅</span> Calendario</div>
+          <div class="sidebar-nav-item"><span class="nav-icon">📂</span> Materiales</div>
+          <div class="sidebar-nav-section">Logros</div>
+          <div class="sidebar-nav-item"><span class="nav-icon">🏆</span> Certificados</div>
+          <div class="sidebar-nav-item"><span class="nav-icon">⭐</span> Mis logros</div>
+          <div class="sidebar-nav-section">Cuenta</div>
+          <div class="sidebar-nav-item"><span class="nav-icon">💳</span> Historial de pagos</div>
+          <div class="sidebar-nav-item"><span class="nav-icon">🔔</span> Notificaciones</div>
+          <div class="sidebar-nav-item"><span class="nav-icon">⚙️</span> Configuración</div>
+        </nav>
+        <div class="sidebar-bottom">
+          <div class="sidebar-notify-card">
+            <p>Próxima clase en vivo:<br/><strong style="color:var(--gold-light)">Miércoles 2 Jul · 18:00 hs</strong></p>
+            <button class="btn btn-gold" style="width:100%;justify-content:center;padding:8px">Ver detalles</button>
+          </div>
+        </div>
+      </aside>
+
+      <!-- MAIN -->
+      <div class="main-content">
+        <div class="topbar">
+          <div class="topbar-title">Mi Dashboard</div>
+          <div class="topbar-search"><span>🔍</span><input placeholder="Buscar cursos, materiales…"/></div>
+          <div class="topbar-icon-btn">📅</div>
+          <div class="topbar-icon-btn">
+            🔔
+            <div class="topbar-notif-dot"></div>
+          </div>
+          <div class="topbar-avatar">ML</div>
+        </div>
+
+        <div class="page-body">
+
+          <!-- Welcome -->
+          <div class="alu-welcome">
+            <div class="alu-welcome-text">
+              <h2>¡Buen día, María Laura! 👋</h2>
+              <p>Tenés una clase en vivo esta semana. ¡Seguí así, vas muy bien!</p>
+            </div>
+            <div class="alu-welcome-streak">
+              <div class="alu-streak-num">🔥 12</div>
+              <div class="alu-streak-lbl">Días seguidos<br/>estudiando</div>
+            </div>
+          </div>
+
+          <!-- Stats -->
+          <div class="alu-stats">
+            <div class="alu-stat-card">
+              <div class="alu-stat-icon">📚</div>
+              <div class="alu-stat-val">3</div>
+              <div class="alu-stat-lbl">Cursos activos</div>
+              <div class="alu-stat-delta">▲ 1 nuevo este mes</div>
+            </div>
+            <div class="alu-stat-card">
+              <div class="alu-stat-icon">✅</div>
+              <div class="alu-stat-val">68%</div>
+              <div class="alu-stat-lbl">Progreso promedio</div>
+              <div class="alu-stat-delta">▲ +12% esta semana</div>
+            </div>
+            <div class="alu-stat-card">
+              <div class="alu-stat-icon">🏆</div>
+              <div class="alu-stat-val">2</div>
+              <div class="alu-stat-lbl">Certificados</div>
+              <div class="alu-stat-delta">1 pendiente de completar</div>
+            </div>
+            <div class="alu-stat-card">
+              <div class="alu-stat-icon">⏱</div>
+              <div class="alu-stat-val">24h</div>
+              <div class="alu-stat-lbl">Horas cursadas</div>
+              <div class="alu-stat-delta">▲ 6h esta semana</div>
+            </div>
+          </div>
+
+          <!-- Dos columnas -->
+          <div class="alu-two-col">
+
+            <!-- Mis cursos -->
+            <div class="panel-card">
+              <div class="panel-card-head">
+                <div class="panel-card-title">📚 Mis cursos en curso</div>
+                <button class="btn btn-ghost" style="padding:6px 14px;font-size:.75rem">Ver todos</button>
+              </div>
+              <div class="panel-card-body">
+
+                <div class="my-course-row">
+                  <div class="my-course-thumb" style="background:linear-gradient(135deg,#003B8F,#1A7FE8)">✈️</div>
+                  <div class="my-course-info">
+                    <div class="my-course-title">Amadeus Selling Platform Connect</div>
+                    <div class="my-course-meta">Clase 22 de 32 · Próxima: 2 Jul</div>
+                    <div class="my-course-prog-row">
+                      <div class="my-course-prog-bar"><div class="my-course-prog-fill" style="width:68%;background:var(--blue)"></div></div>
+                      <span class="my-course-prog-pct">68%</span>
+                    </div>
+                  </div>
+                  <span class="my-course-arrow">›</span>
+                </div>
+
+                <div class="my-course-row">
+                  <div class="my-course-thumb" style="background:linear-gradient(135deg,#065f46,#10B981)">🌍</div>
+                  <div class="my-course-info">
+                    <div class="my-course-title">Circuitos Europeos — Destinos</div>
+                    <div class="my-course-meta">Clase 8 de 16 · Próxima: 5 Jul</div>
+                    <div class="my-course-prog-row">
+                      <div class="my-course-prog-bar"><div class="my-course-prog-fill" style="width:50%;background:var(--green)"></div></div>
+                      <span class="my-course-prog-pct">50%</span>
+                    </div>
+                  </div>
+                  <span class="my-course-arrow">›</span>
+                </div>
+
+                <div class="my-course-row">
+                  <div class="my-course-thumb" style="background:linear-gradient(135deg,#5b21b6,#8B5CF6)">💼</div>
+                  <div class="my-course-info">
+                    <div class="my-course-title">Técnicas de Venta para Agencias</div>
+                    <div class="my-course-meta">Clase 10 de 12 · Casi terminado!</div>
+                    <div class="my-course-prog-row">
+                      <div class="my-course-prog-bar"><div class="my-course-prog-fill" style="width:85%;background:var(--gold)"></div></div>
+                      <span class="my-course-prog-pct">85%</span>
+                    </div>
+                  </div>
+                  <span class="my-course-arrow">›</span>
+                </div>
+
+              </div>
+            </div>
+
+            <!-- Calendario -->
+            <div class="panel-card">
+              <div class="cal-month">
+                <span class="cal-month-title">Julio 2026</span>
+                <div class="cal-month-nav">
+                  <button class="cal-nav-btn">‹</button>
+                  <button class="cal-nav-btn">›</button>
+                </div>
+              </div>
+              <div class="cal-grid">
+                <div class="cal-days-header">
+                  <span>Lu</span><span>Ma</span><span>Mi</span><span>Ju</span><span>Vi</span><span>Sa</span><span>Do</span>
+                </div>
+                <div class="cal-days">
+                  <!-- Row 1 -->
+                  <div class="cal-day other-month">29</div>
+                  <div class="cal-day other-month">30</div>
+                  <div class="cal-day has-class">1</div>
+                  <div class="cal-day has-class">2</div>
+                  <div class="cal-day">3</div>
+                  <div class="cal-day">4</div>
+                  <div class="cal-day">5</div>
+                  <!-- Row 2 -->
+                  <div class="cal-day">6</div>
+                  <div class="cal-day">7</div>
+                  <div class="cal-day has-class">8</div>
+                  <div class="cal-day has-class">9</div>
+                  <div class="cal-day">10</div>
+                  <div class="cal-day">11</div>
+                  <div class="cal-day">12</div>
+                  <!-- Row 3 -->
+                  <div class="cal-day">13</div>
+                  <div class="cal-day">14</div>
+                  <div class="cal-day has-class">15</div>
+                  <div class="cal-day has-class">16</div>
+                  <div class="cal-day">17</div>
+                  <div class="cal-day">18</div>
+                  <div class="cal-day">19</div>
+                  <!-- Row 4 -->
+                  <div class="cal-day">20</div>
+                  <div class="cal-day">21</div>
+                  <div class="cal-day has-class">22</div>
+                  <div class="cal-day today">28</div>
+                  <div class="cal-day">29</div>
+                  <div class="cal-day">30</div>
+                  <div class="cal-day">31</div>
+                </div>
+              </div>
+              <div class="cal-events">
+                <div class="cal-event">
+                  <div class="cal-event-dot" style="background:var(--blue)"></div>
+                  <span class="cal-event-title">Amadeus — Clase 22</span>
+                  <span class="cal-event-time">Mié 2 · 18:00</span>
+                </div>
+                <div class="cal-event">
+                  <div class="cal-event-dot" style="background:var(--green)"></div>
+                  <span class="cal-event-title">Destinos — Clase 9</span>
+                  <span class="cal-event-time">Jue 3 · 19:00</span>
+                </div>
+                <div class="cal-event">
+                  <div class="cal-event-dot" style="background:var(--gold)"></div>
+                  <span class="cal-event-title">Evaluación Final — Ventas</span>
+                  <span class="cal-event-time">Mié 9 · 18:00</span>
+                </div>
+              </div>
+            </div>
+
+          </div><!-- /two-col -->
+
+          <!-- Materiales + Certificados -->
+          <div class="alu-two-col" style="margin-bottom:22px">
+
+            <div class="panel-card">
+              <div class="panel-card-head">
+                <div class="panel-card-title">📂 Materiales recientes</div>
+                <button class="btn btn-ghost" style="padding:6px 14px;font-size:.75rem">Ver todos</button>
+              </div>
+              <div>
+                <div class="material-row">
+                  <span class="material-icon">📄</span>
+                  <span class="material-name">Manual Amadeus SPC — Módulo 4</span>
+                  <span class="material-size">3.2 MB · PDF</span>
+                  <div class="material-dl">⬇</div>
+                </div>
+                <div class="material-row">
+                  <span class="material-icon">🎥</span>
+                  <span class="material-name">Grabación — Clase 21 en vivo</span>
+                  <span class="material-size">280 MB · MP4</span>
+                  <div class="material-dl">⬇</div>
+                </div>
+                <div class="material-row">
+                  <span class="material-icon">📊</span>
+                  <span class="material-name">Ejercicios prácticos — Tarifas</span>
+                  <span class="material-size">1.1 MB · XLSX</span>
+                  <div class="material-dl">⬇</div>
+                </div>
+                <div class="material-row">
+                  <span class="material-icon">📋</span>
+                  <span class="material-name">Guía de Circuitos Europeos 2026</span>
+                  <span class="material-size">4.8 MB · PDF</span>
+                  <div class="material-dl">⬇</div>
+                </div>
+                <div class="material-row">
+                  <span class="material-icon">🖼️</span>
+                  <span class="material-name">Presentación — Módulo Ventas 3</span>
+                  <span class="material-size">2.0 MB · PPTX</span>
+                  <div class="material-dl">⬇</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="panel-card">
+              <div class="panel-card-head">
+                <div class="panel-card-title">🏆 Mis certificados</div>
+                <button class="btn btn-ghost" style="padding:6px 14px;font-size:.75rem">Ver todos</button>
+              </div>
+              <div class="cert-grid">
+                <div class="cert-card">
+                  <div class="cert-card-icon">🎓</div>
+                  <div class="cert-card-title">Amadeus SPC Básico</div>
+                  <div class="cert-card-date">Obtenido: 12/03/2026</div>
+                  <span class="cert-dl-btn">⬇ Descargar PDF</span>
+                </div>
+                <div class="cert-card">
+                  <div class="cert-card-icon">🏅</div>
+                  <div class="cert-card-title">Ventas Turísticas</div>
+                  <div class="cert-card-date">Obtenido: 28/05/2026</div>
+                  <span class="cert-dl-btn">⬇ Descargar PDF</span>
+                </div>
+                <div class="cert-card" style="opacity:.5;cursor:default">
+                  <div class="cert-card-icon">🔒</div>
+                  <div class="cert-card-title">Amadeus Completo</div>
+                  <div class="cert-card-date">Completá el 100% para desbloquear</div>
+                  <span class="cert-dl-btn" style="background:var(--gray-300)">🔒 Bloqueado</span>
+                </div>
+                <div class="cert-card" style="opacity:.5;cursor:default">
+                  <div class="cert-card-icon">🔒</div>
+                  <div class="cert-card-title">Destinos Internacionales</div>
+                  <div class="cert-card-date">Finalizá el curso primero</div>
+                  <span class="cert-dl-btn" style="background:var(--gray-300)">🔒 Bloqueado</span>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Historial de Pagos -->
+          <div class="panel-card" style="margin-bottom:8px">
+            <div class="panel-card-head">
+              <div class="panel-card-title">💳 Historial de pagos</div>
+              <button class="btn btn-ghost" style="padding:6px 14px;font-size:.75rem">Descargar recibos</button>
+            </div>
+            <div>
+              <div class="payment-row">
+                <div class="payment-icon">🧾</div>
+                <div>
+                  <div class="payment-name">Amadeus Selling Platform — Cuota 3/4</div>
+                  <div class="payment-date">15/06/2026</div>
+                </div>
+                <span class="badge badge-green">✓ Pagado</span>
+                <div class="payment-amount">$4.625</div>
+              </div>
+              <div class="payment-row">
+                <div class="payment-icon">🧾</div>
+                <div>
+                  <div class="payment-name">Destinos Europeos — Pago único</div>
+                  <div class="payment-date">02/06/2026</div>
+                </div>
+                <span class="badge badge-green">✓ Pagado</span>
+                <div class="payment-amount">$12.000</div>
+              </div>
+              <div class="payment-row">
+                <div class="payment-icon">🧾</div>
+                <div>
+                  <div class="payment-name">Amadeus Selling Platform — Cuota 4/4</div>
+                  <div class="payment-date">Vence: 15/07/2026</div>
+                </div>
+                <span class="badge badge-gold">⏳ Pendiente</span>
+                <div class="payment-amount">$4.625</div>
+              </div>
+            </div>
+          </div>
+
+        </div><!-- /page-body -->
+      </div><!-- /main-content -->
+    </div><!-- /app-shell -->
+  </div><!-- /view-alumno -->
+
+
+  <!-- ═══════════════════════════════════════════════════
+       ③ PANEL ADMINISTRADOR
+  ═══════════════════════════════════════════════════ -->
+  <div id="view-admin" class="view">
+    <div class="app-shell">
+
+      <!-- SIDEBAR ADMIN -->
+      <aside class="sidebar">
+        <div class="sidebar-brand">
+          <div class="sidebar-brand-top">
+            <img class="sidebar-logo" src="https://www.acav.com.ar/wp-content/uploads/2022/09/logo-acav-blanco-218x78.png" alt="ACAV"/>
+            <span class="sidebar-badge" style="background:var(--red)">ADMIN</span>
+          </div>
+          <div class="sidebar-user">
+            <div class="sidebar-user-avatar" style="background:var(--red)">AD</div>
+            <div>
+              <div class="sidebar-user-name">Administrador</div>
+              <div class="sidebar-user-role">ACAV · Super Admin</div>
+            </div>
+          </div>
+        </div>
+        <nav class="sidebar-nav">
+          <div class="sidebar-nav-section">Panel</div>
+          <div class="sidebar-nav-item active"><span class="nav-icon">📊</span> Métricas</div>
+          <div class="sidebar-nav-item"><span class="nav-icon">📚</span> Cursos</div>
+          <div class="sidebar-nav-item"><span class="nav-icon">👥</span> Alumnos <span class="nav-badge">128</span></div>
+          <div class="sidebar-nav-item"><span class="nav-icon">💳</span> Pagos</div>
+          <div class="sidebar-nav-section">Herramientas</div>
+          <div class="sidebar-nav-item"><span class="nav-icon">🔔</span> Notificaciones</div>
+          <div class="sidebar-nav-item"><span class="nav-icon">🏆</span> Certificados</div>
+          <div class="sidebar-nav-item"><span class="nav-icon">📝</span> Contenido</div>
+          <div class="sidebar-nav-section">Sistema</div>
+          <div class="sidebar-nav-item"><span class="nav-icon">⚙️</span> Configuración</div>
+          <div class="sidebar-nav-item"><span class="nav-icon">📤</span> Exportar datos</div>
+        </nav>
+      </aside>
+
+      <!-- MAIN ADMIN -->
+      <div class="main-content">
+        <div class="topbar">
+          <div class="topbar-title">Panel de Administración</div>
+          <div class="topbar-search"><span>🔍</span><input placeholder="Buscar alumnos, cursos…"/></div>
+          <div class="topbar-icon-btn">🔔<div class="topbar-notif-dot"></div></div>
+          <div class="topbar-icon-btn">⚙️</div>
+          <button class="btn btn-gold" style="font-size:.8rem;padding:8px 18px">+ Nuevo curso</button>
+        </div>
+
+        <div class="page-body">
+
+          <!-- KPIs -->
+          <div class="admin-kpis">
+            <div class="admin-kpi">
+              <div class="admin-kpi-top">
+                <div class="admin-kpi-icon" style="background:#DBEAFE">👥</div>
+                <span class="admin-kpi-trend trend-up">▲ 12%</span>
+              </div>
+              <div class="admin-kpi-val">128</div>
+              <div class="admin-kpi-lbl">Alumnos activos</div>
+            </div>
+            <div class="admin-kpi">
+              <div class="admin-kpi-top">
+                <div class="admin-kpi-icon" style="background:var(--green-pale)">💰</div>
+                <span class="admin-kpi-trend trend-up">▲ 18%</span>
+              </div>
+              <div class="admin-kpi-val">$2.4M</div>
+              <div class="admin-kpi-lbl">Ingresos este mes</div>
+            </div>
+            <div class="admin-kpi">
+              <div class="admin-kpi-top">
+                <div class="admin-kpi-icon" style="background:var(--gold-pale)">📚</div>
+                <span class="admin-kpi-trend trend-up">▲ 2</span>
+              </div>
+              <div class="admin-kpi-val">12</div>
+              <div class="admin-kpi-lbl">Cursos activos</div>
+            </div>
+            <div class="admin-kpi">
+              <div class="admin-kpi-top">
+                <div class="admin-kpi-icon" style="background:var(--purple-pale)">🏆</div>
+                <span class="admin-kpi-trend trend-up">▲ 23</span>
+              </div>
+              <div class="admin-kpi-val">312</div>
+              <div class="admin-kpi-lbl">Certificados emitidos</div>
+            </div>
+          </div>
+
+          <!-- Charts -->
+          <div class="admin-charts">
+
+            <!-- Barras mensuales -->
+            <div class="chart-box">
+              <div class="chart-box-head">
+                <div class="chart-box-title">📈 Inscripciones por mes</div>
+                <span class="badge badge-green">▲ +18% vs. año anterior</span>
+              </div>
+              <div class="fake-bar-chart">
+                <div class="fake-bar-wrap"><div class="fake-bar" style="height:55%;background:var(--gray-200)"></div><span class="fake-bar-lbl">Ene</span></div>
+                <div class="fake-bar-wrap"><div class="fake-bar" style="height:62%;background:var(--gray-200)"></div><span class="fake-bar-lbl">Feb</span></div>
+                <div class="fake-bar-wrap"><div class="fake-bar" style="height:75%;background:var(--blue-light)"></div><span class="fake-bar-lbl">Mar</span></div>
+                <div class="fake-bar-wrap"><div class="fake-bar" style="height:60%;background:var(--gray-200)"></div><span class="fake-bar-lbl">Abr</span></div>
+                <div class="fake-bar-wrap"><div class="fake-bar" style="height:80%;background:var(--blue-light)"></div><span class="fake-bar-lbl">May</span></div>
+                <div class="fake-bar-wrap"><div class="fake-bar" style="height:90%;background:var(--navy)"></div><span class="fake-bar-lbl">Jun</span></div>
+                <div class="fake-bar-wrap"><div class="fake-bar" style="height:72%;background:var(--gold)"></div><span class="fake-bar-lbl">Jul</span></div>
+              </div>
+            </div>
+
+            <!-- Distribución cursos -->
+            <div class="chart-box">
+              <div class="chart-box-head">
+                <div class="chart-box-title">🎯 Distribución de alumnos</div>
+              </div>
+              <!-- SVG donut simplificado -->
+              <svg class="donut-svg" width="100" height="100" viewBox="0 0 100 100">
+                <circle cx="50" cy="50" r="38" fill="none" stroke="#EFF3F8" stroke-width="16"/>
+                <circle cx="50" cy="50" r="38" fill="none" stroke="#0057B8" stroke-width="16" stroke-dasharray="95 144" stroke-dashoffset="0" transform="rotate(-90 50 50)"/>
+                <circle cx="50" cy="50" r="38" fill="none" stroke="#F0A500" stroke-width="16" stroke-dasharray="54 185" stroke-dashoffset="-95" transform="rotate(-90 50 50)"/>
+                <circle cx="50" cy="50" r="38" fill="none" stroke="#10B981" stroke-width="16" stroke-dasharray="30 209" stroke-dashoffset="-149" transform="rotate(-90 50 50)"/>
+                <circle cx="50" cy="50" r="38" fill="none" stroke="#8B5CF6" stroke-width="16" stroke-dasharray="21 218" stroke-dashoffset="-179" transform="rotate(-90 50 50)"/>
+                <text x="50" y="54" text-anchor="middle" font-size="11" font-weight="800" fill="#1E3050">128</text>
+              </svg>
+              <div class="donut-wrap">
+                <div class="donut-row"><div class="donut-dot" style="background:var(--blue)"></div><span class="donut-lbl">Amadeus</span><span class="donut-val">62</span></div>
+                <div class="donut-row"><div class="donut-dot" style="background:var(--gold)"></div><span class="donut-lbl">Destinos</span><span class="donut-val">35</span></div>
+                <div class="donut-row"><div class="donut-dot" style="background:var(--green)"></div><span class="donut-lbl">Ventas</span><span class="donut-val">19</span></div>
+                <div class="donut-row"><div class="donut-dot" style="background:var(--purple)"></div><span class="donut-lbl">Marketing</span><span class="donut-val">12</span></div>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Tabla alumnos -->
+          <div class="admin-table-card">
+            <div class="admin-table-head">
+              <div class="panel-card-title">👥 Gestión de alumnos</div>
+              <div style="display:flex;gap:10px;align-items:center">
+                <div class="admin-table-search">🔍 Buscar alumno…</div>
+                <button class="btn btn-ghost" style="padding:7px 14px;font-size:.75rem">Filtrar</button>
+                <button class="btn btn-navy" style="padding:7px 14px;font-size:.75rem">⬇ Exportar</button>
+              </div>
+            </div>
+            <table>
+              <thead>
+                <tr>
+                  <th>Alumno</th>
+                  <th>Curso</th>
+                  <th>Progreso</th>
+                  <th>Estado</th>
+                  <th>Pago</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><div class="td-avatar"><div class="td-av-circle" style="background:var(--blue)">ML</div><div><div class="td-name">María Laura Díaz</div><div class="td-email">mldíaz@email.com</div></div></div></td>
+                  <td>Amadeus SPC</td>
+                  <td><div class="td-mini-bar"><div class="td-mini-fill" style="width:68%;background:var(--blue)"></div></div><div class="td-prog-pct">68%</div></td>
+                  <td><span class="badge badge-green">Activa</span></td>
+                  <td><span class="badge badge-gold">3/4 cuotas</span></td>
+                  <td><button class="action-btn" title="Ver">👁</button> <button class="action-btn" title="Mensaje">✉️</button> <button class="action-btn" title="Editar">✏️</button></td>
+                </tr>
+                <tr>
+                  <td><div class="td-avatar"><div class="td-av-circle" style="background:var(--green)">RC</div><div><div class="td-name">Roberto Casas</div><div class="td-email">rcasas@agencia.com</div></div></div></td>
+                  <td>Destinos Europeos</td>
+                  <td><div class="td-mini-bar"><div class="td-mini-fill" style="width:100%;background:var(--green)"></div></div><div class="td-prog-pct">100% ✓</div></td>
+                  <td><span class="badge badge-blue">Completado</span></td>
+                  <td><span class="badge badge-green">Pagado</span></td>
+                  <td><button class="action-btn">👁</button> <button class="action-btn">🏆</button> <button class="action-btn">✏️</button></td>
+                </tr>
+                <tr>
+                  <td><div class="td-avatar"><div class="td-av-circle" style="background:var(--purple)">FC</div><div><div class="td-name">Florencia Castro</div><div class="td-email">fcastro@mail.com</div></div></div></td>
+                  <td>Técnicas de Venta</td>
+                  <td><div class="td-mini-bar"><div class="td-mini-fill" style="width:40%;background:var(--gold)"></div></div><div class="td-prog-pct">40%</div></td>
+                  <td><span class="badge badge-green">Activa</span></td>
+                  <td><span class="badge badge-red">⚠ Vencido</span></td>
+                  <td><button class="action-btn">👁</button> <button class="action-btn">✉️</button> <button class="action-btn">✏️</button></td>
+                </tr>
+                <tr>
+                  <td><div class="td-avatar"><div class="td-av-circle" style="background:var(--gold);color:var(--navy-dark)">PF</div><div><div class="td-name">Pablo Ferreyra</div><div class="td-email">pferreyra@viajes.com</div></div></div></td>
+                  <td>Amadeus Avanzado</td>
+                  <td><div class="td-mini-bar"><div class="td-mini-fill" style="width:22%;background:var(--blue)"></div></div><div class="td-prog-pct">22%</div></td>
+                  <td><span class="badge badge-green">Activo</span></td>
+                  <td><span class="badge badge-green">Pagado</span></td>
+                  <td><button class="action-btn">👁</button> <button class="action-btn">✉️</button> <button class="action-btn">✏️</button></td>
+                </tr>
+                <tr>
+                  <td><div class="td-avatar"><div class="td-av-circle" style="background:var(--red)">SN</div><div><div class="td-name">Sofía Navarro</div><div class="td-email">sofianav@mail.com</div></div></div></td>
+                  <td>Marketing Digital</td>
+                  <td><div class="td-mini-bar"><div class="td-mini-fill" style="width:100%;background:var(--green)"></div></div><div class="td-prog-pct">100% ✓</div></td>
+                  <td><span class="badge badge-blue">Completado</span></td>
+                  <td><span class="badge badge-gray">Gratuito</span></td>
+                  <td><button class="action-btn">👁</button> <button class="action-btn">🏆</button> <button class="action-btn">✏️</button></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Notificaciones -->
+          <div class="notif-grid">
+
+            <!-- Canal Email -->
+            <div class="notif-card">
+              <div class="panel-card-head">
+                <div class="panel-card-title">📧 Notificaciones por Email</div>
+                <button class="btn btn-ghost" style="padding:6px 14px;font-size:.75rem">Configurar plantillas</button>
+              </div>
+              <div>
+                <div class="notif-row">
+                  <span class="notif-ch-icon">📧</span>
+                  <div>
+                    <div class="notif-ch-name">Recordatorio de clase en vivo</div>
+                    <div class="notif-ch-msg">Se envía 24hs y 1hs antes del inicio. Incluye link de acceso.</div>
+                    <div class="notif-ch-time">Última envío: hace 3 días · 89 destinatarios</div>
+                  </div>
+                  <div class="notif-toggle"></div>
+                </div>
+                <div class="notif-row">
+                  <span class="notif-ch-icon">📧</span>
+                  <div>
+                    <div class="notif-ch-name">Bienvenida al curso</div>
+                    <div class="notif-ch-msg">Se envía automáticamente al confirmar la inscripción.</div>
+                    <div class="notif-ch-time">Última envío: hace 2 días · 3 nuevos alumnos</div>
+                  </div>
+                  <div class="notif-toggle"></div>
+                </div>
+                <div class="notif-row">
+                  <span class="notif-ch-icon">📧</span>
+                  <div>
+                    <div class="notif-ch-name">Alerta de pago vencido</div>
+                    <div class="notif-ch-msg">Se envía a los 3, 7 y 15 días de vencimiento.</div>
+                    <div class="notif-ch-time">Pendientes: 2 alumnos con pago vencido</div>
+                  </div>
+                  <div class="notif-toggle"></div>
+                </div>
+                <div class="notif-row">
+                  <span class="notif-ch-icon">📧</span>
+                  <div>
+                    <div class="notif-ch-name">Certificado disponible</div>
+                    <div class="notif-ch-msg">Se envía cuando el alumno completa el 100% del curso.</div>
+                    <div class="notif-ch-time">Enviados este mes: 23</div>
+                  </div>
+                  <div class="notif-toggle"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Canal WhatsApp -->
+            <div class="notif-card">
+              <div class="panel-card-head">
+                <div class="panel-card-title">💬 Notificaciones por WhatsApp</div>
+                <button class="btn btn-green" style="padding:6px 14px;font-size:.75rem">Conectar API</button>
+              </div>
+              <div>
+                <div class="notif-row">
+                  <span class="notif-ch-icon">💬</span>
+                  <div>
+                    <div class="notif-ch-name">Recordatorio 1hs antes (WA)</div>
+                    <div class="notif-ch-msg">"Hola [nombre]! Tu clase empieza en 1 hora 🎓 Link: ..."</div>
+                    <div class="notif-ch-time">Última envío: hace 5 días · Tasa apertura 94%</div>
+                  </div>
+                  <div class="notif-toggle"></div>
+                </div>
+                <div class="notif-row">
+                  <span class="notif-ch-icon">💬</span>
+                  <div>
+                    <div class="notif-ch-name">Nuevo material disponible</div>
+                    <div class="notif-ch-msg">"📂 Subimos el material de la clase de hoy. Descargalo acá: ..."</div>
+                    <div class="notif-ch-time">Última envío: hace 2 días</div>
+                  </div>
+                  <div class="notif-toggle"></div>
+                </div>
+                <div class="notif-row">
+                  <span class="notif-ch-icon">💬</span>
+                  <div>
+                    <div class="notif-ch-name">Felicitación certificado (WA)</div>
+                    <div class="notif-ch-msg">"🏆 ¡Felicitaciones [nombre]! Tu certificado está disponible."</div>
+                    <div class="notif-ch-time">Enviados este mes: 23 · Tasa apertura 98%</div>
+                  </div>
+                  <div class="notif-toggle"></div>
+                </div>
+                <div class="notif-row">
+                  <span class="notif-ch-icon">💬</span>
+                  <div>
+                    <div class="notif-ch-name">Pago vencido (WA)</div>
+                    <div class="notif-ch-msg">"⚠️ [nombre], tu cuota está pendiente. Regularizala aquí: ..."</div>
+                    <div class="notif-ch-time" style="color:var(--red)">DESACTIVADO — activar con precaución</div>
+                  </div>
+                  <div class="notif-toggle off"></div>
+                </div>
+              </div>
+            </div>
+
+          </div><!-- /notif-grid -->
+
+        </div><!-- /page-body -->
+      </div><!-- /main-content -->
+    </div><!-- /app-shell -->
+  </div><!-- /view-admin -->
+
+
+  <script>
+    function showView(name) {
+      document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+      document.querySelectorAll('.demo-tab').forEach(t => t.classList.remove('active'));
+      document.getElementById('view-' + name).classList.add('active');
+      const tabs = document.querySelectorAll('.demo-tab');
+      const map = { landing: 0, alumno: 1, admin: 2 };
+      tabs[map[name]].classList.add('active');
+      window.scrollTo(0, 0);
+    }
+  </script>
+
+</body>
+</html>

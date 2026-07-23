@@ -1,0 +1,38 @@
+import { corsPreflight, errorJson, json } from "@/lib/api-helpers";
+import { assertRole, canViewEnrollment, requireCourseActor } from "@/lib/courses/server/auth";
+import { getEnrollmentById, updateEnrollment } from "@/lib/courses/server/enrollments";
+
+export const runtime = "nodejs";
+
+export function OPTIONS(request: Request) {
+  return corsPreflight(request);
+}
+
+export async function GET(request: Request, ctx: { params: { id: string } }) {
+  try {
+    const actor = await requireCourseActor(request);
+    assertRole(actor, ["admin", "empresa", "candidato"]);
+    const application = await getEnrollmentById(ctx.params.id);
+    if (!application) return errorJson("application_not_found", 404, request);
+    if (!canViewEnrollment(actor, application)) return errorJson("forbidden", 403, request);
+    return json({ application }, { status: 200 }, request);
+  } catch (e: any) {
+    return errorJson(e?.message || "internal_error", e?.status || 500, request);
+  }
+}
+
+export async function PATCH(request: Request, ctx: { params: { id: string } }) {
+  try {
+    const actor = await requireCourseActor(request);
+    assertRole(actor, ["admin", "empresa"]);
+    const application = await getEnrollmentById(ctx.params.id);
+    if (!application) return errorJson("application_not_found", 404, request);
+    if (!canViewEnrollment(actor, application)) return errorJson("forbidden", 403, request);
+
+    const body = await request.json();
+    const updated = await updateEnrollment(ctx.params.id, body);
+    return json({ application: updated }, { status: 200 }, request);
+  } catch (e: any) {
+    return errorJson(e?.message || "internal_error", e?.status || 500, request);
+  }
+}
