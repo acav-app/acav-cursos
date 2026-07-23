@@ -6,34 +6,17 @@ import { cn } from "@/lib/utils";
 import { ReactToaster } from "@/components/ui/toaster";
 import { Toaster } from "react-hot-toast";
 import { SonnToaster } from "@/components/ui/sonner";
-import { usePathname } from "next/navigation";
-import AuthProvider from "./auth.provider";
+import { useMounted } from "@/hooks/use-mounted";
 
 const inter = Inter({ subsets: ["latin"] });
 const Providers = ({ children }) => {
   const { theme, radius } = useThemeStore();
-  const location = usePathname();
+  const mounted = useMounted();
+  const resolvedTheme = mounted ? theme : "light";
 
-  if (location === "/") {
-    return (
-      <body className={cn("dash-tail-app ", inter.className)}>
-        <ThemeProvider
-          attribute="class"
-          enableSystem={false}
-          defaultTheme="light"
-        >
-          <AuthProvider>
-            <div className={cn("h-full  ")}>{children}<ReactToaster /></div>
-            <Toaster />
-            <SonnToaster />
-          </AuthProvider>
-        </ThemeProvider>
-      </body>
-    );
-  }
   return (
-    <body
-      className={cn("dash-tail-app ", inter.className, "theme-" + theme)}
+    <div
+      className={cn("dash-tail-app ", inter.className, "theme-" + resolvedTheme)}
       style={{
         "--radius": `${radius}rem`,
       }}
@@ -43,13 +26,14 @@ const Providers = ({ children }) => {
         enableSystem={false}
         defaultTheme="light"
       >
-        <AuthProvider>
-          <div className={cn("h-full  ")}>{children}<ReactToaster /></div>
-          <Toaster />
-          <SonnToaster />
-        </AuthProvider>
+        <div className={cn("h-full", `theme-${resolvedTheme}`)}>
+          {children}
+          <ReactToaster />
+        </div>
+        <Toaster />
+        <SonnToaster />
       </ThemeProvider>
-    </body>
+    </div>
   );
 };
 

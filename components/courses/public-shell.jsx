@@ -3,7 +3,7 @@
 import { Icon } from "@iconify/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Award, Bookmark, Briefcase, Building2, ChevronDown, Clock3, CreditCard, LogIn, Mail, MapPin, Phone, Plus, User } from "lucide-react";
+import { Award, Bookmark, Briefcase, Building2, ChevronDown, Clock3, CreditCard, LogIn, Mail, MapPin, Phone, User } from "lucide-react";
 import ApplicationPublicModal from "@/components/courses/application-public-modal";
 import { useCourseActor } from "@/components/courses/dashboard/use-course-actor";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -358,13 +358,6 @@ export default function PublicCoursesShell({ lang, settings, navMode = "routes",
 
       <ApplicationPublicModal lang={lang} />
 
-      <Link
-        href={`/${lang}/cursos`}
-        className="fixed bottom-7 right-7 z-40 inline-flex items-center gap-2 rounded-full bg-[#DD4913] px-6 py-3 text-sm font-extrabold text-white shadow-[0_12px_40px_rgba(221,73,19,.5)] transition hover:-translate-y-1"
-      >
-        <Plus className="h-4 w-4" />
-        Explorar cursos
-      </Link>
     </div>
   );
 }

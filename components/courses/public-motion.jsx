@@ -2,8 +2,7 @@
 
 import { motion, useReducedMotion } from "framer-motion";
 import { cn } from "@/lib/utils";
-
-const defaultViewport = { once: true, amount: 0.2 };
+import { useMounted } from "@/hooks/use-mounted";
 
 export function MotionReveal({
   children,
@@ -14,13 +13,20 @@ export function MotionReveal({
   as: Component = "div",
 }) {
   const shouldReduceMotion = useReducedMotion();
+  const mounted = useMounted();
+  const disableMotion = shouldReduceMotion || !mounted;
+
+  if (disableMotion) {
+    return <Component className={className}>{children}</Component>;
+  }
+
   const MotionComponent = motion(Component);
 
   return (
     <MotionComponent
       className={className}
-      initial={shouldReduceMotion ? undefined : { opacity: 0, y, scale }}
-      animate={shouldReduceMotion ? undefined : { opacity: 1, y: 0, scale: 1 }}
+      initial={{ opacity: 0, y, scale }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ duration: 0.75, delay, ease: [0.22, 1, 0.36, 1] }}
     >
       {children}
@@ -36,9 +42,11 @@ export function MotionStagger({
   as: Component = "div",
 }) {
   const shouldReduceMotion = useReducedMotion();
+  const mounted = useMounted();
   const MotionComponent = motion(Component);
+  const disableMotion = shouldReduceMotion || !mounted;
 
-  if (shouldReduceMotion) {
+  if (disableMotion) {
     return <Component className={className}>{children}</Component>;
   }
 
@@ -64,8 +72,10 @@ export function MotionStagger({
 
 export function MotionStaggerItem({ children, className, y = 24, scale = 0.985 }) {
   const shouldReduceMotion = useReducedMotion();
+  const mounted = useMounted();
+  const disableMotion = shouldReduceMotion || !mounted;
 
-  if (shouldReduceMotion) {
+  if (disableMotion) {
     return <div className={className}>{children}</div>;
   }
 
@@ -91,11 +101,13 @@ export function MotionStaggerItem({ children, className, y = 24, scale = 0.985 }
 
 export function MotionHoverCard({ children, className }) {
   const shouldReduceMotion = useReducedMotion();
+  const mounted = useMounted();
+  const disableMotion = shouldReduceMotion || !mounted;
 
   return (
     <motion.div
       className={cn(className)}
-      whileHover={shouldReduceMotion ? undefined : { y: -6, scale: 1.01 }}
+      whileHover={disableMotion ? undefined : { y: -6, scale: 1.01 }}
       transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
     >
       {children}
