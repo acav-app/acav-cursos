@@ -288,6 +288,75 @@ function sanitizeAttachments(attachments) {
     .filter(Boolean);
 }
 
+function getCourseLoadErrorMessage(error) {
+  const code = String(error?.message || "").trim();
+  if (!code) return "No se pudo cargar el curso. Revisa tu conexión e intenta nuevamente.";
+  if (code === "course_not_found") return "No encontramos el curso solicitado o ya no está disponible para edición.";
+  if (code === "forbidden") return "No tienes permisos para editar este curso con la cuenta actual.";
+  if (code === "unauthorized" || code === "auth_required") return "Tu sesión venció. Vuelve a iniciar sesión para continuar.";
+  if (code === "request_failed") return "La solicitud no pudo completarse. Intenta nuevamente en unos segundos.";
+  return code;
+}
+
+function mapCourseToFormValues(current, defaultValues) {
+  return {
+    ...defaultValues,
+    academyId: current.academyId || current.institutionId || current.companyId || "",
+    title: current.title || "",
+    slug: current.slug || "",
+    category: current.subRubro || "",
+    level: current.level || "Todos los niveles",
+    modality: current.modality || "100% Online",
+    language: current.language || "Español",
+    shortDescription: current.shortDescription || "",
+    description: current.description || "",
+    learningObjectives:
+      Array.isArray(current.learningObjectives) && current.learningObjectives.length ? current.learningObjectives : [""],
+    requirements:
+      Array.isArray(current.requirements) && current.requirements.length
+        ? current.requirements
+        : typeof current.requirements === "string" && current.requirements.trim()
+          ? current.requirements.split("\n").filter(Boolean)
+          : [""],
+    targetAudience:
+      Array.isArray(current.targetAudience) && current.targetAudience.length ? current.targetAudience : [""],
+    modules:
+      Array.isArray(current.modules) && current.modules.length
+        ? current.modules
+        : [
+            {
+              id: `module-${Date.now()}`,
+              title: "",
+              description: "",
+              lessons: [""],
+            },
+          ],
+    duration: current.duration || "",
+    classes: Number(current.classes || 1),
+    coverImage: current.imageUrl || "",
+    thumbnail: current.thumbnailUrl || "",
+    promoVideo: current.videoUrl || "",
+    promoVideoFileName: current.videoFileName || "",
+    promoVideoMimeType: current.videoMimeType || "",
+    promoVideoSizeBytes: current.videoSizeBytes || undefined,
+    promoVideoDurationSeconds: current.videoDurationSeconds || undefined,
+    attachments: Array.isArray(current.attachments) ? current.attachments : [],
+    price: Number(current.price || 0),
+    oldPrice: Number.isFinite(Number(current.oldPrice)) ? Number(current.oldPrice) : undefined,
+    freeCourse: Boolean(current.freeCourse),
+    certificate: Boolean(current.includesCertificate),
+    lifetimeAccess: Boolean(current.lifetimeAccess),
+    downloadableResources: Boolean(current.downloadableResources),
+    recordedClasses: Boolean(current.recordedClasses),
+    support: Boolean(current.support),
+    featured: Boolean(current.featured),
+    allowEnrollment: current.allowEnrollment !== false,
+    showOnHome: Boolean(current.showOnHome),
+    status: current.publicationStatus || current.status || "borrador",
+    expiresAtDate: dateInputFromIso(current.expiresAt),
+  };
+}
+
 function FieldError({ error }) {
   if (!error?.message) return null;
   return <p className="text-sm text-destructive">{String(error.message)}</p>;
@@ -429,11 +498,14 @@ export default function CourseWizard({ jobId }) {
   const { actor, loading: actorLoading, error: actorError } = useCourseActor();
   const [institutions, setInstitutions] = useState([]);
   const [course, setCourse] = useState(null);
-  const [loading, setLoading] = useState(Boolean(jobId));
+  const [loadingCourse, setLoadingCourse] = useState(Boolean(jobId));
+  const [courseLoadError, setCourseLoadError] = useState("");
+  const [courseLoadedAt, setCourseLoadedAt] = useState("");
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState("general");
   const [draftSavedAt, setDraftSavedAt] = useState("");
   const [draftRestored, setDraftRestored] = useState(false);
+  const [courseLoadAttempt, setCourseLoadAttempt] = useState(0);
 
   const isAdmin = actor?.role === "admin";
   const draftStorageKey = useMemo(() => buildDraftStorageKey(actor, jobId), [actor, jobId]);
@@ -588,80 +660,40 @@ export default function CourseWizard({ jobId }) {
   useEffect(() => {
     let alive = true;
     async function loadCourse() {
-      if (!user || !jobId) return;
-      setLoading(true);
+      if (!jobId) {
+        setLoadingCourse(false);
+        setCourseLoadError("");
+        setCourseLoadedAt("");
+        return;
+      }
+      if (!user) return;
+      setLoadingCourse(true);
+      setCourseLoadError("");
+      setCourseLoadedAt("");
       try {
         const data = await authedFetch(user, `/api/courses/${jobId}`, { method: "GET" });
         if (!alive) return;
         const current = data?.course || {};
         setCourse(current);
-        reset({
-          ...defaultValues,
-          academyId: current.academyId || current.institutionId || current.companyId || "",
-          title: current.title || "",
-          slug: current.slug || "",
-          category: current.subRubro || "",
-          level: current.level || "Todos los niveles",
-          modality: current.modality || "100% Online",
-          language: current.language || "Español",
-          shortDescription: current.shortDescription || "",
-          description: current.description || "",
-          learningObjectives:
-            Array.isArray(current.learningObjectives) && current.learningObjectives.length ? current.learningObjectives : [""],
-          requirements:
-            Array.isArray(current.requirements) && current.requirements.length
-              ? current.requirements
-              : typeof current.requirements === "string" && current.requirements.trim()
-                ? current.requirements.split("\n").filter(Boolean)
-                : [""],
-          targetAudience:
-            Array.isArray(current.targetAudience) && current.targetAudience.length ? current.targetAudience : [""],
-          modules:
-            Array.isArray(current.modules) && current.modules.length
-              ? current.modules
-              : [
-                  {
-                    id: `module-${Date.now()}`,
-                    title: "",
-                    description: "",
-                    lessons: [""],
-                  },
-                ],
-          duration: current.duration || "",
-          classes: Number(current.classes || 1),
-          coverImage: current.imageUrl || "",
-          thumbnail: current.thumbnailUrl || "",
-          promoVideo: current.videoUrl || "",
-          promoVideoFileName: current.videoFileName || "",
-          promoVideoMimeType: current.videoMimeType || "",
-          promoVideoSizeBytes: current.videoSizeBytes || undefined,
-          promoVideoDurationSeconds: current.videoDurationSeconds || undefined,
-          attachments: Array.isArray(current.attachments) ? current.attachments : [],
-          price: Number(current.price || 0),
-          oldPrice: Number.isFinite(Number(current.oldPrice)) ? Number(current.oldPrice) : undefined,
-          freeCourse: Boolean(current.freeCourse),
-          certificate: Boolean(current.includesCertificate),
-          lifetimeAccess: Boolean(current.lifetimeAccess),
-          downloadableResources: Boolean(current.downloadableResources),
-          recordedClasses: Boolean(current.recordedClasses),
-          support: Boolean(current.support),
-          featured: Boolean(current.featured),
-          allowEnrollment: current.allowEnrollment !== false,
-          showOnHome: Boolean(current.showOnHome),
-          status: current.publicationStatus || current.status || "borrador",
-          expiresAtDate: dateInputFromIso(current.expiresAt),
-        });
+        reset(mapCourseToFormValues(current, defaultValues));
+        setCourseLoadError("");
+        setCourseLoadedAt(new Date().toISOString());
+        toast.success("Curso cargado correctamente", { position: "top-right" });
       } catch (error) {
-        toast.error(error?.message || "No se pudo cargar el curso.", { position: "top-right" });
+        if (!alive) return;
+        setCourse(null);
+        const nextError = getCourseLoadErrorMessage(error);
+        setCourseLoadError(nextError);
+        toast.error(nextError, { position: "top-right" });
       } finally {
-        if (alive) setLoading(false);
+        if (alive) setLoadingCourse(false);
       }
     }
     loadCourse();
     return () => {
       alive = false;
     };
-  }, [defaultValues, jobId, reset, user]);
+  }, [courseLoadAttempt, defaultValues, jobId, reset, user]);
 
   const updateArrayField = (field, next) => {
     setValue(
@@ -917,12 +949,30 @@ export default function CourseWizard({ jobId }) {
     }
   };
 
-  if (actorLoading || loading) {
+  if (actorLoading || loadingCourse) {
     return (
       <div className="rounded-[28px] border border-border/60 bg-card p-8">
-        <div className="flex items-center gap-3 text-sm text-muted-foreground">
-          <Loader2 className="h-5 w-5 animate-spin" />
-          Cargando configurador de cursos...
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div className="flex items-start gap-3">
+            <div className="mt-0.5 rounded-full border border-primary/15 bg-primary/5 p-2 text-primary">
+              <Loader2 className="h-5 w-5 animate-spin" />
+            </div>
+            <div>
+              <div className="text-sm font-semibold text-foreground">
+                {jobId ? "Cargando curso existente..." : "Cargando configurador de cursos..."}
+              </div>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {jobId
+                  ? "Estamos trayendo la información del curso y preparando el formulario para edición."
+                  : "Estamos preparando el formulario y las configuraciones necesarias."}
+              </p>
+            </div>
+          </div>
+          {jobId ? (
+            <div className="rounded-full border border-border/60 bg-background px-4 py-2 text-xs font-medium text-muted-foreground">
+              Esto puede tardar unos segundos en conexiones lentas
+            </div>
+          ) : null}
         </div>
       </div>
     );
@@ -937,8 +987,45 @@ export default function CourseWizard({ jobId }) {
     );
   }
 
+  if (jobId && courseLoadError) {
+    return (
+      <div className="rounded-[28px] border border-destructive/20 bg-card p-8">
+        <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h2 className="text-xl font-semibold text-foreground">No pudimos cargar el curso</h2>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">{courseLoadError}</p>
+          </div>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Button type="button" variant="outline" onClick={() => setCourseLoadAttempt((value) => value + 1)}>
+              Reintentar carga
+            </Button>
+            <Button type="button" asChild>
+              <Link href={buildLocalizedPath("/dashboard/cursos")}>Volver al listado</Link>
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="grid gap-6">
+      {jobId && courseLoadedAt ? (
+        <div className="rounded-[24px] border border-emerald-200 bg-emerald-50 px-5 py-4">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div>
+              <div className="text-sm font-semibold text-emerald-700">Curso cargado correctamente</div>
+              <p className="mt-1 text-sm text-emerald-700/80">
+                Ya puedes editar el contenido. Carga completada el {new Date(courseLoadedAt).toLocaleString("es-AR")}.
+              </p>
+            </div>
+            <Button type="button" variant="outline" onClick={() => setCourseLoadedAt("")} className="border-emerald-200 bg-white text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800">
+              Ocultar aviso
+            </Button>
+          </div>
+        </div>
+      ) : null}
+
       {draftSavedAt ? (
         <div className="rounded-[24px] border border-primary/15 bg-primary/5 px-5 py-4">
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
