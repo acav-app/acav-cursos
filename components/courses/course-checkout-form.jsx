@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -12,7 +12,6 @@ import {
   ChevronRight,
   Copy,
   CreditCard,
-  FileUp,
   Landmark,
   Loader2,
   Receipt,
@@ -36,7 +35,7 @@ const FALLBACK_PAYMENT_SETTINGS = {
   paymentCvu: "00000000000000000",
   paymentAccountHolder: "ACAV",
   paymentInstructions:
-    "Realiza la transferencia, sube el comprobante y el equipo revisará tu pago dentro de las próximas 24 hs hábiles.",
+    "Realiza la transferencia con estos datos. Tu inscripción quedará iniciada y podrás continuar el seguimiento del pago desde tu panel.",
 };
 
 function toTitleCase(value) {
@@ -69,45 +68,6 @@ function formatCurrency(value) {
   }).format(amount);
 }
 
-function formatBytes(bytes) {
-  const value = Number(bytes || 0);
-  if (!value) return "";
-  if (value < 1024) return `${value} B`;
-  if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
-  return `${(value / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-function uploadFileWithProgress(file, folder, onProgress) {
-  return new Promise((resolve, reject) => {
-    const formData = new FormData();
-    formData.set("file", file);
-    formData.set("folder", folder);
-
-    const xhr = new XMLHttpRequest();
-    xhr.open("POST", "/api/upload");
-
-    xhr.upload.onprogress = (event) => {
-      if (!event.lengthComputable) return;
-      const percent = Math.min(100, Math.max(0, Math.round((event.loaded / event.total) * 100)));
-      onProgress?.(percent);
-    };
-
-    xhr.onerror = () => reject(new Error("upload_failed"));
-    xhr.onabort = () => reject(new Error("upload_aborted"));
-    xhr.onload = () => {
-      const data = JSON.parse(xhr.responseText || "null");
-      if (xhr.status >= 200 && xhr.status < 300) {
-        onProgress?.(100);
-        resolve(data?.url);
-        return;
-      }
-      reject(new Error(data?.error || "upload_failed"));
-    };
-
-    xhr.send(formData);
-  });
-}
-
 function notifyApplicationCreated(jobId) {
   if (typeof window === "undefined") return;
   window.dispatchEvent(
@@ -128,11 +88,9 @@ export default function CourseCheckoutForm({ lang, job, variant = "modal", onClo
   const [settings, setSettings] = useState(FALLBACK_PAYMENT_SETTINGS);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
+  const [createdEnrollmentId, setCreatedEnrollmentId] = useState("");
   const [copyState, setCopyState] = useState("");
   const [draftReady, setDraftReady] = useState(false);
-  const [receiptRestorationNeeded, setReceiptRestorationNeeded] = useState(false);
-  const fileInputRef = useRef(null);
 
   const amount = Number(job?.price || 0);
   const requiresPayment = !job?.freeCourse && amount > 0;
@@ -155,12 +113,12 @@ export default function CourseCheckoutForm({ lang, job, variant = "modal", onClo
       {
         id: "confirmation",
         title: "Confirmación",
-        description: "Sube el comprobante y envía tu inscripción.",
+        description: "Acepta los términos y confirma tu inscripción.",
         icon: Receipt,
-        fields: requiresPayment ? ["receiptFile", "acceptedTerms", "acceptedSecurity"] : ["acceptedTerms", "acceptedSecurity"],
+        fields: ["acceptedTerms", "acceptedSecurity"],
       },
     ],
-    [requiresPayment]
+    []
   );
 
   const schema = useMemo(
@@ -177,15 +135,10 @@ export default function CourseCheckoutForm({ lang, job, variant = "modal", onClo
         province: z.string().min(2, "Provincia requerida"),
         paymentMethod: z.string().min(1, "Método requerido"),
         paymentReference: z.string().optional(),
-        receiptFile: z.any().optional(),
         acceptedTerms: z.boolean().refine((value) => value === true, { message: "Debes aceptar los términos." }),
         acceptedSecurity: z.boolean().refine((value) => value === true, { message: "Debes confirmar la seguridad." }),
-      }).superRefine((values, ctx) => {
-        if (requiresPayment && (!values.receiptFile || values.receiptFile.length !== 1)) {
-          ctx.addIssue({ code: "custom", path: ["receiptFile"], message: "El comprobante es obligatorio." });
-        }
       }),
-    [requiresPayment]
+    []
   );
 
   const draftKey = useMemo(() => `course-checkout-draft:${job?.id || "global"}`, [job?.id]);
@@ -210,15 +163,12 @@ export default function CourseCheckoutForm({ lang, job, variant = "modal", onClo
       province: "",
       paymentMethod: "transferencia",
       paymentReference: "",
-      receiptFile: null,
       acceptedTerms: false,
       acceptedSecurity: false,
     },
     mode: "onChange",
   });
 
-  const receiptFileList = watch("receiptFile");
-  const receiptFile = receiptFileList?.[0] || null;
   const watchedValues = watch(["firstName", "lastName", "email", "phone", "city", "province", "paymentReference", "acceptedTerms", "acceptedSecurity"]);
   const [firstNameValue, lastNameValue, emailValue, phoneValue, cityValue, provinceValue, paymentReferenceValue, acceptedTermsValue, acceptedSecurityValue] = watchedValues;
 
@@ -259,7 +209,6 @@ export default function CourseCheckoutForm({ lang, job, variant = "modal", onClo
       city: toTitleCase(actor?.city || currentValues.city),
       province: toTitleCase(actor?.province || currentValues.province),
       paymentMethod: "transferencia",
-      receiptFile: null,
     });
   }, [actor, getValues, reset, user?.displayName, user?.email]);
 
@@ -273,9 +222,7 @@ export default function CourseCheckoutForm({ lang, job, variant = "modal", onClo
         reset({
           ...currentValues,
           ...parsed,
-          receiptFile: null,
         });
-        if (parsed?.hadReceipt) setReceiptRestorationNeeded(true);
       }
     } catch {
       // Ignore malformed drafts.
@@ -298,7 +245,6 @@ export default function CourseCheckoutForm({ lang, job, variant = "modal", onClo
         paymentReference: paymentReferenceValue,
         acceptedTerms: acceptedTermsValue,
         acceptedSecurity: acceptedSecurityValue,
-        hadReceipt: Boolean(receiptFile),
       })
     );
   }, [
@@ -313,7 +259,6 @@ export default function CourseCheckoutForm({ lang, job, variant = "modal", onClo
     paymentReferenceValue,
     phoneValue,
     provinceValue,
-    receiptFile,
     submitted,
   ]);
 
@@ -329,15 +274,6 @@ export default function CourseCheckoutForm({ lang, job, variant = "modal", onClo
 
   const goBack = () => {
     setCurrentStep((value) => Math.max(value - 1, 0));
-  };
-
-  const openFilePicker = () => fileInputRef.current?.click();
-
-  const handleFiles = (fileList) => {
-    const file = fileList?.[0];
-    if (!file) return;
-    setValue("receiptFile", [file], { shouldValidate: true, shouldDirty: true });
-    setReceiptRestorationNeeded(false);
   };
 
   const handleCopy = async (label, value) => {
@@ -359,7 +295,6 @@ export default function CourseCheckoutForm({ lang, job, variant = "modal", onClo
 
     try {
       setSubmitting(true);
-      let receiptUrl = "";
 
       await authedFetch(user, "/api/courses/me", {
         method: "PATCH",
@@ -372,10 +307,6 @@ export default function CourseCheckoutForm({ lang, job, variant = "modal", onClo
         }),
       }).catch(() => null);
 
-      if (requiresPayment && values.receiptFile?.[0]) {
-        receiptUrl = await uploadFileWithProgress(values.receiptFile[0], "courses/payments", setUploadProgress);
-      }
-
       const payload = {
         userId: actor?.uid || user?.uid || undefined,
         courseId: job.id,
@@ -386,26 +317,26 @@ export default function CourseCheckoutForm({ lang, job, variant = "modal", onClo
         city: values.city,
         province: values.province,
         acceptedPrivacy: true,
-        status: requiresPayment ? "payment_under_review" : "active",
-        paymentStatus: requiresPayment ? "under_review" : "approved",
+        status: requiresPayment ? "waiting_payment" : "active",
+        paymentStatus: requiresPayment ? "pending" : "approved",
         paymentMethod: values.paymentMethod,
         paymentReference: values.paymentReference || undefined,
-        paymentReceiptUrl: receiptUrl || undefined,
         paymentAmount: amount || 0,
         paymentCurrency: "ARS",
       };
 
-      await authedFetch(user, "/api/enrollments", {
+      const response = await authedFetch(user, "/api/enrollments", {
         method: "POST",
         body: JSON.stringify(payload),
       });
+      setCreatedEnrollmentId(String(response?.enrollment?.id || ""));
 
       if (typeof window !== "undefined") {
         window.localStorage.removeItem(draftKey);
       }
       notifyApplicationCreated(job.id);
       setSubmitted(true);
-      toast.success(requiresPayment ? "Comprobante enviado para revisión." : "Inscripción confirmada.", {
+      toast.success(requiresPayment ? "Inscripción iniciada. Pago pendiente." : "Inscripción confirmada.", {
         position: "top-right",
       });
     } catch (error) {
@@ -417,7 +348,6 @@ export default function CourseCheckoutForm({ lang, job, variant = "modal", onClo
       toast.error(error?.message || "No pudimos completar la inscripción.", { position: "top-right" });
     } finally {
       setSubmitting(false);
-      setUploadProgress(0);
     }
   };
 
@@ -438,16 +368,16 @@ export default function CourseCheckoutForm({ lang, job, variant = "modal", onClo
         <div className="mx-auto flex w-full max-w-[620px] flex-col items-center text-center">
           <div className="inline-flex items-center gap-2 rounded-full bg-[#ECFDF3] px-3 py-1 text-[11px] font-bold text-[#127A45]">
             <CheckCircle2 className="h-3.5 w-3.5" />
-            {requiresPayment ? "Pago en revisión" : "Inscripción activa"}
+            {requiresPayment ? "Pago pendiente" : "Inscripción activa"}
           </div>
 
           <h2 className="mt-4 text-[32px] font-semibold tracking-[-0.03em] text-[#0F172A]">
-            {requiresPayment ? "Tu comprobante ya quedó enviado" : "Tu acceso ya quedó confirmado"}
+            {requiresPayment ? "Tu inscripción ya quedó iniciada" : "Tu acceso ya quedó confirmado"}
           </h2>
 
           <p className="mt-3 max-w-[560px] text-sm leading-6 text-[#667085]">
             {requiresPayment
-              ? "Registramos tu inscripción y el equipo de ACAV revisará el pago para habilitar el curso."
+              ? "Registramos tu inscripción. El pago queda pendiente y podrás continuar el seguimiento desde tu panel."
               : "La inscripción se activó automáticamente y ya puedes continuar desde tu panel."}
           </p>
 
@@ -462,7 +392,7 @@ export default function CourseCheckoutForm({ lang, job, variant = "modal", onClo
             </div>
             <div>
               <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#94A3B8]">Estado</div>
-              <div className="mt-1 font-semibold text-[#0F172A]">{requiresPayment ? "Esperando aprobación" : "Activo"}</div>
+              <div className="mt-1 font-semibold text-[#0F172A]">{requiresPayment ? "Esperando pago" : "Activo"}</div>
             </div>
           </div>
 
@@ -473,10 +403,10 @@ export default function CourseCheckoutForm({ lang, job, variant = "modal", onClo
               </Button>
             ) : null}
             <Link
-              href={`/${lang}/dashboard`}
+              href={createdEnrollmentId ? `/${lang}/dashboard/inscripciones/${createdEnrollmentId}` : `/${lang}/dashboard`}
               className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#1B2B50] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#133778]"
             >
-              Ir a mi panel
+              {createdEnrollmentId ? "Ver inscripción" : "Ir a mi panel"}
               <ChevronRight className="h-4 w-4" />
             </Link>
           </div>
@@ -505,7 +435,7 @@ export default function CourseCheckoutForm({ lang, job, variant = "modal", onClo
                 <h2 className="mt-2 truncate text-[28px] font-semibold tracking-[-0.03em] text-[#0F172A]">
                   {job?.title || "Inscripción"}
                 </h2>
-                <p className="mt-1 text-sm text-[#667085]">Un proceso corto: perfil, pago y comprobante.</p>
+                <p className="mt-1 text-sm text-[#667085]">Un proceso corto: perfil, pago y confirmación.</p>
                 <div className="mt-3 flex flex-wrap gap-2 text-[13px] text-[#667085]">
                   <span>{job?.companyName || "ACAV"}</span>
                   {amount > 0 ? <span>· {formatCurrency(amount)}</span> : <span>· Gratuito</span>}
@@ -679,65 +609,14 @@ export default function CourseCheckoutForm({ lang, job, variant = "modal", onClo
             <div className="grid gap-6">
               {requiresPayment ? (
                 <div className="rounded-[20px] border border-[#E5EAF2] bg-white p-5">
-                  <div className="grid gap-2">
-                    <Label>Comprobante de transferencia</Label>
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept=".png,.jpg,.jpeg,.webp,.pdf,application/pdf,image/png,image/jpeg,image/webp"
-                      className="hidden"
-                      onChange={(e) => handleFiles(e.target.files)}
-                    />
-                    <button
-                      type="button"
-                      onClick={openFilePicker}
-                      className="group flex min-h-[170px] w-full flex-col items-center justify-center gap-3 rounded-[24px] border-2 border-dashed border-slate-200 bg-slate-50 px-6 py-8 text-center transition hover:border-[#1B2B50] hover:bg-[#F7FBFF]"
-                    >
-                      <span className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-[#1B2B50] shadow-sm">
-                        <FileUp className="h-6 w-6" />
-                      </span>
-                      <div>
-                        <div className="text-base font-semibold text-[#1B2B50]">
-                          {receiptFile ? "Comprobante listo para enviar" : "Sube tu comprobante"}
-                        </div>
-                        <div className="mt-2 text-sm leading-6 text-slate-500">
-                          Imagen o PDF. Máximo 10MB.
-                        </div>
-                      </div>
-                    </button>
-                    {receiptRestorationNeeded && !receiptFile ? (
-                      <p className="text-sm text-amber-700">
-                        Recuperamos tu borrador, pero por seguridad debes volver a adjuntar el comprobante.
-                      </p>
-                    ) : null}
-                    {receiptFile ? (
-                      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm">
-                        <div className="min-w-0">
-                          <div className="truncate font-semibold text-emerald-800">{receiptFile.name}</div>
-                          <div className="text-emerald-700">{formatBytes(receiptFile.size)}</div>
-                        </div>
-                        <Button type="button" variant="outline" size="sm" onClick={openFilePicker}>
-                          Cambiar archivo
-                        </Button>
-                      </div>
-                    ) : null}
-                    {errors.receiptFile ? <p className="text-sm text-destructive">{errors.receiptFile.message}</p> : null}
+                  <div className="rounded-[16px] border border-[#DCE6F7] bg-[#F8FBFF] p-4 text-sm leading-6 text-[#52607A]">
+                    No te pediremos el comprobante dentro de este modal. Primero dejamos iniciada tu inscripción y luego podrás seguir el estado del pago desde tu panel.
                   </div>
 
                   <div className="mt-4 grid gap-2">
                     <Label>Referencia (opcional)</Label>
                     <Input placeholder="Últimos números, banco o aclaración" className="h-12 rounded-[14px]" {...register("paymentReference")} />
                   </div>
-
-                  {submitting ? (
-                    <div className="mt-4 rounded-2xl border border-slate-200 bg-[#FAFBFD] p-4">
-                      <div className="mb-2 flex items-center justify-between gap-3 text-sm">
-                        <span className="font-semibold text-[#1B2B50]">Subiendo comprobante...</span>
-                        <span className="text-slate-400">{uploadProgress}%</span>
-                      </div>
-                      <Progress value={uploadProgress} size="sm" color="primary" className="bg-slate-100 [&>div]:bg-[#1B2B50]" />
-                    </div>
-                  ) : null}
                 </div>
               ) : (
                 <div className="rounded-[20px] border border-emerald-200 bg-emerald-50 p-5 text-sm text-emerald-800">
@@ -754,7 +633,7 @@ export default function CourseCheckoutForm({ lang, job, variant = "modal", onClo
                     <div className="text-sm font-semibold text-[#0F172A]">Confirmación final</div>
                     <p className="mt-1 text-xs leading-5 text-[#667085]">
                       {requiresPayment
-                        ? "Enviaremos tu comprobante para revisión manual y te avisaremos cuando el curso quede activo."
+                        ? "Crearemos tu inscripción con el pago pendiente para que puedas continuar el seguimiento desde tu panel."
                         : "Al confirmar, tu curso quedará disponible de inmediato."}
                     </p>
                   </div>
@@ -828,7 +707,7 @@ export default function CourseCheckoutForm({ lang, job, variant = "modal", onClo
             ) : (
               <Button type="submit" className={`h-11 rounded-xl bg-[#1B2B50] px-6 font-semibold text-white hover:bg-[#133778] ${submitting ? "pointer-events-none" : ""}`}>
                 {submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                {submitting ? "Enviando..." : requiresPayment ? "Enviar comprobante" : "Confirmar inscripción"}
+                {submitting ? "Confirmando..." : "Confirmar inscripción"}
               </Button>
             )}
           </div>

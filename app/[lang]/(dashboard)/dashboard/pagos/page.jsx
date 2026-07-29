@@ -264,7 +264,7 @@ export default function DashboardPagosPage() {
           <p className="mt-2 text-sm text-muted-foreground">
             {actor?.role === "admin"
               ? "Centraliza conciliación, comprobantes y revisión manual de cobros."
-              : "Revisa el estado financiero de las inscripciones de tu institución."}
+              : "Consulta el estado financiero de cada inscripción desde una vista simple y completamente integrada al panel."}
           </p>
         </div>
 

@@ -457,7 +457,7 @@ function StudentEnrollmentRow({ enrollment, lang }) {
 
   return (
     <Link
-      href={`/${lang}/mis-inscripciones/${enrollment.id}`}
+      href={`/${lang}/dashboard/inscripciones/${enrollment.id}`}
       className="block w-full rounded-2xl border border-border/60 p-4 transition hover:border-primary/20 hover:bg-muted/20"
     >
       <div className="flex items-start justify-between gap-3">
@@ -482,7 +482,7 @@ function StudentPaymentRow({ enrollment, lang }) {
   const payment = resolvePaymentMeta(enrollment);
   return (
     <Link
-      href={`/${lang}/historial-pagos`}
+      href={`/${lang}/dashboard/pagos`}
       className="block w-full rounded-2xl border border-border/60 p-4 transition hover:border-primary/20 hover:bg-muted/20"
     >
       <div className="flex items-start justify-between gap-3">
@@ -503,7 +503,7 @@ function StudentCertificateRow({ enrollment, lang }) {
   const certificate = resolveCertificateMeta(enrollment);
   return (
     <Link
-      href={`/${lang}/mis-certificados`}
+      href={`/${lang}/dashboard/certificados`}
       className="block w-full rounded-2xl border border-border/60 p-4 transition hover:border-primary/20 hover:bg-muted/20"
     >
       <div className="flex items-start justify-between gap-3">
@@ -738,13 +738,16 @@ const DashboardPageView = () => {
               </div>
               <div className="flex flex-wrap gap-2">
                 <Button asChild variant="outline">
-                  <Link href={`/${lang}/mis-inscripciones`}>Mis inscripciones</Link>
+                  <Link href={`/${lang}/dashboard/mis-cursos`}>Mis cursos</Link>
                 </Button>
                 <Button asChild variant="outline">
-                  <Link href={`/${lang}/mis-certificados`}>Mis certificados</Link>
+                  <Link href={`/${lang}/dashboard/inscripciones`}>Mis inscripciones</Link>
                 </Button>
                 <Button asChild variant="outline">
-                  <Link href={`/${lang}/historial-pagos`}>Historial de pagos</Link>
+                  <Link href={`/${lang}/dashboard/certificados`}>Mis certificados</Link>
+                </Button>
+                <Button asChild variant="outline">
+                  <Link href={`/${lang}/dashboard/pagos`}>Historial de pagos</Link>
                 </Button>
               </div>
             </CardContent>

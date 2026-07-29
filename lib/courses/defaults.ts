@@ -30,7 +30,7 @@ export const DEFAULT_COURSE_SETTINGS = {
   paymentCvu: "00000000000000000",
   paymentAccountHolder: "ACAV",
   paymentInstructions:
-    "Realiza la transferencia, sube el comprobante y el equipo revisará tu pago dentro de las próximas 24 hs hábiles.",
+    "Realiza la transferencia con estos datos. Tu inscripción quedará iniciada y podrás continuar el seguimiento del pago desde tu panel.",
   adminNotificationEmail: "",
   emailFrom: "",
   emailFromName: "",

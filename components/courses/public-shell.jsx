@@ -120,10 +120,10 @@ export default function PublicCoursesShell({
   const router = useRouter();
   const { user, logout, loading } = useAuth();
   const { actor, loading: actorLoading } = useCourseActor();
-  const isCandidate = actor?.role === "candidato";
-  const isDashboardRole = actor?.role === "admin" || actor?.role === "empresa";
+  const isCandidate = actor?.role === "alumno";
+  const isDashboardRole = actor?.role === "admin";
   const isAccountResolving = loading || (Boolean(user) && actorLoading);
-  const candidateAreaHref = `/${lang}/mi-campus`;
+  const candidateAreaHref = `/${lang}/dashboard`;
   const accountHomeHref = isDashboardRole
     ? `/${lang}/dashboard`
     : user
@@ -217,31 +217,31 @@ export default function PublicCoursesShell({
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem asChild className="rounded-xl px-3 py-2">
-                    <ViewTransitionLink href={`/${lang}/mi-campus`}>
+                    <ViewTransitionLink href={`/${lang}/dashboard`}>
                       <User className="mr-2 h-4 w-4" />
-                      Mi Campus
+                      Mi panel
                     </ViewTransitionLink>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild className="rounded-xl px-3 py-2">
-                    <ViewTransitionLink href={`/${lang}/mis-cursos`}>
+                    <ViewTransitionLink href={`/${lang}/dashboard/mis-cursos`}>
                       <Bookmark className="mr-2 h-4 w-4" />
                       Mis Cursos
                     </ViewTransitionLink>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild className="rounded-xl px-3 py-2">
-                    <ViewTransitionLink href={`/${lang}/mis-inscripciones`}>
+                    <ViewTransitionLink href={`/${lang}/dashboard/inscripciones`}>
                       <Briefcase className="mr-2 h-4 w-4" />
                       Mis Inscripciones
                     </ViewTransitionLink>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild className="rounded-xl px-3 py-2">
-                    <ViewTransitionLink href={`/${lang}/mis-certificados`}>
+                    <ViewTransitionLink href={`/${lang}/dashboard/certificados`}>
                       <Award className="mr-2 h-4 w-4" />
                       Mis Certificados
                     </ViewTransitionLink>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild className="rounded-xl px-3 py-2">
-                    <ViewTransitionLink href={`/${lang}/historial-pagos`}>
+                    <ViewTransitionLink href={`/${lang}/dashboard/pagos`}>
                       <CreditCard className="mr-2 h-4 w-4" />
                       Historial de Pagos
                     </ViewTransitionLink>
@@ -434,23 +434,23 @@ export default function PublicCoursesShell({
                   {isDashboardRole
                     ? "Campus admin"
                     : user
-                      ? "Mi campus"
+                      ? "Mi panel"
                       : "Acceder"}
                 </Link>
                 <ViewTransitionLink
-                  href={`/${lang}/mis-cursos`}
+                  href={`/${lang}/dashboard/mis-cursos`}
                   className="transition hover:text-white"
                 >
                   Mis cursos
                 </ViewTransitionLink>
                 <ViewTransitionLink
-                  href={`/${lang}/mis-certificados`}
+                  href={`/${lang}/dashboard/certificados`}
                   className="transition hover:text-white"
                 >
                   Mis certificados
                 </ViewTransitionLink>
                 <ViewTransitionLink
-                  href={`/${lang}/historial-pagos`}
+                  href={`/${lang}/dashboard/pagos`}
                   className="transition hover:text-white"
                 >
                   Historial de pagos

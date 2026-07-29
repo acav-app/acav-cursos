@@ -170,7 +170,7 @@ export default function DashboardCertificadosPage() {
           <p className="mt-2 text-sm text-muted-foreground">
             {actor?.role === "admin"
               ? "Controla certificados emitidos, pendientes y accesos de descarga."
-              : "Gestiona constancias y seguimiento de certificados de tu institución."}
+              : "Consulta tus constancias emitidas y el estado de cada certificado desde el mismo dashboard."}
           </p>
         </div>
 

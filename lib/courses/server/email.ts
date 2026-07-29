@@ -217,15 +217,20 @@ export async function notifyStudentEnrollmentConfirmation(enrollment: any) {
   if (!to) return { ok: true, skipped: true };
 
   const subject = `Confirmación de inscripción: ${enrollment.courseTitle || enrollment.jobTitle}`;
+  const paymentStatus = enrollment.paymentStatus || enrollment?.payment?.status || "-";
+  const paymentMessage =
+    paymentStatus === "pending"
+      ? "Tu inscripción quedó iniciada con el pago pendiente. Puedes continuar el seguimiento desde tu panel."
+      : "Recibimos tu comprobante y el equipo revisará la acreditación manualmente.";
   const text = [
     "Tu inscripción fue registrada correctamente.",
     "",
     `Curso: ${enrollment.courseTitle || enrollment.jobTitle}`,
     `Institución: ${enrollment.institutionName || enrollment.companyName || "-"}`,
     `Estado: ${enrollment.status || "-"}`,
-    `Pago: ${enrollment.paymentStatus || enrollment?.payment?.status || "-"}`,
+    `Pago: ${paymentStatus}`,
     "",
-    "Recibimos tu comprobante y el equipo revisará la acreditación manualmente.",
+    paymentMessage,
   ].join("\n");
 
   return sendCourseEmail({

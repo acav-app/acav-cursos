@@ -41,9 +41,14 @@ export function middleware(request) {
   const publicLegacyRedirects = new Map([
     ["empleos", "cursos"],
     ["empresas", "instituciones"],
-    ["mi-perfil", "mi-campus"],
-    ["mis-guardados", "mis-cursos"],
-    ["mis-postulaciones", "mis-inscripciones"],
+    ["mi-perfil", "dashboard"],
+    ["mi-campus", "dashboard"],
+    ["mis-guardados", "dashboard/mis-cursos"],
+    ["mis-cursos", "dashboard/mis-cursos"],
+    ["mis-postulaciones", "dashboard/inscripciones"],
+    ["mis-inscripciones", "dashboard/inscripciones"],
+    ["mis-certificados", "dashboard/certificados"],
+    ["historial-pagos", "dashboard/pagos"],
     ["publicar-puesto", "publicar-curso"],
     ["registrar-empresa", "registrar-institucion"],
   ]);

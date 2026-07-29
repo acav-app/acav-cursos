@@ -107,8 +107,9 @@ export async function createEnrollment(input: unknown) {
   const paymentReference = String(parsed.paymentReference || "").trim();
   const paymentReceiptUrl = String(parsed.paymentReceiptUrl || "").trim();
   const shouldCreatePayment = Boolean(paymentAmount > 0 || paymentReceiptUrl || paymentReference);
-  const nextPaymentStatus = parsed.paymentStatus || (paymentAmount > 0 ? "under_review" : "approved");
-  const nextEnrollmentStatus = parsed.status || (paymentAmount > 0 ? "payment_under_review" : "active");
+  const hasReceipt = Boolean(paymentReceiptUrl);
+  const nextPaymentStatus = parsed.paymentStatus || (paymentAmount > 0 ? (hasReceipt ? "under_review" : "pending") : "approved");
+  const nextEnrollmentStatus = parsed.status || (paymentAmount > 0 ? (hasReceipt ? "payment_under_review" : "waiting_payment") : "active");
 
   const db = getAdminDb();
   const existingForCourse = await db

@@ -1,18 +1,5 @@
-import CampusPageTransition from "@/components/courses/campus-page-transition";
-import CampusPortalPanel from "@/components/courses/campus-portal-panel";
-import PublicCoursesShell from "@/components/courses/public-shell";
-import { getPublicCourseSettings } from "@/lib/courses/public";
+import { redirect } from "next/navigation";
 
 export default async function CampusCoursesPage({ params: { lang } }) {
-  const settings = await getPublicCourseSettings();
-
-  return (
-    <PublicCoursesShell lang={lang} settings={settings} navMode="routes">
-      <main>
-        <CampusPageTransition>
-          <CampusPortalPanel lang={lang} view="saved" />
-        </CampusPageTransition>
-      </main>
-    </PublicCoursesShell>
-  );
+  redirect(`/${lang}/dashboard/mis-cursos`);
 }

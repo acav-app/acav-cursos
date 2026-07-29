@@ -168,7 +168,7 @@ export default function DashboardInscripcionesPage() {
         <p className="mt-2 text-sm text-muted-foreground">
           {actor?.role === "admin"
             ? "Visualiza y filtra inscripciones por curso, institucion y estado."
-            : "Visualiza inscripciones recibidas para tu institucion."}
+            : "Sigue el estado de tus inscripciones curso por curso desde una vista simple y directa."}
         </p>
       </div>
 

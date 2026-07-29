@@ -375,8 +375,8 @@ export default function ApplicationPublicModal({ lang }) {
     <div className={`flex flex-col overflow-hidden bg-white ${submittedView ? "h-auto" : "h-full"}`}>
       <DialogTitle className="sr-only">{job?.title || "Inscripcion"}</DialogTitle>
       <DrawerTitle className="sr-only">{job?.title || "Inscripcion"}</DrawerTitle>
-      <DialogDescription className="sr-only">Confirma tu perfil, revisa el pago y sube el comprobante.</DialogDescription>
-      <DrawerDescription className="sr-only">Confirma tu perfil, revisa el pago y sube el comprobante.</DrawerDescription>
+      <DialogDescription className="sr-only">Confirma tu perfil, revisa el pago y completa tu inscripción.</DialogDescription>
+      <DrawerDescription className="sr-only">Confirma tu perfil, revisa el pago y completa tu inscripción.</DrawerDescription>
 
 {loading ? (
           <ApplicationModalSkeleton mobile={isMobile} step={skeletonStep} />

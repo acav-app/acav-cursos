@@ -1,4 +1,4 @@
-import { BarChart3, Briefcase, CreditCard, FileText, Trophy, Users2 } from "lucide-react";
+import { BarChart3, Bookmark, Briefcase, CreditCard, FileText, Trophy, Users2 } from "lucide-react";
 
 function withRoles(item) {
   return item;
@@ -123,6 +123,30 @@ export const menusConfig = {
       href: "/dashboard",
       roles: ["alumno"],
     }),
+    withRoles({
+      title: "Mis cursos",
+      icon: Bookmark,
+      href: "/dashboard/mis-cursos",
+      roles: ["alumno"],
+    }),
+    withRoles({
+      title: "Inscripciones",
+      icon: Briefcase,
+      href: "/dashboard/inscripciones",
+      roles: ["alumno"],
+    }),
+    withRoles({
+      title: "Pagos",
+      icon: CreditCard,
+      href: "/dashboard/pagos",
+      roles: ["alumno"],
+    }),
+    withRoles({
+      title: "Certificados",
+      icon: Trophy,
+      href: "/dashboard/certificados",
+      roles: ["alumno"],
+    }),
   ],
   sidebarNav: {
     modern: [
@@ -176,6 +200,30 @@ export const menusConfig = {
         title: "Mi panel",
         icon: BarChart3,
         href: "/dashboard",
+        roles: ["alumno"],
+      }),
+      withRoles({
+        title: "Mis cursos",
+        icon: Bookmark,
+        href: "/dashboard/mis-cursos",
+        roles: ["alumno"],
+      }),
+      withRoles({
+        title: "Inscripciones",
+        icon: Briefcase,
+        href: "/dashboard/inscripciones",
+        roles: ["alumno"],
+      }),
+      withRoles({
+        title: "Pagos",
+        icon: CreditCard,
+        href: "/dashboard/pagos",
+        roles: ["alumno"],
+      }),
+      withRoles({
+        title: "Certificados",
+        icon: Trophy,
+        href: "/dashboard/certificados",
         roles: ["alumno"],
       }),
     ],
@@ -234,6 +282,30 @@ export const menusConfig = {
         title: "Mi panel",
         icon: BarChart3,
         href: "/dashboard",
+        roles: ["alumno"],
+      }),
+      withRoles({
+        title: "Mis cursos",
+        icon: Bookmark,
+        href: "/dashboard/mis-cursos",
+        roles: ["alumno"],
+      }),
+      withRoles({
+        title: "Inscripciones",
+        icon: Briefcase,
+        href: "/dashboard/inscripciones",
+        roles: ["alumno"],
+      }),
+      withRoles({
+        title: "Pagos",
+        icon: CreditCard,
+        href: "/dashboard/pagos",
+        roles: ["alumno"],
+      }),
+      withRoles({
+        title: "Certificados",
+        icon: Trophy,
+        href: "/dashboard/certificados",
         roles: ["alumno"],
       }),
     ],
