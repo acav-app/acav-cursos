@@ -28,14 +28,20 @@ export default function CourseEnrollButton({
   const [alreadyApplied, setAlreadyApplied] = useState(false);
   const [checking, setChecking] = useState(false);
 
-  const resolvedHref = useMemo(() => {
-    const applyPath = href || `/${lang}/cursos/${slug}?inscribirse=${jobId}`;
-    const registerParams = new URLSearchParams({
-      redirect: applyPath,
-    });
-    return `/${lang}/auth/register?${registerParams.toString()}`;
+  const applyPath = useMemo(() => {
+    return href || `/${lang}/cursos/${slug}?inscribirse=${jobId}`;
   }, [href, jobId, lang, slug]);
-  const shouldCheck = Boolean(user) && actor?.role === "candidato" && Boolean(jobId);
+
+  const resolvedHref = useMemo(() => {
+    if (user) return applyPath;
+    const registerParams = new URLSearchParams({ redirect: applyPath });
+    return `/${lang}/auth/register?${registerParams.toString()}`;
+  }, [applyPath, lang, user]);
+
+  const actorRole = String(actor?.role || "").trim();
+  const isStudent = actorRole === "alumno";
+  const isAdmin = actorRole === "admin";
+  const shouldCheck = Boolean(user) && isStudent && Boolean(jobId);
 
   useEffect(() => {
     let alive = true;
@@ -111,6 +117,15 @@ export default function CourseEnrollButton({
         <CheckCircle2 className="h-4 w-4" />
         {appliedLabel}
       </span>
+    );
+  }
+
+  if (user && isAdmin) {
+    return (
+      <Link href={`/${lang}/dashboard`} scroll={scroll} className={className}>
+        Ir al panel
+        <ArrowRight className="h-4 w-4" />
+      </Link>
     );
   }
 
