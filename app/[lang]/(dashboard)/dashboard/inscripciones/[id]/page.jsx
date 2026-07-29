@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
-import { ArrowLeft, Loader2, Save } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Loader2, RotateCcw, Save, XCircle } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import FilePreview from "@/components/courses/file-preview";
 import { Button } from "@/components/ui/button";
@@ -15,10 +15,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/provider/auth.provider";
 import { authedFetch } from "@/lib/auth/authed-fetch";
 import { useLocalizedPath } from "@/lib/utils";
-import { ENROLLMENT_STATUSES } from "@/lib/courses/constants";
+import { ENROLLMENT_STATUSES, PAYMENT_STATUSES } from "@/lib/courses/constants";
 import { DashboardDetailSkeleton } from "@/components/courses/dashboard/page-skeletons";
 
 function dateLabel(iso) {
@@ -35,6 +36,8 @@ export default function InscripcionDetailPage({ params: { id } }) {
   const [application, setApplication] = useState(null);
   const [course, setCourse] = useState(null);
   const [status, setStatus] = useState("");
+  const [paymentStatus, setPaymentStatus] = useState("");
+  const [reviewComment, setReviewComment] = useState("");
   const [institutionStatus, setInstitutionStatus] = useState("");
 
   useEffect(() => {
@@ -48,6 +51,8 @@ export default function InscripcionDetailPage({ params: { id } }) {
         const nextApplication = data?.enrollment || null;
         setApplication(nextApplication);
         setStatus(nextApplication?.status || "");
+        setPaymentStatus(nextApplication?.paymentStatus || nextApplication?.payment?.status || "");
+        setReviewComment(nextApplication?.payment?.reviewComment || "");
         if (nextApplication?.institutionId || nextApplication?.companyId) {
           const institutionData = await authedFetch(user, `/api/institutions/${nextApplication.institutionId || nextApplication.companyId}`, { method: "GET" });
           if (!alive) return;
@@ -90,12 +95,77 @@ export default function InscripcionDetailPage({ params: { id } }) {
       setSaving(true);
       const data = await authedFetch(user, `/api/enrollments/${id}`, {
         method: "PATCH",
-        body: JSON.stringify({ status }),
+        body: JSON.stringify({
+          status,
+          paymentStatus,
+          reviewComment: reviewComment || undefined,
+          reviewedBy: user?.email || user?.uid || "admin",
+        }),
       });
       setApplication(data?.enrollment || null);
+      setStatus(data?.enrollment?.status || status);
+      setPaymentStatus(data?.enrollment?.paymentStatus || data?.enrollment?.payment?.status || paymentStatus);
+      setReviewComment(data?.enrollment?.payment?.reviewComment || reviewComment);
       toast.success("Estado actualizado", { position: "top-right" });
     } catch (e) {
       toast.error(e?.message || "Error actualizando estado", { position: "top-right" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleQuickAction = async (action) => {
+    if (!user) return;
+    if (!institutionAllowsManualManagement) {
+      toast.error(`No se puede revisar manualmente mientras la institucion este ${institutionStatusLabel}.`, {
+        position: "top-right",
+      });
+      return;
+    }
+
+    const payloadByAction = {
+      approve: {
+        status: "active",
+        paymentStatus: "approved",
+        approvedBy: user?.email || user?.uid || "admin",
+      },
+      reject: {
+        status: "rejected",
+        paymentStatus: "rejected",
+      },
+      request_receipt: {
+        status: "waiting_payment",
+        paymentStatus: "rejected",
+      },
+    };
+
+    const payload = payloadByAction[action];
+    if (!payload) return;
+
+    try {
+      setSaving(true);
+      const data = await authedFetch(user, `/api/enrollments/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          ...payload,
+          reviewComment: reviewComment || undefined,
+          reviewedBy: user?.email || user?.uid || "admin",
+        }),
+      });
+      setApplication(data?.enrollment || null);
+      setStatus(data?.enrollment?.status || payload.status);
+      setPaymentStatus(data?.enrollment?.paymentStatus || data?.enrollment?.payment?.status || payload.paymentStatus);
+      setReviewComment(data?.enrollment?.payment?.reviewComment || reviewComment);
+      toast.success(
+        action === "approve"
+          ? "Pago aprobado y curso activado."
+          : action === "reject"
+            ? "Inscripción rechazada."
+            : "Se solicitó un nuevo comprobante.",
+        { position: "top-right" }
+      );
+    } catch (e) {
+      toast.error(e?.message || "No pudimos actualizar la revisión.", { position: "top-right" });
     } finally {
       setSaving(false);
     }
@@ -154,7 +224,7 @@ export default function InscripcionDetailPage({ params: { id } }) {
           </div>
 
           <div className="rounded-3xl border border-border/60 bg-background p-6">
-            <div className="text-sm font-semibold text-foreground">Estado</div>
+            <div className="text-sm font-semibold text-foreground">Estado y pago</div>
             <div className="mt-4 grid gap-3">
               {!institutionAllowsManualManagement ? (
                 <Alert color="warning" variant="soft" className="items-start rounded-3xl border border-warning/20">
@@ -180,6 +250,60 @@ export default function InscripcionDetailPage({ params: { id } }) {
                 </SelectContent>
               </Select>
 
+              <Select value={paymentStatus} onValueChange={setPaymentStatus}>
+                <SelectTrigger disabled={!institutionAllowsManualManagement || saving}>
+                  <SelectValue placeholder="Seleccionar estado del pago" />
+                </SelectTrigger>
+                <SelectContent>
+                  {PAYMENT_STATUSES.map((item) => (
+                    <SelectItem key={item} value={item}>
+                      {item}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Textarea
+                value={reviewComment}
+                onChange={(event) => setReviewComment(event.target.value)}
+                placeholder="Comentario interno o motivo de revisión"
+                className="min-h-[110px] rounded-2xl"
+                disabled={!institutionAllowsManualManagement || saving}
+              />
+
+              <div className="grid gap-3 md:grid-cols-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => handleQuickAction("approve")}
+                  disabled={!institutionAllowsManualManagement || saving}
+                  className="border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+                >
+                  <CheckCircle2 className="mr-2 h-4 w-4" />
+                  Aprobar
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => handleQuickAction("request_receipt")}
+                  disabled={!institutionAllowsManualManagement || saving}
+                  className="border-amber-200 text-amber-700 hover:bg-amber-50"
+                >
+                  <RotateCcw className="mr-2 h-4 w-4" />
+                  Nuevo comprobante
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => handleQuickAction("reject")}
+                  disabled={!institutionAllowsManualManagement || saving}
+                  className="border-rose-200 text-rose-700 hover:bg-rose-50"
+                >
+                  <XCircle className="mr-2 h-4 w-4" />
+                  Rechazar
+                </Button>
+              </div>
+
               <Button
                 onClick={handleSave}
                 disabled={!institutionAllowsManualManagement || saving}
@@ -194,15 +318,18 @@ export default function InscripcionDetailPage({ params: { id } }) {
 
         <div className="mt-8 grid gap-6 md:grid-cols-2">
           <FilePreview
-            url={application.cvUrl}
-            title="Documentacion"
-            description="Imágenes, PDFs y textos se muestran directo. Documentos Office usan un visor embebido cuando la URL es pública."
+            url={application.paymentReceiptUrl || application?.payment?.receiptUrl || application.cvUrl}
+            title="Comprobante"
+            description="Vista previa del comprobante cargado para validar el pago de la inscripción."
           />
           <div className="rounded-3xl border border-border/60 bg-background p-6">
-            <div className="text-sm font-semibold text-foreground">Links</div>
+            <div className="text-sm font-semibold text-foreground">Pago</div>
             <div className="mt-4 grid gap-3">
-              <Input readOnly value={application.linkedinUrl || ""} placeholder="LinkedIn (no informado)" />
-              <Input readOnly value={application.portfolioUrl || ""} placeholder="Portfolio (no informado)" />
+              <Input readOnly value={String(application.paymentAmount || application.amount || "")} placeholder="Monto (no informado)" />
+              <Input readOnly value={application.paymentReference || application?.payment?.reference || ""} placeholder="Referencia (no informada)" />
+              <Input readOnly value={application.paymentMethod || application?.payment?.method || ""} placeholder="Método (no informado)" />
+              <Input readOnly value={application.paymentStatus || application?.payment?.status || ""} placeholder="Estado del pago (no informado)" />
+              <Textarea readOnly value={application?.payment?.reviewComment || reviewComment || ""} placeholder="Comentario de revisión (sin comentario)" className="min-h-[96px] rounded-2xl" />
             </div>
           </div>
         </div>

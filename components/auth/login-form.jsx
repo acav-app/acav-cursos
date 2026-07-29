@@ -42,6 +42,8 @@ const LogInForm = () => {
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const redirectParam = String(searchParams.get("redirect") || "").trim();
+  const safeRedirectPath = redirectParam.startsWith("/") ? redirectParam : "";
   const getCurrentLang = () => {
     const segments = pathname.split("/");
     return segments[1] || "es";
@@ -93,7 +95,7 @@ const LogInForm = () => {
         );
         toast.success("Inicio de sesión exitoso");
         const lang = getCurrentLang();
-        const nextPath = await resolveCoursePostLoginPath(credentials.user, lang);
+        const nextPath = await resolveCoursePostLoginPath(credentials.user, lang, safeRedirectPath);
         window.location.assign(nextPath);
         reset();
       } catch (error) {

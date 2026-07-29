@@ -193,8 +193,11 @@ export async function notifyInstitutionNewEnrollment(enrollment: any) {
     `Teléfono: ${enrollment.phone}`,
     `Ciudad: ${enrollment.city}`,
     `Provincia: ${enrollment.province || "-"}`,
+    `Monto: ${enrollment.paymentAmount || enrollment.amount || "-"}`,
+    `Estado del pago: ${enrollment.paymentStatus || enrollment?.payment?.status || "-"}`,
+    `Referencia: ${enrollment.paymentReference || enrollment?.payment?.reference || "-"}`,
     "",
-    `CV: ${enrollment.cvUrl}`,
+    `Comprobante: ${enrollment.paymentReceiptUrl || enrollment?.payment?.receiptUrl || enrollment.cvUrl || "-"}`,
   ].join("\n");
 
   return sendCourseEmail({
@@ -219,8 +222,10 @@ export async function notifyStudentEnrollmentConfirmation(enrollment: any) {
     "",
     `Curso: ${enrollment.courseTitle || enrollment.jobTitle}`,
     `Institución: ${enrollment.institutionName || enrollment.companyName || "-"}`,
+    `Estado: ${enrollment.status || "-"}`,
+    `Pago: ${enrollment.paymentStatus || enrollment?.payment?.status || "-"}`,
     "",
-    "Gracias por inscribirte.",
+    "Recibimos tu comprobante y el equipo revisará la acreditación manualmente.",
   ].join("\n");
 
   return sendCourseEmail({

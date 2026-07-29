@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
+import { CheckCircle2, Loader2, RotateCcw, XCircle } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -38,6 +40,7 @@ export default function DashboardInscripcionesPage() {
   const [institutionId, setInstitutionId] = useState("");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
+  const [actionLoadingId, setActionLoadingId] = useState("");
 
   useEffect(() => {
     let alive = true;
@@ -66,6 +69,62 @@ export default function DashboardInscripcionesPage() {
       alive = false;
     };
   }, [user]);
+
+  const syncEnrollment = (updatedEnrollment) => {
+    if (!updatedEnrollment?.id) return;
+    setApplications((current) =>
+      current.map((item) => (item.id === updatedEnrollment.id ? updatedEnrollment : item))
+    );
+  };
+
+  const handleQuickAction = async (application, action) => {
+    if (!user || !application?.id) return;
+
+    const payloadByAction = {
+      approve: {
+        status: "active",
+        paymentStatus: "approved",
+        approvedBy: user?.email || user?.uid || "admin",
+      },
+      request_receipt: {
+        status: "waiting_payment",
+        paymentStatus: "rejected",
+      },
+      reject: {
+        status: "rejected",
+        paymentStatus: "rejected",
+      },
+    };
+
+    const payload = payloadByAction[action];
+    if (!payload) return;
+
+    try {
+      setActionLoadingId(String(application.id));
+      const data = await authedFetch(user, `/api/enrollments/${application.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          ...payload,
+          reviewedBy: user?.email || user?.uid || "admin",
+        }),
+      });
+      syncEnrollment(data?.enrollment);
+      toast.success(
+        action === "approve"
+          ? "Pago aprobado y curso activado."
+          : action === "request_receipt"
+            ? "Se solicitó un nuevo comprobante."
+            : "Inscripción rechazada.",
+        { position: "top-right" }
+      );
+    } catch (error) {
+      toast.error(error?.message || "No pudimos actualizar la inscripción.", {
+        position: "top-right",
+      });
+    } finally {
+      setActionLoadingId("");
+    }
+  };
 
   const filtered = useMemo(() => {
     const email = String(queryEmail || "").trim().toLowerCase();
@@ -186,10 +245,58 @@ export default function DashboardInscripcionesPage() {
                       {application.courseTitle || application.jobTitle} · {application.institutionName || application.companyName}
                     </div>
                     <div className="mt-1 text-xs text-muted-foreground">
-                      {application.email} · {application.phone} · {application.city} · {application.province || "-"} · {application.status} · {dateLabel(application.createdAt)}
+                      {application.email} · {application.phone} · {application.city} · {application.province || "-"} · {application.status} · Pago: {application.paymentStatus || application?.payment?.status || "-"} · {dateLabel(application.createdAt)}
                     </div>
                   </div>
-                  <div className="text-sm font-semibold text-primary">Ver detalle</div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {actor?.role === "admin" ? (
+                      <>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={(event) => {
+                            event.preventDefault();
+                            handleQuickAction(application, "approve");
+                          }}
+                          disabled={actionLoadingId === String(application.id)}
+                          className="border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+                        >
+                          {actionLoadingId === String(application.id) ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}
+                          Aprobar
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={(event) => {
+                            event.preventDefault();
+                            handleQuickAction(application, "request_receipt");
+                          }}
+                          disabled={actionLoadingId === String(application.id)}
+                          className="border-amber-200 text-amber-700 hover:bg-amber-50"
+                        >
+                          <RotateCcw className="mr-2 h-4 w-4" />
+                          Nuevo comprobante
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={(event) => {
+                            event.preventDefault();
+                            handleQuickAction(application, "reject");
+                          }}
+                          disabled={actionLoadingId === String(application.id)}
+                          className="border-rose-200 text-rose-700 hover:bg-rose-50"
+                        >
+                          <XCircle className="mr-2 h-4 w-4" />
+                          Rechazar
+                        </Button>
+                      </>
+                    ) : null}
+                    <div className="text-sm font-semibold text-primary">Ver detalle</div>
+                  </div>
                 </div>
               </Link>
             ))

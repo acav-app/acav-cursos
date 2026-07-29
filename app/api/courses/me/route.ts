@@ -17,6 +17,9 @@ const StudentSelfUpdateSchema = z.object({
   displayName: z.string().trim().min(1).max(120).optional(),
   firstName: z.string().trim().min(1).max(80).optional(),
   lastName: z.string().trim().min(1).max(80).optional(),
+  phone: z.string().trim().min(1).max(40).optional(),
+  city: z.string().trim().min(1).max(120).optional(),
+  province: z.string().trim().min(1).max(120).optional(),
 });
 
 export function OPTIONS(request: Request) {

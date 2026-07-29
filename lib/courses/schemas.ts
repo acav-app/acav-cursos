@@ -15,7 +15,10 @@ import {
   COURSE_VIDEO_MAX_SIZE_BYTES,
   ENROLLMENT_STATUSES,
   INSTITUTION_STATUSES,
+  PAYMENT_METHODS,
+  PAYMENT_STATUSES,
   PORTAL_ROLES,
+  USER_ACCOUNT_STATUSES,
 } from "@/lib/courses/constants";
 
 export const CourseIsoDateString = z.string().min(1);
@@ -33,6 +36,15 @@ const OptionalUrl = z.preprocess(
 const OptionalEmail = z.preprocess(
   (value) => (value === "" || value === null || value === undefined ? undefined : value),
   z.string().email().optional()
+);
+
+const OptionalNumber = z.preprocess(
+  (value) => {
+    if (value === "" || value === null || value === undefined) return undefined;
+    const next = Number(value);
+    return Number.isFinite(next) ? next : value;
+  },
+  z.number().optional()
 );
 
 const StringArray = z.preprocess(
@@ -61,9 +73,12 @@ const CourseModuleSchema = z.object({
 });
 
 export const PortalRoleSchema = z.enum(PORTAL_ROLES);
+export const UserAccountStatusSchema = z.enum(USER_ACCOUNT_STATUSES);
 export const InstitutionStatusSchema = z.enum(INSTITUTION_STATUSES);
 export const CourseStatusSchema = z.enum(COURSE_STATUSES);
 export const EnrollmentStatusSchema = z.enum(ENROLLMENT_STATUSES);
+export const PaymentStatusSchema = z.enum(PAYMENT_STATUSES);
+export const PaymentMethodSchema = z.enum(PAYMENT_METHODS);
 
 export const PortalUserProfileSchema = z.object({
   uid: z.string().min(1),
@@ -71,12 +86,17 @@ export const PortalUserProfileSchema = z.object({
   displayName: OptionalString.optional(),
   firstName: OptionalString.optional(),
   lastName: OptionalString.optional(),
+  phone: OptionalString.optional(),
+  city: OptionalString.optional(),
+  province: OptionalString.optional(),
+  avatar: OptionalUrl.optional(),
   role: PortalRoleSchema,
   companyId: OptionalString.optional(),
   companyName: OptionalString.optional(),
   institutionId: OptionalString.optional(),
   institutionName: OptionalString.optional(),
   isActive: z.boolean().default(true),
+  accountStatus: UserAccountStatusSchema.default("active"),
   createdAt: CourseIsoDateString,
   updatedAt: CourseIsoDateString,
 });
@@ -216,14 +236,18 @@ export type CourseUpdateInput = z.infer<typeof CourseUpdateSchema>;
 export type CourseModuleInput = z.infer<typeof CourseModuleSchema>;
 
 const EnrollmentBaseSchema = z.object({
+  userId: z.string().min(1).optional(),
   courseId: z.string().min(1).optional(),
   jobId: z.string().min(1).optional(),
+  paymentId: z.string().min(1).optional(),
   courseTitle: z.string().min(1).optional(),
   jobTitle: z.string().min(1).optional(),
   institutionId: z.string().min(1).optional(),
   companyId: z.string().min(1).optional(),
   institutionName: z.string().min(1).optional(),
   companyName: z.string().min(1).optional(),
+  amount: z.number().nonnegative().optional(),
+  currency: z.string().min(1).optional(),
   firstName: z.string().min(1),
   lastName: z.string().min(1),
   studentName: OptionalString.optional(),
@@ -232,11 +256,20 @@ const EnrollmentBaseSchema = z.object({
   phone: z.string().min(1),
   city: z.string().min(1),
   province: z.string().min(1),
-  cvUrl: z.string().min(1),
+  cvUrl: OptionalUrl.optional(),
   linkedinUrl: OptionalUrl.optional(),
   portfolioUrl: OptionalUrl.optional(),
   message: OptionalString.optional(),
   status: EnrollmentStatusSchema.optional(),
+  paymentStatus: PaymentStatusSchema.optional(),
+  paymentMethod: PaymentMethodSchema.optional(),
+  paymentReference: OptionalString.optional(),
+  paymentReceiptUrl: OptionalUrl.optional(),
+  paymentAmount: OptionalNumber.optional(),
+  paymentCurrency: OptionalString.optional(),
+  progress: z.number().min(0).max(100).optional(),
+  approvedAt: CourseIsoDateString.optional(),
+  approvedBy: OptionalString.optional(),
   acceptedPrivacy: z.boolean().refine((value) => value === true, {
     message: "privacy_required",
   }),
@@ -255,12 +288,33 @@ export const EnrollmentCreateSchema = EnrollmentBaseSchema.superRefine(validateE
 
 export const EnrollmentUpdateSchema = z.object({
   status: EnrollmentStatusSchema.optional(),
+  paymentStatus: PaymentStatusSchema.optional(),
   message: OptionalString.optional(),
+  reviewComment: OptionalString.optional(),
   reviewedBy: OptionalString.optional(),
+  approvedBy: OptionalString.optional(),
+  approvedAt: CourseIsoDateString.optional(),
+  paymentId: OptionalString.optional(),
 });
 
 export const EnrollmentSchema = EnrollmentBaseSchema.extend({
   id: z.string().min(1),
+  payment: z
+    .object({
+      id: z.string().min(1).optional(),
+      amount: OptionalNumber.optional(),
+      currency: OptionalString.optional(),
+      method: PaymentMethodSchema.optional(),
+      receiptUrl: OptionalUrl.optional(),
+      reference: OptionalString.optional(),
+      status: PaymentStatusSchema.optional(),
+      reviewComment: OptionalString.optional(),
+      reviewedBy: OptionalString.optional(),
+      reviewedAt: CourseIsoDateString.optional(),
+      createdAt: CourseIsoDateString.optional(),
+      updatedAt: CourseIsoDateString.optional(),
+    })
+    .optional(),
   courseTitle: z.string().min(1).optional(),
   jobTitle: z.string().min(1).optional(),
   institutionName: z.string().min(1).optional(),
@@ -273,6 +327,44 @@ export const EnrollmentSchema = EnrollmentBaseSchema.extend({
 export type Enrollment = z.infer<typeof EnrollmentSchema>;
 export type EnrollmentCreateInput = z.infer<typeof EnrollmentCreateSchema>;
 export type EnrollmentUpdateInput = z.infer<typeof EnrollmentUpdateSchema>;
+
+const PaymentBaseSchema = z.object({
+  enrollmentId: z.string().min(1),
+  amount: z.number().nonnegative(),
+  currency: z.string().min(1).default("ARS"),
+  method: PaymentMethodSchema,
+  receiptUrl: OptionalUrl.optional(),
+  reference: OptionalString.optional(),
+  status: PaymentStatusSchema.optional(),
+  reviewComment: OptionalString.optional(),
+  reviewedBy: OptionalString.optional(),
+  reviewedAt: CourseIsoDateString.optional(),
+});
+
+export const PaymentCreateSchema = PaymentBaseSchema;
+
+export const PaymentUpdateSchema = z.object({
+  amount: z.number().nonnegative().optional(),
+  currency: z.string().min(1).optional(),
+  method: PaymentMethodSchema.optional(),
+  receiptUrl: OptionalUrl.optional(),
+  reference: OptionalString.optional(),
+  status: PaymentStatusSchema.optional(),
+  reviewComment: OptionalString.optional(),
+  reviewedBy: OptionalString.optional(),
+  reviewedAt: CourseIsoDateString.optional(),
+});
+
+export const PaymentSchema = PaymentBaseSchema.extend({
+  id: z.string().min(1),
+  status: PaymentStatusSchema.default("pending"),
+  createdAt: CourseIsoDateString,
+  updatedAt: CourseIsoDateString.optional(),
+});
+
+export type Payment = z.infer<typeof PaymentSchema>;
+export type PaymentCreateInput = z.infer<typeof PaymentCreateSchema>;
+export type PaymentUpdateInput = z.infer<typeof PaymentUpdateSchema>;
 
 export const CourseStatSchema = z.object({
   label: z.string().min(1),
@@ -314,6 +406,11 @@ export const CourseSettingsSchema = z.object({
   socialLinks: z.array(SocialLinkSchema).optional(),
   legalLinks: z.array(LegalLinkSchema).optional(),
   testimonials: z.array(TestimonialSchema).optional(),
+  paymentAlias: OptionalString.optional(),
+  paymentCbu: OptionalString.optional(),
+  paymentCvu: OptionalString.optional(),
+  paymentAccountHolder: OptionalString.optional(),
+  paymentInstructions: OptionalString.optional(),
   adminNotificationEmail: OptionalEmail.optional(),
   emailFrom: OptionalEmail.optional(),
   emailFromName: OptionalString.optional(),

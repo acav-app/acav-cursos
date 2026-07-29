@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import ApplicationPublicForm from "@/components/courses/application-public-form";
+import CourseCheckoutForm from "@/components/courses/course-checkout-form";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Drawer, DrawerContent, DrawerDescription, DrawerTitle } from "@/components/ui/drawer";
 import { useMediaQuery } from "@/hooks/use-media-query";
@@ -22,9 +22,9 @@ function SkeletonBlock({ className = "" }) {
 }
 
 const SKELETON_STEPS = [
-  { title: "Tu perfil", description: "Datos de contacto y ubicación" },
-  { title: "CV y experiencia", description: "Adjuntá tu CV y sumá links" },
-  { title: "Confirmación", description: "Revisión final y consentimiento" },
+  { title: "Tu perfil", description: "Confirmación de datos" },
+  { title: "Pago", description: "Datos bancarios e importe" },
+  { title: "Confirmación", description: "Comprobante y envío final" },
 ];
 
 function ApplicationModalSkeleton({ mobile = false, step = 0 }) {
@@ -375,8 +375,8 @@ export default function ApplicationPublicModal({ lang }) {
     <div className={`flex flex-col overflow-hidden bg-white ${submittedView ? "h-auto" : "h-full"}`}>
       <DialogTitle className="sr-only">{job?.title || "Inscripcion"}</DialogTitle>
       <DrawerTitle className="sr-only">{job?.title || "Inscripcion"}</DrawerTitle>
-      <DialogDescription className="sr-only">Completa tu inscripcion y envia tu documentacion.</DialogDescription>
-      <DrawerDescription className="sr-only">Completa tu inscripcion y envia tu documentacion.</DrawerDescription>
+      <DialogDescription className="sr-only">Confirma tu perfil, revisa el pago y sube el comprobante.</DialogDescription>
+      <DrawerDescription className="sr-only">Confirma tu perfil, revisa el pago y sube el comprobante.</DrawerDescription>
 
 {loading ? (
           <ApplicationModalSkeleton mobile={isMobile} step={skeletonStep} />
@@ -387,7 +387,7 @@ export default function ApplicationPublicModal({ lang }) {
             </div>
           </div>
         ) : job ? (
-          <ApplicationPublicForm
+          <CourseCheckoutForm
             lang={lang}
             job={job}
             variant="modal"

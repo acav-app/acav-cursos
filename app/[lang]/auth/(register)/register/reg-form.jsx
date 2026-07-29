@@ -109,7 +109,7 @@ const RegForm = ({
         const credentials = await loginWithEmail(payload.email, data.password);
         toast.success("Cuenta creada correctamente.");
         reset();
-        const nextPath = safeRedirectPath || (await resolveCoursePostLoginPath(credentials.user, currentLang));
+        const nextPath = await resolveCoursePostLoginPath(credentials.user, currentLang, safeRedirectPath);
         window.location.assign(nextPath);
       } catch (error) {
         const message = getFirebaseRegisterErrorMessage(error);

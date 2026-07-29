@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
-import { CreditCard, ReceiptText, Wallet } from "lucide-react";
+import { CheckCircle2, CreditCard, Loader2, Receipt, RotateCcw, Wallet, XCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -61,7 +61,7 @@ function resolvePaymentMeta(enrollment) {
     };
   }
 
-  if (["pendiente", "pending", "processing", "in_process"].includes(paymentStatus)) {
+  if (["pendiente", "pending", "processing", "in_process", "under_review"].includes(paymentStatus)) {
     return {
       label: "Pendiente",
       tone: "warning",
@@ -112,6 +112,7 @@ export default function DashboardPagosPage() {
   const [courseId, setCourseId] = useState("");
   const [institutionId, setInstitutionId] = useState("");
   const [paymentState, setPaymentState] = useState("");
+  const [actionLoadingId, setActionLoadingId] = useState("");
 
   useEffect(() => {
     let alive = true;
@@ -160,8 +161,8 @@ export default function DashboardPagosPage() {
 
     return rows
       .filter((row) => (paymentState ? row.paymentMeta.label === paymentState : true))
-      .filter((row) => (courseId ? String(row.jobId || "") === courseId : true))
-      .filter((row) => (institutionId ? String(row.companyId || "") === institutionId : true))
+      .filter((row) => (courseId ? String(row.courseId || row.jobId || "") === courseId : true))
+      .filter((row) => (institutionId ? String(row.institutionId || row.companyId || "") === institutionId : true))
       .filter((row) => {
         if (!normalizedQuery) return true;
 
@@ -182,6 +183,62 @@ export default function DashboardPagosPage() {
     const noCharge = filtered.filter((row) => row.paymentMeta.label === "Sin cargo").length;
     return { total, credited, pending, noCharge };
   }, [filtered]);
+
+  const syncEnrollment = (updatedEnrollment) => {
+    if (!updatedEnrollment?.id) return;
+    setEnrollments((current) =>
+      current.map((item) => (item.id === updatedEnrollment.id ? updatedEnrollment : item))
+    );
+  };
+
+  const handleQuickAction = async (row, action) => {
+    if (!user || !row?.id) return;
+
+    const payloadByAction = {
+      approve: {
+        status: "active",
+        paymentStatus: "approved",
+        approvedBy: user?.email || user?.uid || "admin",
+      },
+      request_receipt: {
+        status: "waiting_payment",
+        paymentStatus: "rejected",
+      },
+      reject: {
+        status: "rejected",
+        paymentStatus: "rejected",
+      },
+    };
+
+    const payload = payloadByAction[action];
+    if (!payload) return;
+
+    try {
+      setActionLoadingId(String(row.id));
+      const data = await authedFetch(user, `/api/enrollments/${row.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          ...payload,
+          reviewedBy: user?.email || user?.uid || "admin",
+        }),
+      });
+      syncEnrollment(data?.enrollment);
+      toast.success(
+        action === "approve"
+          ? "Pago aprobado y curso activado."
+          : action === "request_receipt"
+            ? "Se solicitó un nuevo comprobante."
+            : "Inscripción rechazada.",
+        { position: "top-right" }
+      );
+    } catch (error) {
+      toast.error(error?.message || "No pudimos actualizar el pago.", {
+        position: "top-right",
+      });
+    } finally {
+      setActionLoadingId("");
+    }
+  };
 
   if (actorLoading || loading) {
     return <DashboardPageShellSkeleton showHeaderAction={false} filterColumns={4} rowCount={6} />;
@@ -267,7 +324,7 @@ export default function DashboardPagosPage() {
         <div className="mt-6 grid gap-4 md:grid-cols-4">
           <MetricCard icon={Wallet} label="Registros" value={String(summary.total)} helper="Inscripciones con seguimiento financiero" />
           <MetricCard icon={CreditCard} label="Acreditados" value={String(summary.credited)} helper="Pagos confirmados por el campus" />
-          <MetricCard icon={ReceiptText} label="Pendientes" value={String(summary.pending)} helper="Registros todavía en conciliación" />
+          <MetricCard icon={Receipt} label="Pendientes" value={String(summary.pending)} helper="Registros todavía en conciliación" />
           <MetricCard icon={Wallet} label="Sin cargo" value={String(summary.noCharge)} helper="Inscripciones cerradas sin cobro" />
         </div>
 
@@ -306,6 +363,40 @@ export default function DashboardPagosPage() {
                           Ver comprobante
                         </a>
                       </Button>
+                    ) : null}
+                    {actor?.role === "admin" ? (
+                      <>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => handleQuickAction(row, "approve")}
+                          disabled={actionLoadingId === String(row.id)}
+                          className="border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+                        >
+                          {actionLoadingId === String(row.id) ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}
+                          Aprobar
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => handleQuickAction(row, "request_receipt")}
+                          disabled={actionLoadingId === String(row.id)}
+                          className="border-amber-200 text-amber-700 hover:bg-amber-50"
+                        >
+                          <RotateCcw className="mr-2 h-4 w-4" />
+                          Nuevo comprobante
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => handleQuickAction(row, "reject")}
+                          disabled={actionLoadingId === String(row.id)}
+                          className="border-rose-200 text-rose-700 hover:bg-rose-50"
+                        >
+                          <XCircle className="mr-2 h-4 w-4" />
+                          Rechazar
+                        </Button>
+                      </>
                     ) : null}
                     <Button asChild variant="ghost">
                       <Link href={buildLocalizedPath(`/dashboard/inscripciones/${row.id}`)}>Ver inscripción</Link>

@@ -21,6 +21,7 @@ La idea es usar este archivo como fuente unica de seguimiento hasta finalizar:
 - Mantener el boton `Inscribirme` apuntando al flujo correcto de registro/inscripcion.
 - Reutilizar sidebar y componentes existentes del dashboard.
 - El producto principal es `Cursos`; admin y alumno deben sentirse como extensiones del mismo ecosistema.
+- La nueva fuente funcional de verdad para checkout, pago e inscripcion es `FLUJO_INSCRIPCION_Y_ACTIVACION_CURSOS.md`.
 
 ## Criterio de terminado
 
@@ -80,6 +81,7 @@ El proyecto se considera cerrado cuando se cumplan todos estos puntos:
 - [x] Limpiar metadata y branding global.
 - [x] Eliminar logica muerta del rol `candidato` dentro del dashboard interno.
 - [ ] Ejecutar refactor semantico interno de nombres legacy.
+- [ ] Migrar el flujo actual de inscripcion directa al nuevo flujo `Usuario -> Checkout -> Payment -> Enrollment -> Activacion`.
 
 ## Prioridad 1 - Funcionamiento critico
 
@@ -197,7 +199,7 @@ Checklist:
 
 Objetivo:
 
-- Simplificar el alta/inscripcion desde el catalogo hasta el panel del alumno.
+- Simplificar el alta/inscripcion desde el catalogo hasta el panel del alumno, separando identidad, enrollment y payment.
 
 Archivos a tocar:
 
@@ -211,6 +213,9 @@ Archivos a tocar:
 Checklist:
 
 - [ ] Confirmar un unico flujo de inscripcion.
+- [ ] Reemplazar el formulario actual de `documentacion/CV` por checkout + pago.
+- [ ] Crear entidad `payments` y su ciclo de revision.
+- [ ] Separar `userId`, `enrollmentId` y `paymentId` en toda la capa server.
 - [ ] Quitar nomenclatura de postulacion en UI visible.
 - [ ] Verificar que el CTA `Inscribirme` lleve siempre al flujo correcto.
 - [ ] Verificar mensajes de exito, errores y estados intermedios.

@@ -33,8 +33,16 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    const actor = await requireCourseActor(request);
+    assertRole(actor, ["admin", "alumno"]);
     const body = await request.json();
-    const enrollment = await createEnrollment(body);
+    const enrollment = await createEnrollment({
+      ...body,
+      userId: body?.userId || actor.uid,
+      email: body?.email || actor.email,
+      firstName: body?.firstName || actor.firstName || actor.displayName || "",
+      lastName: body?.lastName || actor.lastName || "",
+    });
     await Promise.all([
       notifyInstitutionNewEnrollment(enrollment),
       notifyStudentEnrollmentConfirmation(enrollment),

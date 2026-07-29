@@ -20,6 +20,7 @@ function normalizeCourseProfile(uid: string, data: any) {
     uid: String(uid || data?.uid || "").trim(),
     ...data,
     role: normalizePortalRole(data?.role),
+    accountStatus: data?.accountStatus || "active",
     institutionId: data?.institutionId || data?.companyId,
     institutionName: data?.institutionName || data?.companyName,
   } as PortalUserProfile;
@@ -64,6 +65,7 @@ export async function requireCourseActor(request: Request): Promise<CourseActor>
       displayName: "Dev Admin",
       role: "admin",
       isActive: true,
+      accountStatus: "active",
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       isDevBypass: true,

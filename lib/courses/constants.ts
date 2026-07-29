@@ -2,6 +2,12 @@ import { CANONICAL_PORTAL_ROLES } from "@/lib/courses/roles";
 
 export const PORTAL_ROLES = CANONICAL_PORTAL_ROLES;
 
+export const USER_ACCOUNT_STATUSES = [
+  "pending_email_verification",
+  "active",
+  "suspended",
+] as const;
+
 export const INSTITUTION_STATUSES = ["activa", "pendiente", "inactiva"] as const;
 
 export const COURSE_STATUSES = [
@@ -15,11 +21,31 @@ export const COURSE_STATUSES = [
 ] as const;
 
 export const ENROLLMENT_STATUSES = [
+  "started",
+  "waiting_payment",
+  "payment_under_review",
+  "active",
+  "rejected",
+  "cancelled",
   "recibida",
   "vista",
   "preseleccionada",
   "descartada",
   "contactada",
+] as const;
+
+export const PAYMENT_STATUSES = [
+  "pending",
+  "under_review",
+  "approved",
+  "rejected",
+] as const;
+
+export const PAYMENT_METHODS = [
+  "transferencia",
+  "manual",
+  "pasarela",
+  "otro",
 ] as const;
 
 export const COURSE_CATEGORIES = [

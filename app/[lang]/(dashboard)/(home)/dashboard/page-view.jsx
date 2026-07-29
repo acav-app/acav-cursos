@@ -173,7 +173,7 @@ function resolvePaymentMeta(enrollment) {
     };
   }
 
-  if (["pendiente", "pending", "processing", "in_process"].includes(paymentStatus)) {
+  if (["pendiente", "pending", "processing", "in_process", "under_review"].includes(paymentStatus)) {
     return {
       label: "Pendiente",
       tone: "warning",

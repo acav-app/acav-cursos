@@ -25,6 +25,12 @@ export const DEFAULT_COURSE_SETTINGS = {
   address: "",
   socialLinks: [],
   legalLinks: [],
+  paymentAlias: "acav.cursos",
+  paymentCbu: "00000000000000000",
+  paymentCvu: "00000000000000000",
+  paymentAccountHolder: "ACAV",
+  paymentInstructions:
+    "Realiza la transferencia, sube el comprobante y el equipo revisará tu pago dentro de las próximas 24 hs hábiles.",
   adminNotificationEmail: "",
   emailFrom: "",
   emailFromName: "",

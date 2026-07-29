@@ -22,6 +22,11 @@ const PUBLIC_SETTINGS_KEYS = [
   "socialLinks",
   "legalLinks",
   "testimonials",
+  "paymentAlias",
+  "paymentCbu",
+  "paymentCvu",
+  "paymentAccountHolder",
+  "paymentInstructions",
 ] as const;
 
 function normalizeSettings(settings: Record<string, any>) {
