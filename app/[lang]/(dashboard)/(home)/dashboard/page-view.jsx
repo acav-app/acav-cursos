@@ -80,8 +80,7 @@ const fromNowLabel = (iso) => {
 
 const roleLabel = {
   admin: "Administrador ACAV",
-  empresa: "Institucion asociada",
-  candidato: "Alumno",
+  alumno: "Alumno",
 };
 
 const statusLabel = {
@@ -118,8 +117,7 @@ const toneClasses = {
 
 const roleTone = {
   admin: "warning",
-  empresa: "success",
-  candidato: "info",
+  alumno: "info",
 };
 
 const formatBadgeDate = (iso) => {
@@ -214,7 +212,48 @@ function resolvePaymentMeta(enrollment) {
   };
 }
 
-function KpiCard({ title, value, detail, icon, tone = "default" }) {
+function resolveCertificateMeta(enrollment) {
+  const certificateUrl = String(
+    enrollment?.certificateUrl ||
+      enrollment?.certificate?.url ||
+      enrollment?.certificate?.downloadUrl ||
+      enrollment?.certificateDownloadUrl ||
+      ""
+  ).trim();
+  const issuedAt =
+    enrollment?.certificateIssuedAt ||
+    enrollment?.certificate?.issuedAt ||
+    enrollment?.certificateGeneratedAt ||
+    "";
+  const enrollmentStatus = String(enrollment?.status || "").trim().toLowerCase();
+
+  if (certificateUrl) {
+    return {
+      label: "Emitido",
+      tone: "success",
+      helper: issuedAt ? `Disponible desde el ${formatDate(issuedAt)}.` : "Ya puedes descargar tu certificado.",
+      downloadUrl: certificateUrl,
+    };
+  }
+
+  if (["descartada", "rechazada"].includes(enrollmentStatus)) {
+    return {
+      label: "Sin emisión",
+      tone: "secondary",
+      helper: "Esta inscripción se cerró sin certificado emitido.",
+      downloadUrl: "",
+    };
+  }
+
+  return {
+    label: "Pendiente",
+    tone: "warning",
+    helper: "La emisión todavía está pendiente.",
+    downloadUrl: "",
+  };
+}
+
+function KpiCard({ title, value, icon, tone = "default" }) {
   return (
     <Card className="rounded-3xl border border-border/60 bg-card/90 shadow-sm">
       <CardContent className="p-5">
@@ -224,7 +263,6 @@ function KpiCard({ title, value, detail, icon, tone = "default" }) {
               {title}
             </MetaBadge>
             <div className="mt-2 break-words text-3xl font-semibold text-foreground [overflow-wrap:anywhere]">{value}</div>
-            {detail ? <p className="mt-2 text-sm text-muted-foreground">{detail}</p> : null}
           </div>
           <ToneIcon icon={icon} tone={tone} />
         </div>
@@ -240,41 +278,6 @@ function EmptyBlock({ text }) {
 function DashboardSkeleton() {
   return (
     <div className="space-y-6 pb-8">
-      <section className="overflow-hidden rounded-[28px] border border-primary/15 bg-gradient-to-br from-primary/10 via-background to-background shadow-sm">
-        <div className="grid gap-6 p-6 lg:grid-cols-[1.4fr_0.8fr] lg:p-8">
-          <div className="min-w-0">
-            <Skeleton className="h-7 w-36 rounded-full" />
-            <div className="mt-4 flex flex-wrap items-center gap-4">
-              <Skeleton className="h-10 w-32 rounded-2xl" />
-              <Skeleton className="h-8 w-40 rounded-full" />
-            </div>
-            <Skeleton className="mt-5 h-10 w-full max-w-3xl rounded-2xl" />
-            <Skeleton className="mt-3 h-4 w-full max-w-2xl rounded-xl" />
-            <Skeleton className="mt-2 h-4 w-4/5 max-w-2xl rounded-xl" />
-            <div className="mt-5 flex flex-wrap gap-3">
-              <Skeleton className="h-11 w-36 rounded-2xl" />
-              <Skeleton className="h-11 w-40 rounded-2xl" />
-            </div>
-          </div>
-          <Card className="rounded-[28px] border border-border/60 bg-card/90">
-            <CardHeader className="pb-3">
-              <Skeleton className="h-6 w-40 rounded-xl" />
-            </CardHeader>
-            <CardContent className="grid gap-4">
-              {[0, 1, 2].map((item) => (
-                <div key={item} className="flex items-center justify-between rounded-2xl bg-muted/30 p-4">
-                  <div className="min-w-0 flex-1">
-                    <Skeleton className="h-3 w-28 rounded-xl" />
-                    <Skeleton className="mt-3 h-8 w-24 rounded-xl" />
-                  </div>
-                  <Skeleton className="h-10 w-10 rounded-2xl" />
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        </div>
-      </section>
-
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {[0, 1, 2, 3].map((item) => (
           <Card key={item} className="rounded-3xl border border-border/60 bg-card/90 shadow-sm">
@@ -332,6 +335,12 @@ function DashboardSkeleton() {
 }
 
 function JobRow({ job, lang, href }) {
+  const courseCategory = String(job?.subRubro || job?.categoryLabel || "Sin categoría").trim();
+  const courseModality = String(job?.modality || job?.modalityLabel || "Sin modalidad").trim();
+  const courseLevel = String(job?.level || "Sin nivel").trim();
+  const courseDuration = String(job?.duration || "").trim();
+  const creationLabel = formatDate(job?.createdAt);
+
   return (
     <Link
       href={href || `/${lang}/dashboard/cursos/${job.id}`}
@@ -341,7 +350,7 @@ function JobRow({ job, lang, href }) {
         <div className="min-w-0">
           <div className="truncate font-semibold text-foreground">{job?.title || "Curso"}</div>
           <div className="mt-1 truncate text-sm text-muted-foreground">
-            {job?.companyName || "Sin institucion"} · {job?.city || "Sin ciudad"}
+            {courseCategory} · {statusLabel[job?.status] || job?.status || "Sin estado"}
           </div>
         </div>
         <Badge color={statusTone(job?.status)} variant="soft" className="shrink-0">
@@ -349,9 +358,15 @@ function JobRow({ job, lang, href }) {
         </Badge>
       </div>
       <div className="mt-3 flex flex-wrap gap-2">
-        <MetaBadge color="default">{job?.area || "Sin area"}</MetaBadge>
-        <MetaBadge color="info">{job?.contractType || "Sin jornada"}</MetaBadge>
+        <MetaBadge color="default">{courseModality}</MetaBadge>
+        <MetaBadge color="info">{courseLevel}</MetaBadge>
+        {courseDuration ? <MetaBadge color="warning">{courseDuration}</MetaBadge> : null}
         <MetaBadge color={getExpiryTone(job?.expiresAt)}>{fromNowLabel(job?.expiresAt)}</MetaBadge>
+      </div>
+      <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+        <span>Cierre: {formatDate(job?.expiresAt)}</span>
+        <span>·</span>
+        <span>Creada: {creationLabel}</span>
       </div>
     </Link>
   );
@@ -431,6 +446,74 @@ function PaymentRow({ enrollment, lang }) {
         <span className="font-medium text-foreground">{payment.amountLabel}</span>
         <span>·</span>
         <span>{payment.helper}</span>
+      </div>
+    </Link>
+  );
+}
+
+function StudentEnrollmentRow({ enrollment, lang }) {
+  const courseTitle = enrollment?.jobTitle || enrollment?.courseTitle || "Curso";
+  const companyName = enrollment?.companyName || enrollment?.institutionName || "ACAV Cursos";
+
+  return (
+    <Link
+      href={`/${lang}/mis-inscripciones/${enrollment.id}`}
+      className="block w-full rounded-2xl border border-border/60 p-4 transition hover:border-primary/20 hover:bg-muted/20"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="truncate font-semibold text-foreground">{courseTitle}</div>
+          <div className="mt-1 truncate text-sm text-muted-foreground">{companyName}</div>
+        </div>
+        <Badge color={statusTone(enrollment?.status)} variant="soft" className="shrink-0">
+          {statusLabel[enrollment?.status] || enrollment?.status || "Recibida"}
+        </Badge>
+      </div>
+      <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+        <span>{formatDate(enrollment?.createdAt)}</span>
+        <span>·</span>
+        <span>{resolvePaymentMeta(enrollment).amountLabel}</span>
+      </div>
+    </Link>
+  );
+}
+
+function StudentPaymentRow({ enrollment, lang }) {
+  const payment = resolvePaymentMeta(enrollment);
+  return (
+    <Link
+      href={`/${lang}/historial-pagos`}
+      className="block w-full rounded-2xl border border-border/60 p-4 transition hover:border-primary/20 hover:bg-muted/20"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="truncate font-semibold text-foreground">{enrollment?.jobTitle || enrollment?.courseTitle || "Curso"}</div>
+          <div className="mt-1 truncate text-sm text-muted-foreground">{payment.helper}</div>
+        </div>
+        <Badge color={payment.tone} variant="soft" className="shrink-0">
+          {payment.label}
+        </Badge>
+      </div>
+      <div className="mt-3 text-xs font-medium text-foreground">{payment.amountLabel}</div>
+    </Link>
+  );
+}
+
+function StudentCertificateRow({ enrollment, lang }) {
+  const certificate = resolveCertificateMeta(enrollment);
+  return (
+    <Link
+      href={`/${lang}/mis-certificados`}
+      className="block w-full rounded-2xl border border-border/60 p-4 transition hover:border-primary/20 hover:bg-muted/20"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="truncate font-semibold text-foreground">{enrollment?.jobTitle || enrollment?.courseTitle || "Curso"}</div>
+          <div className="mt-1 truncate text-sm text-muted-foreground">{certificate.helper}</div>
+        </div>
+        <Badge color={certificate.tone} variant="soft" className="shrink-0">
+          {certificate.label}
+        </Badge>
       </div>
     </Link>
   );
@@ -575,120 +658,179 @@ const DashboardPageView = () => {
     return new Map(companies.map((company) => [company.id, company]));
   }, [companies]);
 
-  const roleSummary =
-    actor?.role === "empresa"
-      ? "Supervisas la operación esencial de tu institución con foco en cursos, alumnos y pagos."
-      : "Monitorea el rendimiento operativo del campus.";
+  const isStudent = actor?.role === "alumno";
 
-  const heroTitle =
-    actor?.role === "empresa"
-      ? "Backoffice de tu institución dentro de ACAV Cursos."
-      : "Centro operativo del ecosistema ACAV Cursos.";
+  const studentOverview = useMemo(() => {
+    const activeEnrollments = filteredApplications.filter((application) => !["descartada", "rechazada"].includes(String(application?.status || "").trim().toLowerCase())).length;
+    const emittedCertificates = filteredApplications.filter((application) => resolveCertificateMeta(application).label === "Emitido").length;
+    const creditedPayments = filteredApplications.filter((application) => resolvePaymentMeta(application).label === "Acreditado").length;
 
-  const panelEyebrow =
-    actor?.role === "empresa"
-      ? "Institución ACAV"
-      : "Backoffice ACAV";
+    return {
+      totalEnrollments: filteredApplications.length,
+      activeEnrollments,
+      emittedCertificates,
+      creditedPayments,
+    };
+  }, [filteredApplications]);
+
+  const studentBoards = useMemo(() => {
+    const latestEnrollments = [...filteredApplications]
+      .sort((a, b) => (parseIso(b?.createdAt)?.getTime() || 0) - (parseIso(a?.createdAt)?.getTime() || 0))
+      .slice(0, 4);
+
+    const paymentFollowUp = [...filteredApplications]
+      .filter((application) => ["Acreditado", "Pendiente", "Conciliación manual"].includes(resolvePaymentMeta(application).label))
+      .slice(0, 4);
+
+    const certificates = [...filteredApplications]
+      .filter((application) => ["Emitido", "Pendiente"].includes(resolveCertificateMeta(application).label))
+      .slice(0, 4);
+
+    return {
+      latestEnrollments,
+      paymentFollowUp,
+      certificates,
+    };
+  }, [filteredApplications]);
 
   if (actorLoading || loading) {
     return <DashboardSkeleton />;
   }
 
-  return (
-    <div className="space-y-6 pb-8">
-      <section className="overflow-hidden rounded-[28px] border border-[#22345E] bg-[linear-gradient(145deg,#15203B_0%,#1B2B50_55%,#15203B_100%)] text-white shadow-[0_18px_48px_rgba(21,32,59,0.18)]">
-        <div className="grid gap-6 p-6 lg:grid-cols-[1.4fr_0.8fr] lg:p-8">
-          <div className="min-w-0">
-            <Badge color="secondary" variant="soft" className="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-xs uppercase tracking-[0.18em] text-white">
-              {panelEyebrow}
-            </Badge>
-            <div className="mt-4 flex flex-wrap items-center gap-4">
-              <SiteLogo className="h-9 w-auto" />
-              <Badge color={roleTone[actor?.role] || "secondary"} variant="soft" className="rounded-full border border-white/10 bg-white/10 text-white">
-                {roleLabel[actor?.role] || "Panel interno"}
-              </Badge>
-              <MetaBadge color="default" className="border border-[#DD4913]/20 bg-[#DD4913]/15 text-[#FFD3C3]">
-                {fromDate || toDate ? "Filtro operativo" : "Vista general"}
-              </MetaBadge>
-            </div>
-            <h1 className="mt-5 max-w-3xl text-3xl font-semibold tracking-tight text-white md:text-4xl">
-              {heroTitle}
-            </h1>
-            <p className="mt-3 max-w-2xl text-sm leading-7 text-white/72 md:text-base">
-              {roleSummary}
-            </p>
-            <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-white/60">
-              <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1">Cursos</span>
-              <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1">Alumnos</span>
-              <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1">Pagos</span>
-            </div>
-            <div className="mt-5 flex flex-wrap gap-3">
-              <Button asChild className="bg-[#DD4913] text-white hover:bg-[#EB5B24]">
-                <Link href={`/${lang}/dashboard/cursos`}>Gestionar cursos</Link>
-              </Button>
-              <Button asChild variant="outline" className="border-white/20 bg-white/5 text-white hover:bg-white/10 hover:text-white">
-                <Link href={`/${lang}/dashboard/inscripciones`}>Seguir inscripciones</Link>
-              </Button>
-            </div>
-          </div>
+  if (isStudent) {
+    return (
+      <div className="space-y-6 pb-8">
+        <section className="grid gap-4 lg:grid-cols-4">
+          <KpiCard
+            title="Inscripciones"
+            value={studentOverview.totalEnrollments}
+            icon="solar:document-text-bold-duotone"
+            tone="default"
+          />
+          <KpiCard
+            title="Activas"
+            value={studentOverview.activeEnrollments}
+            icon="solar:book-bookmark-bold-duotone"
+            tone="info"
+          />
+          <KpiCard
+            title="Certificados"
+            value={studentOverview.emittedCertificates}
+            icon="solar:medal-ribbon-star-bold-duotone"
+            tone="success"
+          />
+          <KpiCard
+            title="Pagos acreditados"
+            value={studentOverview.creditedPayments}
+            icon="solar:card-bold-duotone"
+            tone="warning"
+          />
+        </section>
 
-          <Card className="rounded-[28px] border border-white/10 bg-white/10 text-white backdrop-blur-sm">
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between gap-3">
-                <CardTitle className="text-base">
-                  {actor?.role === "empresa" ? "Radar de tu institución" : "Pulso del campus"}
-                </CardTitle>
-                <MetaBadge color="default" className="border border-white/10 bg-white/10 text-white">
-                  Interno
-                </MetaBadge>
+        <section>
+          <Card className="rounded-3xl border border-border/60 bg-card">
+            <CardContent className="flex flex-col gap-4 p-5 lg:flex-row lg:items-end lg:justify-between">
+              <div className="min-w-0">
+                <div className="text-sm font-semibold text-foreground">Mi panel</div>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Sigue tus inscripciones, revisa pagos y accede rápido a tus certificados desde un mismo lugar.
+                </p>
               </div>
-            </CardHeader>
-            <CardContent className="grid gap-4">
-              <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 p-4">
-                <div>
-                  <div className="text-xs uppercase tracking-[0.16em] text-white/55">Cursos activos</div>
-                  <div className="mt-1 text-2xl font-semibold text-white">{overview.activeJobs}</div>
-                </div>
-                <ToneIcon icon="solar:case-round-bold-duotone" tone="default" />
-              </div>
-              <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 p-4">
-                <div>
-                  <div className="text-xs uppercase tracking-[0.16em] text-white/55">Alumnos recientes</div>
-                  <div className="mt-1 text-2xl font-semibold text-white">{overview.thisWeekApplications}</div>
-                </div>
-                <ToneIcon icon="solar:users-group-rounded-bold-duotone" tone="info" />
-              </div>
-              <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 p-4">
-                <div>
-                  <div className="text-xs uppercase tracking-[0.16em] text-white/55">Pagos acreditados</div>
-                  <div className="mt-1 text-2xl font-semibold text-white">{overview.creditedPayments}</div>
-                </div>
-                <ToneIcon icon="solar:card-bold-duotone" tone="warning" />
+              <div className="flex flex-wrap gap-2">
+                <Button asChild variant="outline">
+                  <Link href={`/${lang}/mis-inscripciones`}>Mis inscripciones</Link>
+                </Button>
+                <Button asChild variant="outline">
+                  <Link href={`/${lang}/mis-certificados`}>Mis certificados</Link>
+                </Button>
+                <Button asChild variant="outline">
+                  <Link href={`/${lang}/historial-pagos`}>Historial de pagos</Link>
+                </Button>
               </div>
             </CardContent>
           </Card>
-        </div>
-      </section>
+        </section>
 
+        <section className="grid gap-6 xl:grid-cols-3">
+          <Card className="rounded-3xl border border-border/60 bg-card">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between gap-3">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <ToneIcon icon="solar:document-text-bold-duotone" tone="default" />
+                  Inscripciones recientes
+                </CardTitle>
+                <MetaBadge color="default">{studentBoards.latestEnrollments.length}</MetaBadge>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {studentBoards.latestEnrollments.length
+                ? studentBoards.latestEnrollments.map((application) => (
+                    <StudentEnrollmentRow key={application.id} enrollment={application} lang={lang} />
+                  ))
+                : <EmptyBlock text="Todavía no tienes inscripciones registradas." />}
+            </CardContent>
+          </Card>
+
+          <Card className="rounded-3xl border border-border/60 bg-card">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between gap-3">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <ToneIcon icon="solar:card-bold-duotone" tone="warning" />
+                  Pagos
+                </CardTitle>
+                <MetaBadge color="warning">{studentBoards.paymentFollowUp.length}</MetaBadge>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {studentBoards.paymentFollowUp.length
+                ? studentBoards.paymentFollowUp.map((application) => (
+                    <StudentPaymentRow key={application.id} enrollment={application} lang={lang} />
+                  ))
+                : <EmptyBlock text="No hay movimientos de pago para mostrar." />}
+            </CardContent>
+          </Card>
+
+          <Card className="rounded-3xl border border-border/60 bg-card">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between gap-3">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <ToneIcon icon="solar:medal-ribbon-star-bold-duotone" tone="success" />
+                  Certificados
+                </CardTitle>
+                <MetaBadge color="success">{studentBoards.certificates.length}</MetaBadge>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {studentBoards.certificates.length
+                ? studentBoards.certificates.map((application) => (
+                    <StudentCertificateRow key={application.id} enrollment={application} lang={lang} />
+                  ))
+                : <EmptyBlock text="Aún no tienes certificados disponibles." />}
+            </CardContent>
+          </Card>
+        </section>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6 pb-8">
       <section className="grid gap-4 lg:grid-cols-3">
         <KpiCard
           title="Cursos"
           value={overview.totalCourses}
-          detail={`${overview.activeJobs} activos · ${overview.pendingJobs} en borrador o revisión · ${overview.closingSoonJobs} cierran pronto`}
           icon="solar:case-round-bold-duotone"
           tone="default"
         />
         <KpiCard
           title="Alumnos"
           value={overview.totalStudents}
-          detail={`${overview.thisWeekApplications} nuevas en el período · ${overview.reviewedApplications} ya gestionadas · ${overview.contactedApplications} con seguimiento`}
           icon="solar:users-group-rounded-bold-duotone"
           tone="info"
         />
         <KpiCard
           title="Pagos"
           value={overview.totalTrackedPayments}
-          detail={`${overview.creditedPayments} acreditados · ${overview.pendingPayments} pendientes/manuales · ${formatCurrency(overview.creditedRevenue)} confirmados`}
           icon="solar:card-bold-duotone"
           tone="warning"
         />

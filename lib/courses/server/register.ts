@@ -42,7 +42,7 @@ export async function registerCourseStudent(input: unknown) {
       firstName: parsed.firstName,
       lastName: parsed.lastName,
       displayName: `${parsed.firstName} ${parsed.lastName}`.trim(),
-      role: "candidato",
+      role: "alumno",
       isActive: true,
     });
 

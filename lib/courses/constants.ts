@@ -1,4 +1,6 @@
-export const PORTAL_ROLES = ["admin", "empresa", "candidato"] as const;
+import { CANONICAL_PORTAL_ROLES } from "@/lib/courses/roles";
+
+export const PORTAL_ROLES = CANONICAL_PORTAL_ROLES;
 
 export const INSTITUTION_STATUSES = ["activa", "pendiente", "inactiva"] as const;
 

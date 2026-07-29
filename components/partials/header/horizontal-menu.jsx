@@ -10,7 +10,8 @@ import Image from "next/image";
 import { useCourseActor } from "@/components/courses/dashboard/use-course-actor";
 export default function MainMenu({ trans }) {
   const { actor } = useCourseActor();
-  const menus = filterMenusByRole(menusConfig.mainNav || [], actor).filter((m) => String(m?.href || "").startsWith("/dashboard"));
+  const effectiveActor = actor || null;
+  const menus = filterMenusByRole(menusConfig.mainNav || [], effectiveActor).filter((m) => String(m?.href || "").startsWith("/dashboard"));
   const buildLocalizedPath = useLocalizedPath();
 
   const [offset, setOffset] = React.useState();

@@ -7,23 +7,45 @@ import type {
   Institution,
   PortalUserProfile,
 } from "@/lib/courses/schemas";
+import { isAdminRole, isStudentRole, normalizePortalRole } from "@/lib/courses/roles";
 import { err } from "@/lib/courses/server/errors";
 
 export type CourseActor = PortalUserProfile & {
   isDevBypass?: boolean;
 };
 
-async function getCourseProfile(uid: string) {
-  const db = getAdminDb();
-  const snap = await db.collection(COURSE_COLLECTIONS.userProfiles).doc(String(uid)).get();
-  if (!snap.exists) return null;
-  const data = snap.data() as any;
+function normalizeCourseProfile(uid: string, data: any) {
+  if (!data) return null;
   return {
-    uid: snap.id,
+    uid: String(uid || data?.uid || "").trim(),
     ...data,
+    role: normalizePortalRole(data?.role),
     institutionId: data?.institutionId || data?.companyId,
     institutionName: data?.institutionName || data?.companyName,
   } as PortalUserProfile;
+}
+
+async function getCourseProfileByUid(uid: string) {
+  const db = getAdminDb();
+  const snap = await db.collection(COURSE_COLLECTIONS.userProfiles).doc(String(uid)).get();
+  if (!snap.exists) return null;
+  return normalizeCourseProfile(snap.id, snap.data() as any);
+}
+
+async function getCourseProfileByEmail(email: string, authUid?: string) {
+  const normalizedEmail = String(email || "").trim().toLowerCase();
+  if (!normalizedEmail) return null;
+
+  const db = getAdminDb();
+  const snap = await db
+    .collection(COURSE_COLLECTIONS.userProfiles)
+    .where("email", "==", normalizedEmail)
+    .limit(1)
+    .get();
+
+  if (snap.empty) return null;
+  const doc = snap.docs[0];
+  return normalizeCourseProfile(authUid || doc.id, doc.data() as any);
 }
 
 export async function requireCourseActor(request: Request): Promise<CourseActor> {
@@ -31,13 +53,14 @@ export async function requireCourseActor(request: Request): Promise<CourseActor>
   const uid = String(decoded?.uid || "");
   if (!uid) throw err(401, "unauthorized");
 
-  const profile = await getCourseProfile(uid);
+  const email = String(decoded?.email || "").trim().toLowerCase();
+  const profile = (await getCourseProfileByUid(uid)) || (await getCourseProfileByEmail(email, uid));
   if (profile) return profile;
 
   if (isDevBypassEnabled()) {
     return {
       uid,
-      email: String(decoded?.email || "dev@example.com"),
+      email: String(decoded?.email || "admin@admin.com"),
       displayName: "Dev Admin",
       role: "admin",
       isActive: true,
@@ -53,11 +76,21 @@ export async function requireCourseActor(request: Request): Promise<CourseActor>
 export async function readOptionalCourseActor(request: Request): Promise<CourseActor | null> {
   const authHeader = request.headers.get("authorization");
   if (!authHeader) return null;
-  return requireCourseActor(request);
+  try {
+    return await requireCourseActor(request);
+  } catch (error: any) {
+    const status = Number(error?.status || 500);
+    if (status === 401 || status === 403) {
+      return null;
+    }
+    throw error;
+  }
 }
 
 export function assertRole(actor: CourseActor, roles: CourseActor["role"][]) {
-  if (!roles.includes(actor.role)) {
+  const actorRole = normalizePortalRole(actor.role);
+  const allowedRoles = roles.map((role) => normalizePortalRole(role));
+  if (!allowedRoles.includes(actorRole)) {
     throw err(403, "forbidden");
   }
 }
@@ -67,21 +100,18 @@ export function assertAdmin(actor: CourseActor) {
 }
 
 export function canManageInstitution(actor: CourseActor, institution: Partial<Institution> | null | undefined) {
-  if (actor.role === "admin") return true;
-  return actor.role === "empresa" && Boolean(actor.companyId) && actor.companyId === institution?.id;
+  void institution;
+  return isAdminRole(actor.role);
 }
 
 export function canManageCourse(actor: CourseActor, course: Partial<Course> | null | undefined) {
-  if (actor.role === "admin") return true;
-  return actor.role === "empresa" && Boolean(actor.companyId) && actor.companyId === (course?.institutionId || course?.companyId);
+  void course;
+  return isAdminRole(actor.role);
 }
 
 export function canViewEnrollment(actor: CourseActor, enrollment: Partial<Enrollment> | null | undefined) {
-  if (actor.role === "admin") return true;
-  if (actor.role === "empresa") {
-    return Boolean(actor.companyId) && actor.companyId === (enrollment?.institutionId || enrollment?.companyId);
-  }
-  if (actor.role === "candidato") {
+  if (isAdminRole(actor.role)) return true;
+  if (isStudentRole(actor.role)) {
     const actorEmail = String(actor.email || "").trim().toLowerCase();
     const enrollmentEmail = String(enrollment?.email || "").trim().toLowerCase();
     return Boolean(actorEmail) && actorEmail === enrollmentEmail;
@@ -90,5 +120,5 @@ export function canViewEnrollment(actor: CourseActor, enrollment: Partial<Enroll
 }
 
 export function canManageCourseSettings(actor: CourseActor, _settings?: Partial<CourseSettings> | null) {
-  return actor.role === "admin";
+  return isAdminRole(actor.role);
 }

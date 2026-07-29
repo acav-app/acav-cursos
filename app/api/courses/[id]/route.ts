@@ -29,7 +29,7 @@ export async function GET(request: Request, ctx: { params: { id: string } }) {
       return json({ course: toPublicCourse(course) }, { status: 200 }, request);
     }
 
-    if (actor.role === "empresa" && !canManageCourse(actor, course)) {
+    if (!canManageCourse(actor, course)) {
       return errorJson("forbidden", 403, request);
     }
 

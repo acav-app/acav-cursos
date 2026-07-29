@@ -11,7 +11,7 @@ export function OPTIONS(request: Request) {
 export async function GET(request: Request, ctx: { params: { id: string } }) {
   try {
     const actor = await requireCourseActor(request);
-    assertRole(actor, ["admin", "empresa", "candidato"]);
+    assertRole(actor, ["admin", "alumno"]);
     const enrollment = await getEnrollmentById(ctx.params.id);
     if (!enrollment) return errorJson("enrollment_not_found", 404, request);
     if (!canViewEnrollment(actor, enrollment)) return errorJson("forbidden", 403, request);
@@ -24,7 +24,7 @@ export async function GET(request: Request, ctx: { params: { id: string } }) {
 export async function PATCH(request: Request, ctx: { params: { id: string } }) {
   try {
     const actor = await requireCourseActor(request);
-    assertRole(actor, ["admin", "empresa"]);
+    assertRole(actor, ["admin"]);
     const enrollment = await getEnrollmentById(ctx.params.id);
     if (!enrollment) return errorJson("enrollment_not_found", 404, request);
     if (!canViewEnrollment(actor, enrollment)) return errorJson("forbidden", 403, request);

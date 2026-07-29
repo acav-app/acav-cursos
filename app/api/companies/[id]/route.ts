@@ -29,7 +29,7 @@ export async function GET(request: Request, ctx: { params: { id: string } }) {
       return json({ company: toPublicInstitution(company) }, { status: 200 }, request);
     }
 
-    if (actor.role === "empresa" && !canManageInstitution(actor, company)) {
+    if (!canManageInstitution(actor, company)) {
       return errorJson("forbidden", 403, request);
     }
 
@@ -47,12 +47,6 @@ export async function PATCH(request: Request, ctx: { params: { id: string } }) {
     if (!canManageInstitution(actor, company)) return errorJson("forbidden", 403, request);
 
     const body = await request.json();
-    if (actor.role === "empresa") {
-      delete body.status;
-      delete body.isVerified;
-      delete body.ownerUserId;
-    }
-
     const updated = await updateInstitution(ctx.params.id, body, { actor });
     return json(updated, { status: 200 }, request);
   } catch (e: any) {

@@ -289,9 +289,6 @@ const RegForm = ({
               <Label htmlFor="terms" className="cursor-pointer text-sm font-medium text-default-700">
                 Acepto terminos y condiciones del portal
               </Label>
-              <p className="mt-1 text-xs leading-6 text-default-500">
-                Creamos tu acceso de forma segura y lo vinculamos a tu perfil interno de cursos.
-              </p>
             </div>
           </div>
           {errors.acceptedTerms ? <div className="mt-3 text-sm text-destructive">{errors.acceptedTerms.message}</div> : null}
@@ -309,12 +306,6 @@ const RegForm = ({
             ¿Ya tenés cuenta?{" "}
             <Link href={buildLocalizedPath("/auth/login", currentLang)} className="font-medium text-primary">
               Iniciar sesión
-            </Link>
-          </div>
-          <div className="mt-2 text-center text-sm text-default-600">
-            ¿Representás una institución?{" "}
-            <Link href={buildLocalizedPath("/auth/login", currentLang)} className="font-medium text-primary">
-              Registrala desde el acceso principal
             </Link>
           </div>
         </>

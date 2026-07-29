@@ -1,4 +1,4 @@
-import { BarChart3, Briefcase, CreditCard, FileSearch, FileText, Trophy, Users2 } from "lucide-react";
+import { BarChart3, Briefcase, CreditCard, FileText, Trophy, Users2 } from "lucide-react";
 
 function withRoles(item) {
   return item;
@@ -13,20 +13,11 @@ function normalizeActor(actorOrRole) {
 
 function resolveMenuByActor(item, actor) {
   const role = String(actor?.role || "").trim().toLowerCase();
-  const companyId = String(actor?.companyId || "").trim();
 
-  if (role === "empresa" && item?.href === "/dashboard") {
+  if (role === "alumno" && item?.href === "/dashboard") {
     return {
       ...item,
-      title: "Mi Campus",
-    };
-  }
-
-  if (role === "empresa" && item?.href === "/dashboard/instituciones") {
-    return {
-      ...item,
-      title: "Mi institución",
-      href: companyId ? `/dashboard/instituciones/${companyId}` : "/dashboard/instituciones",
+      title: "Mi panel",
     };
   }
 
@@ -41,7 +32,7 @@ export function filterMenusByRole(items = [], actorOrRole) {
     .filter((item) => {
       const roles = Array.isArray(item?.roles) ? item.roles : [];
       if (!roles.length) return true;
-      if (!normalizedRole) return roles.includes("admin") ? false : roles.includes("empresa") ? false : roles.includes("candidato");
+      if (!normalizedRole) return false;
       return roles.includes(normalizedRole);
     })
     .map((item) => {
@@ -127,28 +118,10 @@ export const menusConfig = {
       roles: ["admin"],
     }),
     withRoles({
-      title: "Panel",
+      title: "Mi panel",
       icon: BarChart3,
       href: "/dashboard",
-      roles: ["empresa"],
-    }),
-    withRoles({
-      title: "Instituciones",
-      icon: Users2,
-      href: "/dashboard/instituciones",
-      roles: ["empresa"],
-    }),
-    withRoles({
-      title: "Cursos",
-      icon: Briefcase,
-      href: "/dashboard/cursos",
-      roles: ["empresa"],
-    }),
-    withRoles({
-      title: "Inscripciones",
-      icon: FileSearch,
-      href: "/dashboard/inscripciones",
-      roles: ["empresa"],
+      roles: ["alumno"],
     }),
   ],
   sidebarNav: {
@@ -200,28 +173,10 @@ export const menusConfig = {
         roles: ["admin"],
       }),
       withRoles({
-        title: "Panel",
+        title: "Mi panel",
         icon: BarChart3,
         href: "/dashboard",
-        roles: ["empresa"],
-      }),
-      withRoles({
-        title: "Instituciones",
-        icon: Users2,
-        href: "/dashboard/instituciones",
-        roles: ["empresa"],
-      }),
-      withRoles({
-        title: "Cursos",
-        icon: Briefcase,
-        href: "/dashboard/cursos",
-        roles: ["empresa"],
-      }),
-      withRoles({
-        title: "Inscripciones",
-        icon: FileSearch,
-        href: "/dashboard/inscripciones",
-        roles: ["empresa"],
+        roles: ["alumno"],
       }),
     ],
     classic: [
@@ -276,28 +231,10 @@ export const menusConfig = {
         roles: ["admin"],
       }),
       withRoles({
-        title: "Panel",
+        title: "Mi panel",
         icon: BarChart3,
         href: "/dashboard",
-        roles: ["empresa"],
-      }),
-      withRoles({
-        title: "Instituciones",
-        icon: Users2,
-        href: "/dashboard/instituciones",
-        roles: ["empresa"],
-      }),
-      withRoles({
-        title: "Cursos",
-        icon: Briefcase,
-        href: "/dashboard/cursos",
-        roles: ["empresa"],
-      }),
-      withRoles({
-        title: "Inscripciones",
-        icon: FileSearch,
-        href: "/dashboard/inscripciones",
-        roles: ["empresa"],
+        roles: ["alumno"],
       }),
     ],
   },

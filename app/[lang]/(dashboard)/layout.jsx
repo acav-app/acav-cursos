@@ -10,7 +10,7 @@ const Layout = ({ children, params: { lang } }) => {
   const { user, loading } = useAuth();
   const { actor, loading: actorLoading } = useCourseActor();
   const router = useRouter();
-  const isDashboardActor = actor?.role === "admin" || actor?.role === "empresa";
+  const isDashboardActor = actor?.role === "admin" || actor?.role === "alumno";
 
   useEffect(() => {
     if (!loading && !user) {

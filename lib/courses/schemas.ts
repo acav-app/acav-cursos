@@ -133,7 +133,7 @@ export const CourseCreateSchema = z.object({
   companyId: z.string().min(1).optional(),
   companyName: z.string().min(1).optional(),
   companyLogoUrl: OptionalUrl.optional(),
-  subRubro: z.enum(COURSE_CATEGORIES),
+  subRubro: z.string().trim().min(1),
   customSubRubro: OptionalString.optional(),
   area: z.enum(COURSE_AREAS).optional(),
   customArea: OptionalString.optional(),

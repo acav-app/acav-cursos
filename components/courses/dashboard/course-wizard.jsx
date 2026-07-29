@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -22,10 +23,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useAuth } from "@/provider/auth.provider";
-import { authedFetch, asArray } from "@/lib/auth/authed-fetch";
-import { cn, useLocalizedPath } from "@/lib/utils";
+import { authedFetch } from "@/lib/auth/authed-fetch";
+import { useLocalizedPath } from "@/lib/utils";
 import {
-  COURSE_CATEGORIES,
   COURSE_LANGUAGES,
   COURSE_LEVELS,
   COURSE_PUBLICATION_VISIBILITY,
@@ -35,13 +35,21 @@ import {
 } from "@/lib/courses/constants";
 import { uploadToR2 } from "@/components/courses/dashboard/upload";
 import { useCourseActor } from "@/components/courses/dashboard/use-course-actor";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 const COURSE_DRAFT_STORAGE_KEY = "acav:courses:wizard-draft-v2";
 
 const TAB_ITEMS = [
-  { id: "general", label: "Información" },
-  { id: "content", label: "Contenido" },
-  { id: "resources", label: "Multimedia" },
+  { id: "general", label: "Información Base" },
+  { id: "content", label: "Contenido Educativo" },
+  { id: "resources", label: "Multimedia y Recursos" },
   { id: "pricing", label: "Comercialización" },
   { id: "publish", label: "Publicación" },
 ];
@@ -55,8 +63,8 @@ const PUBLICATION_STATUS_OPTIONS = [
 ];
 
 const TAB_FIELD_MAP = {
-  general: ["academyId", "title", "slug", "category", "level", "modality", "language"],
-  content: ["shortDescription", "description", "learningObjectives", "requirements", "targetAudience", "modules", "duration", "classes"],
+  general: ["title", "slug", "category", "level", "modality", "language"],
+  content: ["shortDescription", "description", "learningObjectives", "requirements", "targetAudience", "modules", "duration", "classesCount"],
   resources: ["coverImage", "thumbnail", "promoVideo", "attachments"],
   pricing: [
     "price",
@@ -73,7 +81,7 @@ const TAB_FIELD_MAP = {
 
 const schema = z
   .object({
-    academyId: z.string().min(1, "El instructor o academia es obligatorio"),
+    academyId: z.string().optional(),
     title: z.string().min(4, "El título del curso es obligatorio"),
     slug: z.string().min(3, "La URL del curso es obligatoria"),
     category: z.string().min(1, "La categoría es obligatoria"),
@@ -82,21 +90,35 @@ const schema = z
     language: z.string().min(1, "El idioma es obligatorio"),
     shortDescription: z.string().max(180, "La descripción corta admite hasta 180 caracteres").optional(),
     description: z.string().min(20, "La descripción completa debe tener al menos 20 caracteres"),
-    learningObjectives: z.array(z.string().min(1)).min(1, "Agrega al menos un aprendizaje"),
-    requirements: z.array(z.string().min(1)).default([]),
-    targetAudience: z.array(z.string().min(1)).default([]),
-    modules: z
-      .array(
-        z.object({
-          id: z.string().min(1),
-          title: z.string().min(1, "El título del módulo es obligatorio"),
-          description: z.string().optional(),
-          lessons: z.array(z.string().min(1)).default([]),
-        })
-      )
-      .min(1, "Agrega al menos un módulo"),
+    learningObjectives: z.preprocess(
+      (value) => sanitizeList(value),
+      z.array(z.string().min(1)).min(1, "Agrega al menos un aprendizaje")
+    ),
+    requirements: z.preprocess((value) => sanitizeList(value), z.array(z.string().min(1)).default([])),
+    targetAudience: z.preprocess((value) => sanitizeList(value), z.array(z.string().min(1)).default([])),
+    modules: z.preprocess(
+      (value) =>
+        (Array.isArray(value) ? value : [])
+          .map((module, index) => ({
+            id: String(module?.id || `module-${index}`).trim(),
+            title: String(module?.title || "").trim(),
+            description: String(module?.description || "").trim(),
+            lessons: sanitizeList(module?.lessons),
+          }))
+          .filter((module) => module.title || module.description || module.lessons.length > 0),
+      z
+        .array(
+          z.object({
+            id: z.string().min(1),
+            title: z.string().min(1, "El título del módulo es obligatorio"),
+            description: z.string().optional(),
+            lessons: z.array(z.string().min(1)).default([]),
+          })
+        )
+        .min(1, "Agrega al menos un módulo")
+    ),
     duration: z.string().min(1, "La duración es obligatoria"),
-    classes: z.number().int().min(1, "La cantidad de clases debe ser mayor a 0"),
+    classesCount: z.number().int().min(1, "La cantidad de clases debe ser mayor a 0"),
     coverImage: z.string().url("La portada debe ser una URL válida").optional().or(z.literal("")),
     thumbnail: z.string().url("La miniatura debe ser una URL válida").optional().or(z.literal("")),
     promoVideo: z.string().url("El video debe ser una URL válida").optional().or(z.literal("")),
@@ -127,6 +149,16 @@ const schema = z
     expiresAtDate: z.string().min(1, "La fecha de publicación es obligatoria"),
   })
   .superRefine((values, ctx) => {
+    const validModules = (Array.isArray(values.modules) ? values.modules : []).filter((module) => {
+      const title = String(module?.title || "").trim();
+      const lessons = Array.isArray(module?.lessons)
+        ? module.lessons.map((lesson) => String(lesson || "").trim()).filter(Boolean)
+        : [];
+      return title && lessons.length > 0;
+    });
+    if (validModules.length === 0) {
+      ctx.addIssue({ code: "custom", message: "Agrega al menos un módulo con lecciones.", path: ["modules"] });
+    }
     if (!values.freeCourse && Number(values.price || 0) <= 0) {
       ctx.addIssue({ code: "custom", message: "Indica un precio o marca el curso como gratuito", path: ["price"] });
     }
@@ -229,10 +261,23 @@ function buildDraftStorageKey(actor, jobId) {
   return `${COURSE_DRAFT_STORAGE_KEY}:${userId}:${scope}`;
 }
 
+function isCustomSlugForTitle(title, slug) {
+  const normalizedTitleSlug = slugify(title);
+  const normalizedSlug = String(slug || "").trim();
+  return Boolean(normalizedSlug) && normalizedSlug !== normalizedTitleSlug;
+}
+
+function normalizeFormValues(values = {}, defaultValues) {
+  return {
+    ...defaultValues,
+    ...values,
+    classesCount: Number(values?.classesCount ?? values?.classes ?? defaultValues.classesCount ?? 1),
+  };
+}
+
 function hasMeaningfulDraftContent(values) {
   if (!values || typeof values !== "object") return false;
   return [
-    values.academyId,
     values.title,
     values.slug,
     values.category,
@@ -246,6 +291,21 @@ function hasMeaningfulDraftContent(values) {
     if (Array.isArray(value)) return value.length > 0;
     return Boolean(String(value || "").trim());
   });
+}
+
+function hasNestedFieldError(value) {
+  if (!value) return false;
+  if (typeof value === "object" && "message" in value && value.message) return true;
+  if (Array.isArray(value)) return value.some((item) => hasNestedFieldError(item));
+  if (typeof value === "object") return Object.values(value).some((item) => hasNestedFieldError(item));
+  return false;
+}
+
+function findFirstTabWithErrors(formErrors) {
+  return (
+    TAB_ITEMS.find((tab) => (TAB_FIELD_MAP[tab.id] || []).some((field) => hasNestedFieldError(formErrors?.[field])))?.id ||
+    "general"
+  );
 }
 
 function sanitizeList(items) {
@@ -298,10 +358,19 @@ function getCourseLoadErrorMessage(error) {
   return code;
 }
 
+function normalizeCategoryOptions(items = []) {
+  return Array.from(
+    new Set(
+      (Array.isArray(items) ? items : [])
+        .map((item) => String(item || "").trim())
+        .filter(Boolean)
+    )
+  ).sort((a, b) => a.localeCompare(b, "es"));
+}
+
 function mapCourseToFormValues(current, defaultValues) {
   return {
     ...defaultValues,
-    academyId: current.academyId || current.institutionId || current.companyId || "",
     title: current.title || "",
     slug: current.slug || "",
     category: current.subRubro || "",
@@ -314,12 +383,12 @@ function mapCourseToFormValues(current, defaultValues) {
       Array.isArray(current.learningObjectives) && current.learningObjectives.length ? current.learningObjectives : [""],
     requirements:
       Array.isArray(current.requirements) && current.requirements.length
-        ? current.requirements
+        ? sanitizeList(current.requirements)
         : typeof current.requirements === "string" && current.requirements.trim()
           ? current.requirements.split("\n").filter(Boolean)
-          : [""],
+          : [],
     targetAudience:
-      Array.isArray(current.targetAudience) && current.targetAudience.length ? current.targetAudience : [""],
+      Array.isArray(current.targetAudience) && current.targetAudience.length ? sanitizeList(current.targetAudience) : [],
     modules:
       Array.isArray(current.modules) && current.modules.length
         ? current.modules
@@ -332,7 +401,7 @@ function mapCourseToFormValues(current, defaultValues) {
             },
           ],
     duration: current.duration || "",
-    classes: Number(current.classes || 1),
+    classesCount: Number(current.classesCount || current.classes || 1),
     coverImage: current.imageUrl || "",
     thumbnail: current.thumbnailUrl || "",
     promoVideo: current.videoUrl || "",
@@ -494,30 +563,34 @@ function ModulesField({ modules, onChange, error }) {
 
 export default function CourseWizard({ jobId }) {
   const buildLocalizedPath = useLocalizedPath();
+  const router = useRouter();
   const { user } = useAuth();
   const { actor, loading: actorLoading, error: actorError } = useCourseActor();
-  const [institutions, setInstitutions] = useState([]);
   const [course, setCourse] = useState(null);
   const [loadingCourse, setLoadingCourse] = useState(Boolean(jobId));
   const [courseLoadError, setCourseLoadError] = useState("");
   const [courseLoadedAt, setCourseLoadedAt] = useState("");
-  const [saving, setSaving] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [activeTab, setActiveTab] = useState("general");
   const [draftSavedAt, setDraftSavedAt] = useState("");
   const [draftRestored, setDraftRestored] = useState(false);
   const [courseLoadAttempt, setCourseLoadAttempt] = useState(0);
+  const [slugTouchedManually, setSlugTouchedManually] = useState(Boolean(jobId));
+  const [categoryOptions, setCategoryOptions] = useState([]);
+  const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
+  const [newCategoryTitle, setNewCategoryTitle] = useState("");
 
-  const isAdmin = actor?.role === "admin";
   const draftStorageKey = useMemo(() => buildDraftStorageKey(actor, jobId), [actor, jobId]);
   const activeTabIndex = TAB_ITEMS.findIndex((tab) => tab.id === activeTab);
   const isLastTab = activeTabIndex === TAB_ITEMS.length - 1;
   const isFirstTab = activeTabIndex <= 0;
+  const busy = submitting || uploading;
   const primarySubmitLabel = actor?.role === "empresa" ? "Enviar a revisión" : "Guardar curso";
   const savingSubmitLabel = actor?.role === "empresa" ? "Enviando curso..." : "Guardando curso...";
 
   const defaultValues = useMemo(
     () => ({
-      academyId: "",
       title: "",
       slug: "",
       category: "",
@@ -527,8 +600,8 @@ export default function CourseWizard({ jobId }) {
       shortDescription: "",
       description: "",
       learningObjectives: [""],
-      requirements: [""],
-      targetAudience: [""],
+      requirements: [],
+      targetAudience: [],
       modules: [
         {
           id: `module-${Date.now()}`,
@@ -538,7 +611,7 @@ export default function CourseWizard({ jobId }) {
         },
       ],
       duration: "",
-      classes: 1,
+      classesCount: 1,
       coverImage: "",
       thumbnail: "",
       promoVideo: "",
@@ -582,46 +655,30 @@ export default function CourseWizard({ jobId }) {
   });
 
   const values = watch();
-  const selectedInstitution = useMemo(
-    () => institutions.find((institution) => institution.id === values.academyId) || null,
-    [institutions, values.academyId]
-  );
 
-  useEffect(() => {
-    let alive = true;
-    async function loadInstitutions() {
-      if (!user || !isAdmin) return;
-      try {
-        const data = await authedFetch(user, "/api/institutions", { method: "GET" });
-        if (!alive) return;
-        const nextInstitutions = asArray(data?.institutions);
-        setInstitutions(nextInstitutions);
-        if (!values.academyId && nextInstitutions[0]?.id) {
-          setValue("academyId", nextInstitutions[0].id, { shouldValidate: true, shouldDirty: false });
-        }
-      } catch (error) {
-        toast.error(error?.message || "No se pudieron cargar las academias.", { position: "top-right" });
-      }
-    }
-    loadInstitutions();
-    return () => {
-      alive = false;
-    };
-  }, [isAdmin, setValue, user, values.academyId]);
-
-  useEffect(() => {
-    if (!actor) return;
-    if (actor.role === "empresa" && actor.companyId) {
-      setValue("academyId", actor.companyId, { shouldValidate: true, shouldDirty: false });
-    }
-  }, [actor, setValue]);
+  const onInvalidSubmit = (formErrors) => {
+    const nextTab = findFirstTabWithErrors(formErrors);
+    setActiveTab(nextTab);
+    toast.error("Revisá los campos pendientes antes de guardar.", { position: "top-right" });
+  };
 
   useEffect(() => {
     if (!values.title) return;
+    if (slugTouchedManually) return;
     const generatedSlug = slugify(values.title);
     if (values.slug === generatedSlug) return;
     setValue("slug", generatedSlug, { shouldValidate: true, shouldDirty: true });
-  }, [setValue, values.slug, values.title]);
+  }, [setValue, slugTouchedManually, values.slug, values.title]);
+
+  useEffect(() => {
+    setCategoryOptions((current) =>
+      normalizeCategoryOptions([
+        ...current,
+        values.category,
+        course?.subRubro,
+      ])
+    );
+  }, [course?.subRubro, values.category]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -631,10 +688,11 @@ export default function CourseWizard({ jobId }) {
     try {
       const parsed = JSON.parse(raw);
       if (!parsed?.values || !hasMeaningfulDraftContent(parsed.values)) return;
-      reset({ ...defaultValues, ...parsed.values });
+      reset(normalizeFormValues(parsed.values, defaultValues));
       setActiveTab(parsed.activeTab || "general");
       setDraftSavedAt(String(parsed.updatedAt || ""));
       setDraftRestored(true);
+      setSlugTouchedManually(false);
       toast.success("Se recuperó un borrador del curso", { position: "top-right" });
     } catch {
       window.localStorage.removeItem(draftStorageKey);
@@ -676,6 +734,7 @@ export default function CourseWizard({ jobId }) {
         const current = data?.course || {};
         setCourse(current);
         reset(mapCourseToFormValues(current, defaultValues));
+        setSlugTouchedManually(isCustomSlugForTitle(current?.title, current?.slug));
         setCourseLoadError("");
         setCourseLoadedAt(new Date().toISOString());
         toast.success("Curso cargado correctamente", { position: "top-right" });
@@ -716,7 +775,7 @@ export default function CourseWizard({ jobId }) {
   const handleUpload = async (field, file, folder, successMessage) => {
     if (!file) return;
     try {
-      setSaving(true);
+      setUploading(true);
       const url = await uploadToR2(file, folder);
       setValue(field, url, { shouldValidate: true, shouldDirty: true });
       clearErrors(field);
@@ -724,14 +783,14 @@ export default function CourseWizard({ jobId }) {
     } catch (error) {
       toast.error(error?.message || "No se pudo subir el archivo.", { position: "top-right" });
     } finally {
-      setSaving(false);
+      setUploading(false);
     }
   };
 
   const handleAttachmentUpload = async (file) => {
     if (!file) return;
     try {
-      setSaving(true);
+      setUploading(true);
       const url = await uploadToR2(file, "courses/resources");
       const next = [
         ...(Array.isArray(values.attachments) ? values.attachments : []),
@@ -747,7 +806,7 @@ export default function CourseWizard({ jobId }) {
     } catch (error) {
       toast.error(error?.message || "No se pudo cargar el adjunto.", { position: "top-right" });
     } finally {
-      setSaving(false);
+      setUploading(false);
     }
   };
 
@@ -760,7 +819,7 @@ export default function CourseWizard({ jobId }) {
       return;
     }
     try {
-      setSaving(true);
+      setUploading(true);
       const metadata = await extractVideoMetadata(file);
       const url = await uploadToR2(file, "courses/videos");
       setValue("promoVideo", url, { shouldValidate: true, shouldDirty: true });
@@ -773,26 +832,24 @@ export default function CourseWizard({ jobId }) {
     } catch (error) {
       toast.error(error?.message || "No se pudo cargar el video.", { position: "top-right" });
     } finally {
-      setSaving(false);
+      setUploading(false);
     }
   };
 
-  const clearLocalDraft = () => {
+  const clearLocalDraft = ({ resetForm = true, showToast = true } = {}) => {
     if (typeof window === "undefined") return;
     window.localStorage.removeItem(draftStorageKey);
-    const nextAcademyId =
-      actor?.role === "empresa"
-        ? actor.companyId || ""
-        : institutions[0]?.id || "";
-    reset({
-      ...defaultValues,
-      academyId: nextAcademyId,
-    });
-    clearErrors();
-    setActiveTab("general");
+    if (resetForm) {
+      reset(defaultValues);
+      setSlugTouchedManually(false);
+      clearErrors();
+      setActiveTab("general");
+    }
     setDraftSavedAt("");
     setDraftRestored(false);
-    toast.success("Borrador limpiado", { position: "top-right" });
+    if (showToast) {
+      toast.success("Borrador limpiado", { position: "top-right" });
+    }
   };
 
   const removeAttachment = (attachmentId) => {
@@ -827,9 +884,33 @@ export default function CourseWizard({ jobId }) {
     setActiveTab(TAB_ITEMS[activeTabIndex + 1].id);
   };
 
+  const handleCreateCategory = async () => {
+    const nextCategory = String(newCategoryTitle || "").trim();
+    if (!nextCategory) {
+      toast.error("Ingresá un título para la categoría.", { position: "top-right" });
+      return;
+    }
+    const nextOptions = normalizeCategoryOptions([...categoryOptions, nextCategory]);
+    setCategoryOptions(nextOptions);
+    clearErrors("category");
+    setValue("category", nextCategory, {
+      shouldValidate: false,
+      shouldDirty: true,
+      shouldTouch: true,
+    });
+    await Promise.resolve();
+    await trigger("category");
+    setNewCategoryTitle("");
+    setCategoryDialogOpen(false);
+    toast.success("Categoría creada correctamente", { position: "top-right" });
+  };
+
   const buildPayload = (formValues, mode) => {
-    const academy = institutions.find((institution) => institution.id === formValues.academyId);
     const isFree = Boolean(formValues.freeCourse);
+    const resolvedInstitutionId = String(actor?.companyId || actor?.institutionId || course?.institutionId || course?.companyId || "").trim();
+    const resolvedInstitutionName = String(
+      actor?.companyName || actor?.institutionName || course?.institutionName || course?.companyName || ""
+    ).trim();
     const learningObjectives = sanitizeList(formValues.learningObjectives);
     const requirementsList = sanitizeList(formValues.requirements);
     const targetAudience = sanitizeList(formValues.targetAudience);
@@ -846,11 +927,13 @@ export default function CourseWizard({ jobId }) {
     };
 
     return {
-      academyId: formValues.academyId,
-      institutionId: formValues.academyId,
+      academyId: resolvedInstitutionId || undefined,
+      institutionId: resolvedInstitutionId || undefined,
+      companyId: resolvedInstitutionId || undefined,
       title: formValues.title,
       slug: formValues.slug,
-      institutionName: academy?.name || actor?.companyName || "",
+      institutionName: resolvedInstitutionName || undefined,
+      companyName: resolvedInstitutionName || undefined,
       subRubro: formValues.category,
       area: undefined,
       modality: formValues.modality,
@@ -863,7 +946,8 @@ export default function CourseWizard({ jobId }) {
       targetAudience,
       modules,
       duration,
-      classes: Number(formValues.classes || 0),
+      classes: Number(formValues.classesCount || 0),
+      classesCount: Number(formValues.classesCount || 0),
       benefits: [
         formValues.certificate ? "Incluye certificado" : "",
         formValues.downloadableResources ? "Material descargable" : "",
@@ -897,17 +981,17 @@ export default function CourseWizard({ jobId }) {
       expiresAt: isoFromDateInput(formValues.expiresAtDate),
       initialModality: modalityMap[formValues.modality] || "Virtual",
       workMode: modalityMap[formValues.modality] || "Virtual",
-      city: formValues.modality === "Presencial" || formValues.modality === "Híbrido" ? academy?.city || undefined : undefined,
+      city: String(course?.city || "").trim() || undefined,
       contractType: undefined,
       scheduleAvailability: [],
-      contactEmail: academy?.email || actor?.email || undefined,
+      contactEmail: actor?.email || undefined,
     };
   };
 
   const submit = async (formValues, mode) => {
-    if (!user) return;
+    if (!user || submitting) return;
     const payload = buildPayload(formValues, mode);
-    setSaving(true);
+    setSubmitting(true);
     try {
       if (jobId) {
         const data = await authedFetch(user, `/api/courses/${jobId}`, {
@@ -934,7 +1018,7 @@ export default function CourseWizard({ jobId }) {
       });
       throw error;
     } finally {
-      setSaving(false);
+      setSubmitting(false);
     }
   };
 
@@ -942,8 +1026,8 @@ export default function CourseWizard({ jobId }) {
     try {
       const mode = actor?.role === "admin" && formValues.status === "activa" ? "publish" : actor?.role === "admin" ? "draft" : "review";
       await submit(formValues, mode);
-      clearLocalDraft();
-      window.location.href = buildLocalizedPath("/dashboard/cursos");
+      clearLocalDraft({ resetForm: false, showToast: false });
+      router.push(buildLocalizedPath("/dashboard/cursos"));
     } catch (error) {
       toast.error(error?.message || "No se pudo guardar el curso.", { position: "top-right" });
     }
@@ -1010,43 +1094,7 @@ export default function CourseWizard({ jobId }) {
 
   return (
     <div className="grid gap-6">
-      {jobId && courseLoadedAt ? (
-        <div className="rounded-[24px] border border-emerald-200 bg-emerald-50 px-5 py-4">
-          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <div>
-              <div className="text-sm font-semibold text-emerald-700">Curso cargado correctamente</div>
-              <p className="mt-1 text-sm text-emerald-700/80">
-                Ya puedes editar el contenido. Carga completada el {new Date(courseLoadedAt).toLocaleString("es-AR")}.
-              </p>
-            </div>
-            <Button type="button" variant="outline" onClick={() => setCourseLoadedAt("")} className="border-emerald-200 bg-white text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800">
-              Ocultar aviso
-            </Button>
-          </div>
-        </div>
-      ) : null}
-
-      {draftSavedAt ? (
-        <div className="rounded-[24px] border border-primary/15 bg-primary/5 px-5 py-4">
-          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <div>
-              <div className="flex items-center gap-2 text-sm font-semibold text-primary">
-                <Save className="h-4 w-4" />
-                {draftRestored ? "Borrador recuperado" : "Guardado automático activo"}
-              </div>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Última actualización local: {new Date(draftSavedAt).toLocaleString("es-AR")}
-              </p>
-            </div>
-            <Button type="button" variant="outline" onClick={clearLocalDraft}>
-              <Trash2 className="mr-2 h-4 w-4" />
-              Limpiar borrador
-            </Button>
-          </div>
-        </div>
-      ) : null}
-
-      <form onSubmit={handleSubmit(onSubmit)} className="grid gap-6">
+      <form onSubmit={handleSubmit(onSubmit, onInvalidSubmit)} className="grid gap-6">
         <Tabs value={activeTab} onValueChange={handleTabChange} className="grid gap-6">
           <TabsList className="h-auto w-full flex-wrap justify-start gap-2 rounded-[24px] border border-border/60 bg-card p-2">
             {TAB_ITEMS.map((tab) => (
@@ -1062,7 +1110,6 @@ export default function CourseWizard({ jobId }) {
 
           <TabsContent value="general" className="mt-0 grid gap-6">
             <SectionCard title="Información base" description="Solo quedan los datos imprescindibles para vender el curso.">
-              <input type="hidden" {...register("academyId")} />
               <div className="grid gap-6 md:grid-cols-2">
                 <div className="grid gap-2">
                   <Label>Título del curso</Label>
@@ -1071,7 +1118,10 @@ export default function CourseWizard({ jobId }) {
                 </div>
                 <div className="grid gap-2">
                   <Label>URL del curso</Label>
-                  <Input placeholder="diseno-ux-para-elearning" {...register("slug")} />
+                  <input type="hidden" {...register("slug")} />
+                  <div className="flex min-h-10 items-center rounded-md border border-border/60 bg-muted/40 px-3 text-sm text-muted-foreground">
+                    {values.slug || "Se generará automáticamente desde el título"}
+                  </div>
                   <FieldError error={errors.slug} />
                 </div>
               </div>
@@ -1079,18 +1129,29 @@ export default function CourseWizard({ jobId }) {
               <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
                 <div className="grid gap-2">
                   <Label>Categoría</Label>
-                  <Select value={values.category || ""} onValueChange={(value) => setValue("category", value, { shouldValidate: true, shouldDirty: true })}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Seleccionar categoría" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {COURSE_CATEGORIES.map((item) => (
-                        <SelectItem key={item} value={item}>
-                          {item}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <div className="flex gap-2">
+                    <Select
+                      value={values.category || ""}
+                      onValueChange={(value) => {
+                        clearErrors("category");
+                        setValue("category", value, { shouldValidate: true, shouldDirty: true, shouldTouch: true });
+                      }}
+                    >
+                      <SelectTrigger className="flex-1">
+                        <SelectValue placeholder="Seleccionar categoría" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {categoryOptions.map((item) => (
+                          <SelectItem key={item} value={item}>
+                            {item}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button type="button" variant="outline" size="icon" onClick={() => setCategoryDialogOpen(true)} aria-label="Crear categoría">
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
                   <FieldError error={errors.category} />
                 </div>
                 <div className="grid gap-2">
@@ -1125,9 +1186,6 @@ export default function CourseWizard({ jobId }) {
                   </Select>
                   <FieldError error={errors.modality} />
                 </div>
-              </div>
-
-              <div className="grid gap-6 md:grid-cols-2">
                 <div className="grid gap-2">
                   <Label>Idioma</Label>
                   <Select value={values.language || ""} onValueChange={(value) => setValue("language", value, { shouldValidate: true, shouldDirty: true })}>
@@ -1143,13 +1201,12 @@ export default function CourseWizard({ jobId }) {
                     </SelectContent>
                   </Select>
                 </div>
-                {errors.academyId ? <FieldError error={errors.academyId} /> : null}
               </div>
             </SectionCard>
           </TabsContent>
 
           <TabsContent value="content" className="mt-0 grid gap-6">
-            <SectionCard title="Narrativa comercial" description="Cuenta qué resuelve el curso y por qué vale la pena.">
+            <SectionCard title="Contenido educativo" description="Cuenta qué resuelve el curso y organiza su propuesta de aprendizaje.">
               <div className="grid gap-2">
                 <Label>Descripción corta</Label>
                 <Textarea rows={3} maxLength={180} placeholder="Resumen breve orientado a venta y conversión." {...register("shortDescription")} />
@@ -1176,7 +1233,7 @@ export default function CourseWizard({ jobId }) {
                 error={errors.learningObjectives}
               />
               <DynamicListField
-                label="Requisitos"
+                label="Requisitos previos"
                 description="Conocimientos previos o herramientas necesarias."
                 items={values.requirements || []}
                 onChange={(next) => updateArrayField("requirements", next)}
@@ -1184,7 +1241,7 @@ export default function CourseWizard({ jobId }) {
                 error={errors.requirements}
               />
               <DynamicListField
-                label="¿A quién está dirigido?"
+                label="Audiencia objetivo"
                 items={values.targetAudience || []}
                 onChange={(next) => updateArrayField("targetAudience", next)}
                 placeholder="Ej: Diseñadores UX que venden formación online"
@@ -1193,7 +1250,7 @@ export default function CourseWizard({ jobId }) {
               <ModulesField modules={values.modules || []} onChange={updateModules} error={errors.modules} />
               <div className="grid gap-6 md:grid-cols-2">
                 <div className="grid gap-2">
-                  <Label>Duración</Label>
+                  <Label>Duración estimada (horas/semanas)</Label>
                   <Input placeholder="Ej: 12 horas / 6 semanas" {...register("duration")} />
                   <FieldError error={errors.duration} />
                 </div>
@@ -1202,22 +1259,22 @@ export default function CourseWizard({ jobId }) {
                   <Input
                     type="number"
                     min="1"
-                    value={values.classes ?? 1}
-                    onChange={(event) => setValue("classes", Number(event.target.value || 0), { shouldValidate: true, shouldDirty: true })}
+                    value={values.classesCount ?? 1}
+                    onChange={(event) => setValue("classesCount", Number(event.target.value || 0), { shouldValidate: true, shouldDirty: true })}
                   />
-                  <FieldError error={errors.classes} />
+                  <FieldError error={errors.classesCount} />
                 </div>
               </div>
             </SectionCard>
           </TabsContent>
 
           <TabsContent value="resources" className="mt-0 grid gap-6">
-            <SectionCard title="Activos visuales" description="Sube solo lo necesario para mostrar y vender mejor el curso.">
+            <SectionCard title="Multimedia y recursos" description="Sube solo lo necesario para mostrar y vender mejor el curso.">
               <div className="grid gap-6 lg:grid-cols-2">
                 <div className="grid gap-3">
                   <Label>Portada del curso</Label>
                   <div className="rounded-[24px] border border-border/60 bg-background p-4">
-                    <Input type="file" accept="image/*" onChange={(e) => handleUpload("coverImage", e.target.files?.[0], "courses/covers", "Portada cargada")} disabled={saving} />
+                    <Input type="file" accept="image/*" onChange={(e) => handleUpload("coverImage", e.target.files?.[0], "courses/covers", "Portada cargada")} disabled={busy} />
                     <div className="mt-3 flex items-center gap-2 text-sm text-muted-foreground">
                       <UploadCloud className="h-4 w-4" />
                       Optimizada para catálogo y detalle.
@@ -1229,7 +1286,7 @@ export default function CourseWizard({ jobId }) {
                 <div className="grid gap-3">
                   <Label>Miniatura</Label>
                   <div className="rounded-[24px] border border-border/60 bg-background p-4">
-                    <Input type="file" accept="image/*" onChange={(e) => handleUpload("thumbnail", e.target.files?.[0], "courses/thumbnails", "Miniatura cargada")} disabled={saving} />
+                    <Input type="file" accept="image/*" onChange={(e) => handleUpload("thumbnail", e.target.files?.[0], "courses/thumbnails", "Miniatura cargada")} disabled={busy} />
                     <div className="mt-3 flex items-center gap-2 text-sm text-muted-foreground">
                       <UploadCloud className="h-4 w-4" />
                       Ideal para cards pequeñas y carruseles.
@@ -1240,9 +1297,9 @@ export default function CourseWizard({ jobId }) {
               </div>
 
               <div className="grid gap-3">
-                <Label>Video de presentación</Label>
+                <Label>Video promocional</Label>
                 <div className="rounded-[24px] border border-border/60 bg-background p-4">
-                  <Input type="file" accept={COURSE_VIDEO_ALLOWED_TYPES.join(",")} onChange={(e) => handleVideoUpload(e.target.files?.[0])} disabled={saving} />
+                  <Input type="file" accept={COURSE_VIDEO_ALLOWED_TYPES.join(",")} onChange={(e) => handleVideoUpload(e.target.files?.[0])} disabled={busy} />
                   <div className="mt-3 flex items-start gap-2 text-sm text-muted-foreground">
                     <Film className="mt-0.5 h-4 w-4 shrink-0" />
                     <span>Usa MP4, WebM, OGG o MOV. Máximo {Math.round(COURSE_VIDEO_MAX_SIZE_BYTES / (1024 * 1024))}MB.</span>
@@ -1260,9 +1317,9 @@ export default function CourseWizard({ jobId }) {
               </div>
 
               <div className="grid gap-3">
-                <Label>Archivos adicionales</Label>
+                  <Label>Archivos o guías complementarias</Label>
                 <div className="rounded-[24px] border border-border/60 bg-background p-4">
-                  <Input type="file" onChange={(e) => handleAttachmentUpload(e.target.files?.[0])} disabled={saving} />
+                  <Input type="file" onChange={(e) => handleAttachmentUpload(e.target.files?.[0])} disabled={busy} />
                   <div className="mt-3 text-sm text-muted-foreground">Sube PDFs, plantillas o recursos complementarios.</div>
                 </div>
                 {(values.attachments || []).length ? (
@@ -1285,7 +1342,7 @@ export default function CourseWizard({ jobId }) {
           </TabsContent>
 
           <TabsContent value="pricing" className="mt-0 grid gap-6">
-            <SectionCard title="Precio y beneficios" description="Configura el posicionamiento comercial del curso con la menor fricción posible.">
+            <SectionCard title="Comercialización" description="Configura el posicionamiento comercial del curso con la menor fricción posible.">
               <div className="grid gap-6 md:grid-cols-3">
                 <div className="grid gap-2">
                   <Label>Precio</Label>
@@ -1327,11 +1384,11 @@ export default function CourseWizard({ jobId }) {
 
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                 {[
-                  ["certificate", "Incluye certificado"],
+                  ["certificate", "Incluye certificado oficial ACAV"],
                   ["lifetimeAccess", "Acceso de por vida"],
                   ["downloadableResources", "Material descargable"],
                   ["recordedClasses", "Clases grabadas"],
-                  ["support", "Tutorías"],
+                  ["support", "Tutorías / Soporte"],
                 ].map(([field, label]) => (
                   <div key={field} className="rounded-[22px] border border-border/60 bg-background px-4 py-4">
                     <div className="flex items-center justify-between gap-3">
@@ -1348,12 +1405,12 @@ export default function CourseWizard({ jobId }) {
           </TabsContent>
 
           <TabsContent value="publish" className="mt-0 grid gap-6">
-            <SectionCard title="Publicación y visibilidad" description="Define cómo se publica el curso y qué tan visible será dentro del ecosistema ACAV.">
+            <SectionCard title="Publicación" description="Define cómo se publica el curso y qué tan visible será dentro del ecosistema ACAV.">
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                 {[
-                  ["featured", "Curso destacado"],
-                  ["allowEnrollment", "Permitir inscripciones"],
-                  ["showOnHome", "Mostrar en inicio"],
+                  ["featured", "Destacar en la portada"],
+                  ["allowEnrollment", "Permitir inscripciones abiertas"],
+                  ["showOnHome", "Mostrar en catálogo principal"],
                 ].map(([field, label]) => (
                   <div key={field} className="rounded-[22px] border border-border/60 bg-background px-4 py-4">
                     <div className="flex items-center justify-between gap-3">
@@ -1421,50 +1478,29 @@ export default function CourseWizard({ jobId }) {
         </Tabs>
 
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          {saving ? (
+          {uploading ? (
             <div className="inline-flex items-center gap-2 rounded-full border border-primary/15 bg-primary/5 px-4 py-2 text-sm font-medium text-primary">
               <Loader2 className="h-4 w-4 animate-spin" />
-              {savingSubmitLabel}
+              Subiendo archivos...
             </div>
           ) : (
             <div />
           )}
           <div className="flex flex-col gap-2 sm:flex-row">
             {!isFirstTab ? (
-              <Button type="button" variant="outline" onClick={goToPreviousTab} disabled={saving}>
+              <Button type="button" variant="outline" onClick={goToPreviousTab} disabled={busy}>
                 Anterior
               </Button>
             ) : null}
             {!isLastTab ? (
-              <Button type="button" variant="outline" onClick={goToNextTab} disabled={saving}>
-                Continuar
-              </Button>
-            ) : null}
-            {isLastTab && isAdmin ? (
-              <Button
-                type="button"
-                variant="outline"
-                onClick={async () => {
-                  const valid = await trigger();
-                  if (!valid) return;
-                  try {
-                    await submit(values, "draft");
-                    clearLocalDraft();
-                    window.location.href = buildLocalizedPath("/dashboard/cursos");
-                  } catch (error) {
-                    toast.error(error?.message || "No se pudo guardar el borrador.", { position: "top-right" });
-                  }
-                }}
-                disabled={saving}
-              >
-                {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                {saving ? "Guardando borrador..." : "Guardar borrador"}
+              <Button type="button" variant="outline" onClick={goToNextTab} disabled={busy}>
+                Siguiente
               </Button>
             ) : null}
             {isLastTab ? (
-              <Button type="submit" disabled={saving} className="min-w-[190px]">
-                {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                {saving ? savingSubmitLabel : primarySubmitLabel}
+              <Button type="submit" disabled={busy} className="min-w-[190px]">
+                {submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                {submitting ? savingSubmitLabel : primarySubmitLabel}
               </Button>
             ) : null}
           </div>
@@ -1478,6 +1514,45 @@ export default function CourseWizard({ jobId }) {
           </div>
         ) : null}
       </form>
+
+      <Dialog open={categoryDialogOpen} onOpenChange={setCategoryDialogOpen}>
+        <DialogContent size="sm" className="max-w-lg rounded-[28px] border border-border/60 p-0">
+          <DialogHeader className="border-b border-border/60 px-6 py-5">
+            <DialogTitle>Nueva categoría</DialogTitle>
+            <DialogDescription>Creá una categoría nueva para este curso.</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-3 px-6 py-5">
+            <Label htmlFor="new-course-category">Título</Label>
+            <Input
+              id="new-course-category"
+              value={newCategoryTitle}
+              onChange={(event) => setNewCategoryTitle(event.target.value)}
+              placeholder="Ej: Revenue Management"
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  handleCreateCategory();
+                }
+              }}
+            />
+          </div>
+          <DialogFooter className="border-t border-border/60 px-6 py-5">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setCategoryDialogOpen(false);
+                setNewCategoryTitle("");
+              }}
+            >
+              Cancelar
+            </Button>
+            <Button type="button" onClick={handleCreateCategory}>
+              Crear categoría
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

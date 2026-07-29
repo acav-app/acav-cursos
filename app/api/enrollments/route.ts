@@ -12,7 +12,7 @@ export function OPTIONS(request: Request) {
 export async function GET(request: Request) {
   try {
     const actor = await requireCourseActor(request);
-    assertRole(actor, ["admin", "empresa", "candidato"]);
+    assertRole(actor, ["admin", "alumno"]);
     const url = new URL(request.url);
     const enrollments = await listEnrollments({
       actor,

@@ -247,7 +247,7 @@ export default async function EmpleoDetailPage({ params: { lang, slug } }) {
                 </div>
                 <h2 className="mt-4 text-[28px] font-extrabold tracking-tight text-[#1B2B50]">Inscribite al curso</h2>
                 <p className="mt-3 text-sm leading-7 text-slate-600">
-                  Tu inscripcion es rapida, clara y cuidada para que puedas confirmar tu interes sin friccion.
+                  Tu inscripcion es rapida, clara y cuidada para que puedas confirmar tu cursada.
                 </p>
 
                 <div className="mt-6 rounded-[20px] border border-slate-200 bg-[#FBFCFE] p-5">

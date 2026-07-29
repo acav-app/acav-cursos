@@ -322,16 +322,6 @@ const LogInForm = () => {
                   {isPending ? "Ingresando..." : "Iniciar sesión"}
                 </Button>
               </form>
-
-              <div className="mt-5 rounded-[24px] border border-[#D9E2F2] bg-[#F8FBFF] p-4 text-sm leading-7 text-default-600 dark:border-slate-800/80 dark:bg-slate-900/30">
-                <div className="flex items-center gap-2 font-medium text-default-800">
-                  <UserPlus className="h-4 w-4 text-[#1B2B50]" />
-                  ¿Todavía no tenés cuenta de alumno?
-                </div>
-                <p className="mt-1">
-                  Usá la pestaña de registro para crear tu perfil e inscribirte más rápido.
-                </p>
-              </div>
             </div>
           </TabsContent>
 
@@ -356,30 +346,6 @@ const LogInForm = () => {
           </TabsContent>
         </Tabs>
       )}
-
-      {!companyFlow ? (
-        <div className="mt-5 rounded-[24px] border border-[#D9E2F2] bg-white p-4 text-sm leading-7 text-default-600 shadow-sm dark:border-slate-800/80 dark:bg-slate-950">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <div className="flex items-center gap-2 font-medium text-default-800">
-                <Building2 className="h-4 w-4 text-[#1B2B50]" />
-                ¿Representás una institución?
-              </div>
-              <p className="mt-1 text-sm text-default-600">
-                Completa tu registro para acceder a las funciones de la institución.
-              </p>
-            </div>
-            <Button
-              type="button"
-              variant="outline"
-              className="rounded-2xl"
-              onClick={() => toggleCompanyFlow(true)}
-            >
-              Registrar como institución
-            </Button>
-          </div>
-        </div>
-      ) : null}
     </div>
   );
 };

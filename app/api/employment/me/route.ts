@@ -1,5 +1,6 @@
 import { corsPreflight, errorJson, json } from "@/lib/api-helpers";
 import { requireCourseActor } from "@/lib/courses/server/auth";
+import { normalizePortalRole } from "@/lib/courses/roles";
 import { updatePortalUserProfile } from "@/lib/courses/server/users";
 import { z } from "zod";
 
@@ -30,7 +31,7 @@ export async function PATCH(request: Request) {
     const body = await request.json();
     const payload = CandidateSelfUpdateSchema.parse(body);
 
-    if (actor.role === "candidato") {
+    if (normalizePortalRole(actor.role) === "alumno") {
       const updated = await updatePortalUserProfile(actor.uid, payload);
       return json({ actor: updated }, { status: 200 }, request);
     }

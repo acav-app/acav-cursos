@@ -41,10 +41,10 @@ function SectionHeader({ eyebrow, title, description }) {
         <span className="h-0.5 w-6 rounded bg-[#DD4913]" />
         {eyebrow}
       </div>
-      <h1 className="mt-4 text-3xl font-black leading-tight tracking-tight text-[#1B2B50] md:text-5xl">
+      <h1 className="mt-4 text-[1.3rem] font-medium leading-[1.14] tracking-[-0.02em] text-[#1B2B50] md:text-[1.65rem]">
         {title}
       </h1>
-      <p className="mt-4 text-base leading-7 text-slate-600 md:text-lg">
+      <p className="mt-3 text-[14px] leading-6 text-slate-600 md:text-[15px] md:leading-7">
         {description}
       </p>
     </div>
@@ -82,7 +82,7 @@ export default function CourseCatalogPage({ lang, settings, activeJobs, liveStat
   const [level, setLevel] = useState("all");
   const [status, setStatus] = useState("all");
 
-  const courses = Array.isArray(activeJobs) ? activeJobs : [];
+  const courses = useMemo(() => (Array.isArray(activeJobs) ? activeJobs : []), [activeJobs]);
   const catalogOptions = useMemo(() => buildCatalogOptions(courses), [courses]);
   const filteredCourses = useMemo(
     () =>
@@ -104,88 +104,6 @@ export default function CourseCatalogPage({ lang, settings, activeJobs, liveStat
   return (
     <PublicCoursesShell lang={lang} settings={settings} navMode="routes">
       <main className="bg-[linear-gradient(180deg,#F5F8FD_0%,#FFFFFF_34%,#F8FBFF_100%)] pt-[88px]">
-        <section className="px-6 py-12 md:py-16">
-          <div className="mx-auto max-w-[1240px]">
-            <MotionReveal className="grid gap-8 rounded-[36px] border border-[#D9E3F3] bg-white/90 p-6 shadow-[0_24px_60px_rgba(21,32,59,0.08)] backdrop-blur md:grid-cols-[1.4fr_0.9fr] md:p-8">
-              <div>
-                <SectionHeader
-                  eyebrow="Catálogo profesional"
-                  title="Explora cursos con una experiencia clara, rápida y enfocada"
-                  description="Encuentra programas por categoría, modalidad, nivel o academia. Visualiza la información esencial sin ruido y decide mejor tu próxima formación."
-                />
-
-                <div className="mt-8 grid gap-3 sm:grid-cols-3">
-                  {[
-                    {
-                      icon: BookOpen,
-                      label: "Cursos activos",
-                      value: String(liveStats?.activeJobs || courses.length || 0),
-                    },
-                    {
-                      icon: GraduationCap,
-                      label: "Alumnos formados",
-                      value: String(liveStats?.applications || 0),
-                    },
-                    {
-                      icon: Sparkles,
-                      label: "Modalidades",
-                      value: String(catalogOptions.modalities.length || 0),
-                    },
-                  ].map((item) => (
-                    <div
-                      key={item.label}
-                      className="rounded-[24px] border border-[#E2EAF6] bg-[#F8FBFF] p-4"
-                    >
-                      <div className="flex items-center gap-2 text-[#DD4913]">
-                        <item.icon className="h-4 w-4" />
-                        <span className="text-[11px] font-extrabold uppercase tracking-[0.16em]">
-                          {item.label}
-                        </span>
-                      </div>
-                      <div className="mt-3 text-3xl font-black text-[#1B2B50]">{item.value}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="rounded-[30px] border border-[#E2EAF6] bg-[linear-gradient(180deg,#15203B_0%,#1B2B50_100%)] p-6 text-white shadow-[0_24px_48px_rgba(21,32,59,0.22)]">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="text-xs font-extrabold uppercase tracking-[0.16em] text-[#DD4913]">
-                    Curso destacado
-                  </div>
-                  <div className="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-[11px] font-bold text-white/70">
-                    Recomendado
-                  </div>
-                </div>
-                {highlightedCourse ? (
-                  <>
-                    <div className="mt-5 text-2xl font-black leading-tight">
-                      {highlightedCourse.title}
-                    </div>
-                    <p className="mt-3 text-sm leading-7 text-white/72">
-                      {highlightMeta?.description}
-                    </p>
-                    <div className="mt-6 grid gap-3 text-sm text-white/75">
-                      <div className="rounded-2xl border border-white/10 bg-white/8 px-4 py-3">
-                        Instructor: <span className="font-semibold text-white">{highlightMeta?.instructor}</span>
-                      </div>
-                      <div className="rounded-2xl border border-white/10 bg-white/8 px-4 py-3">
-                        Duración: <span className="font-semibold text-white">{highlightMeta?.duration}</span>
-                      </div>
-                      <div className="rounded-2xl border border-white/10 bg-white/8 px-4 py-3">
-                        Modalidad: <span className="font-semibold text-white">{highlightMeta?.modality}</span>
-                      </div>
-                    </div>
-                  </>
-                ) : (
-                  <p className="mt-6 text-sm leading-7 text-white/72">
-                    Publica cursos para comenzar a poblar el catálogo con programas destacados.
-                  </p>
-                )}
-              </div>
-            </MotionReveal>
-          </div>
-        </section>
 
         <section id="catalogo" className="px-6 pb-20">
           <div className="mx-auto max-w-[1240px]">
@@ -205,10 +123,10 @@ export default function CourseCatalogPage({ lang, settings, activeJobs, liveStat
                       <Filter className="h-3.5 w-3.5" />
                       Búsqueda inteligente
                     </div>
-                    <h2 className="mt-3 text-2xl font-black tracking-tight text-[#1B2B50]">
+                    <h2 className="mt-3 text-[1.1rem] font-medium leading-[1.14] tracking-[-0.02em] text-[#1B2B50] md:text-[1.25rem]">
                       Encuentra el curso correcto en segundos
                     </h2>
-                    <p className="mt-2 max-w-2xl text-sm leading-7 text-slate-600">
+                    <p className="mt-2 max-w-2xl text-[14px] leading-6 text-slate-600">
                       Filtra por categoría, modalidad, academia, nivel y estado para navegar el catálogo con mayor precisión.
                     </p>
                   </div>

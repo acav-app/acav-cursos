@@ -32,7 +32,7 @@ function CardSection({ icon: Icon, title, children }) {
         <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-[#EEF4FF] text-[#2356B8]">
           <Icon className="h-4 w-4" />
         </span>
-        <h2 className="text-[22px] font-extrabold tracking-tight text-[#1B2B50]">{title}</h2>
+        <h2 className="text-[17px] font-semibold tracking-[-0.02em] text-[#1B2B50] md:text-[18px]">{title}</h2>
       </div>
       <div className="mt-5">{children}</div>
     </section>
@@ -160,12 +160,11 @@ export default async function CursoDetailPage({ params: { lang, slug } }) {
                     Detalle del curso
                   </div>
 
-                  <h1 className="mt-4 text-[38px] font-extrabold tracking-tight text-[#1B2B50] md:text-[48px]">{course.title}</h1>
-                  <p className="mt-4 max-w-3xl text-[15px] leading-7 text-slate-600">{shortDescription}</p>
+                  <h1 className="mt-4 text-[28px] font-semibold tracking-[-0.03em] text-[#1B2B50] md:text-[34px]">{course.title}</h1>
+                  <p className="mt-3 max-w-3xl text-[14px] leading-7 text-slate-600">{shortDescription}</p>
 
-                  <div className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                    <MetaBlock icon={Building2} label="Instructor / academia" value={academyLabel} />
-                    <MetaBlock icon={MapPin} label="Modalidad / sede" value={course.city || modalityLabel} />
+                  <div className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                    <MetaBlock icon={Building2} label="Institución" value={academyLabel} />
                     <MetaBlock icon={Briefcase} label="Modalidad" value={modalityLabel} />
                     <MetaBlock icon={Clock3} label="Duración" value={durationLabel} />
                   </div>
@@ -232,7 +231,7 @@ export default async function CursoDetailPage({ params: { lang, slug } }) {
                           <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">
                             Módulo {index + 1}
                           </div>
-                          <h3 className="mt-2 text-lg font-bold text-[#1B2B50]">{module.title}</h3>
+                          <h3 className="mt-2 text-[15px] font-semibold tracking-[-0.02em] text-[#1B2B50] md:text-base">{module.title}</h3>
                           {module.description ? (
                             <p className="mt-2 text-sm leading-7 text-slate-600">{module.description}</p>
                           ) : null}
@@ -315,34 +314,6 @@ export default async function CursoDetailPage({ params: { lang, slug } }) {
                 </MotionStaggerItem>
               ) : null}
 
-              <MotionStaggerItem>
-                <CardSection icon={Building2} title="Sobre la institución">
-                  <div className="rounded-[20px] border border-slate-200 bg-[#FBFCFE] p-5">
-                    <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-                      <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-[22px] border border-slate-200 bg-white">
-                        {institutionLogoUrl ? (
-                          <img src={institutionLogoUrl} alt={`Logo de ${course.companyName}`} className="h-full w-full object-contain p-2.5" />
-                        ) : (
-                          <Building2 className="h-8 w-8 text-[#1B2B50]" />
-                        )}
-                      </div>
-                      <div className="min-w-0">
-                        <div className="text-lg font-bold text-[#1B2B50]">{course.companyName}</div>
-                        <p className="mt-2 text-sm leading-7 text-slate-600">{institutionDescription}</p>
-                        {institution?.slug ? (
-                          <Link
-                            href={`/${lang}/instituciones/${institution.slug}`}
-                            className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-[#31456F] transition hover:text-[#1B2B50]"
-                          >
-                            Ver perfil de la institución
-                            <ArrowRight className="h-4 w-4" />
-                          </Link>
-                        ) : null}
-                      </div>
-                    </div>
-                  </div>
-                </CardSection>
-              </MotionStaggerItem>
 
               {attachments.length ? (
                 <MotionStaggerItem>
@@ -387,9 +358,9 @@ export default async function CursoDetailPage({ params: { lang, slug } }) {
                     <span className="h-1.5 w-1.5 rounded-full bg-[#2356B8]" />
                     Inscripción
                   </div>
-                  <h2 className="mt-4 text-[28px] font-extrabold tracking-tight text-[#1B2B50]">Inscribite al curso</h2>
+                  <h2 className="mt-4 text-[22px] font-semibold tracking-[-0.03em] text-[#1B2B50] md:text-[24px]">Inscribite al curso</h2>
                   <p className="mt-3 text-sm leading-7 text-slate-600">
-                    Tu inscripcion es rapida, clara y cuidada para que puedas confirmar tu interes sin friccion.
+                    Tu inscripcion es rapida, clara y cuidada para que puedas confirmar tu cursada.
                   </p>
 
                   <div className="mt-6 rounded-[20px] border border-slate-200 bg-[#FBFCFE] p-5">
@@ -429,7 +400,7 @@ export default async function CursoDetailPage({ params: { lang, slug } }) {
                 </section>
               </MotionStaggerItem>
 
-              <MotionStaggerItem>
+              {/* <MotionStaggerItem>
                 <PublicResourcesSection
                   lang={lang}
                   variant="sidebar"
@@ -437,13 +408,13 @@ export default async function CursoDetailPage({ params: { lang, slug } }) {
                   title="Preparate mejor"
                   description="Accede a guias claras para organizar tu cursado, entender la propuesta y aprovechar mejor el campus."
                 />
-              </MotionStaggerItem>
+              </MotionStaggerItem> */}
 
               {relatedCourses.length ? (
                 <MotionStaggerItem>
                   <section className="rounded-[24px] border border-slate-200/80 bg-white p-6 shadow-[0_8px_30px_rgba(15,23,42,.04)]">
                     <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">También te puede interesar</div>
-                    <h2 className="mt-2 text-xl font-extrabold tracking-tight text-[#1B2B50]">Cursos relacionados</h2>
+                    <h2 className="mt-2 text-[17px] font-semibold tracking-[-0.02em] text-[#1B2B50] md:text-[18px]">Cursos relacionados</h2>
                     <div className="mt-4 grid gap-3">
                       {relatedCourses.map((item) => (
                         <MotionHoverCard key={item.id}>

@@ -104,7 +104,7 @@ export async function registerInstitution(
       firstName: parsed.firstName,
       lastName: parsed.lastName,
       displayName: `${parsed.firstName} ${parsed.lastName}`.trim(),
-      role: "empresa" as const,
+      role: "admin" as const,
       isActive: true,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -142,7 +142,7 @@ export async function registerInstitution(
       firstName: parsed.firstName,
       lastName: parsed.lastName,
       displayName: `${parsed.firstName} ${parsed.lastName}`.trim(),
-      role: "empresa",
+      role: "admin",
       institutionId: institution.id,
       isActive: true,
     });

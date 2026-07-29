@@ -11,7 +11,7 @@ export function OPTIONS(request: Request) {
 export async function GET(request: Request) {
   try {
     const actor = await readOptionalCourseActor(request);
-    const canReadInternal = actor?.role === "admin" || actor?.role === "empresa";
+    const canReadInternal = actor?.role === "admin";
     const url = new URL(request.url);
     const status = url.searchParams.get("status") || undefined;
     const institutionId = url.searchParams.get("institutionId") || undefined;

@@ -32,8 +32,8 @@ function SectionTitle({ eyebrow, title, description, light = false }) {
         <span className={`h-0.5 w-6 rounded ${light ? "bg-[#DD4913]" : "bg-[#DD4913]"}`} />
         {eyebrow}
       </div>
-      <h2 className={`mt-4 text-3xl font-black leading-tight tracking-tight md:text-4xl ${light ? "text-white" : "text-[#1B2B50]"}`}>{title}</h2>
-      {description ? <p className={`mt-4 text-base leading-7 ${light ? "text-white/65" : "text-slate-600"}`}>{description}</p> : null}
+      <h2 className={`mt-4 text-[1.3rem] font-medium leading-[1.14] tracking-[-0.02em] md:text-[1.65rem] ${light ? "text-white" : "text-[#1B2B50]"}`}>{title}</h2>
+      {description ? <p className={`mt-3 text-[14px] leading-6 md:text-[15px] ${light ? "text-white/65" : "text-slate-600"}`}>{description}</p> : null}
     </div>
   );
 }
@@ -142,14 +142,14 @@ export default function PublicCoursesHome({ lang, settings, activeJobs, companie
                 <span className="h-1.5 w-1.5 rounded-full bg-[#DD4913]" />
                 {heroCopy.eyebrow}
               </div>
-              <h1 className="mt-6 max-w-[720px] text-4xl font-black leading-[1.05] md:text-6xl">
+              <h1 className="mt-6 max-w-[760px] text-[1.75rem] font-medium leading-[1.02] tracking-[-0.035em] md:text-[2.35rem] xl:text-[2.75rem]">
                 {heroCopy.title}
               </h1>
-              <p className="mt-6 max-w-[520px] text-base leading-8 text-white/72 md:text-lg">
+              <p className="mt-5 max-w-[560px] text-[14px] leading-6 text-white/72 md:text-[15px] md:leading-7">
                 {heroCopy.subtitle}
               </p>
 
-              <div className="mt-8 flex flex-wrap gap-3">
+              <div className="mt-7 flex flex-wrap gap-3">
                 <a
                   href="#catalogo"
                   className="inline-flex items-center gap-2 rounded-full bg-[#DD4913] px-7 py-3 text-sm font-extrabold text-white transition hover:-translate-y-0.5 hover:bg-[#EB5B24]"
@@ -169,22 +169,14 @@ export default function PublicCoursesHome({ lang, settings, activeJobs, companie
                 {heroStats.map((stat, index) => (
                   <div key={stat.label} className="flex items-center gap-8">
                     <div>
-                      <div className="text-[30px] font-black leading-none md:text-[34px]">{stat.value}</div>
-                      <div className="mt-1 text-xs text-white/50">{stat.label}</div>
+                      <div className="text-[19px] font-medium leading-none tracking-[-0.02em] md:text-[20px]">{stat.value}</div>
+                      <div className="mt-1 text-[11px] text-white/50">{stat.label}</div>
                     </div>
                     {index < heroStats.length - 1 ? <span className="hidden h-10 w-px bg-white/12 md:block" /> : null}
                   </div>
                 ))}
               </div>
             </MotionReveal>
-
-            {heroCourse ? (
-              <MotionReveal delay={0.05}>
-                <div className="mx-auto w-full max-w-[430px]">
-                  <JobCard job={heroCourse} lang={lang} />
-                </div>
-              </MotionReveal>
-            ) : null}
           </div>
         </section>
 
@@ -245,8 +237,8 @@ export default function PublicCoursesHome({ lang, settings, activeJobs, companie
                   <span className="h-0.5 w-6 rounded bg-[#DD4913]" />
                   ¿Por qué ACAV Cursos?
                 </div>
-                <h2 className="mt-4 text-[1.6rem] font-extrabold leading-tight text-white">Todo lo que necesitás para crecer</h2>
-                <p className="mx-auto mt-3 max-w-[760px] text-sm text-white/60">
+                <h2 className="mt-4 text-[1.25rem] font-medium leading-[1.14] tracking-[-0.02em] text-white md:text-[1.55rem]">Todo lo que necesitás para crecer</h2>
+                <p className="mx-auto mt-3 max-w-[760px] text-[14px] leading-6 text-white/60 md:text-[15px]">
                   La plataforma de formación más completa para profesionales del turismo en Córdoba.
                 </p>
               </MotionReveal>

@@ -61,7 +61,7 @@ export default function DashboardUsuariosPage() {
     lastName: "",
     displayName: "",
     password: "",
-    role: "empresa",
+    role: "admin",
     companyId: "",
     isActive: true,
   });
@@ -118,7 +118,7 @@ export default function DashboardUsuariosPage() {
       lastName: "",
       displayName: "",
       password: "",
-      role: "empresa",
+      role: "admin",
       companyId: "",
       isActive: true,
     });
@@ -134,7 +134,7 @@ export default function DashboardUsuariosPage() {
       lastName: u.lastName || "",
       displayName: u.displayName || "",
       password: "",
-      role: u.role || "empresa",
+      role: u.role || "admin",
       companyId: u.companyId || "",
       isActive: u.isActive !== false,
     });
@@ -147,7 +147,6 @@ export default function DashboardUsuariosPage() {
     if (mode === "create" && !normalizeString(form.firstName)) return "Nombre es obligatorio";
     if (mode === "create" && !normalizeString(form.lastName)) return "Apellido es obligatorio";
     if (!PORTAL_ROLES.includes(role)) return "Rol inválido";
-    if (role === "empresa" && !normalizeString(form.companyId)) return "La institucion es obligatoria para el rol empresa";
     return "";
   };
 
@@ -170,7 +169,7 @@ export default function DashboardUsuariosPage() {
           displayName: normalizeString(form.displayName) || undefined,
           password: normalizeString(form.password) || undefined,
           role: normalizeString(form.role),
-          companyId: normalizeString(form.role) === "empresa" ? normalizeString(form.companyId) : undefined,
+          companyId: normalizeString(form.companyId) || undefined,
           isActive: Boolean(form.isActive),
         }),
       });
@@ -200,7 +199,7 @@ export default function DashboardUsuariosPage() {
           firstName: normalizeString(form.firstName) || undefined,
           lastName: normalizeString(form.lastName) || undefined,
           role: normalizeString(form.role),
-          companyId: normalizeString(form.role) === "empresa" ? normalizeString(form.companyId) : undefined,
+          companyId: normalizeString(form.companyId) || undefined,
           isActive: Boolean(form.isActive),
         }),
       });
@@ -304,7 +303,7 @@ export default function DashboardUsuariosPage() {
 
           <div className="grid gap-6">
             <div className="grid gap-2">
-              <Label>Email (de Firebase Auth)</Label>
+              <Label>Email</Label>
               <Input value={form.email} onChange={(e) => setForm((s) => ({ ...s, email: e.target.value }))} />
             </div>
             <div className="grid gap-6 md:grid-cols-2">
@@ -330,7 +329,7 @@ export default function DashboardUsuariosPage() {
                 placeholder="Mínimo 6 caracteres"
               />
               <p className="text-xs text-muted-foreground">
-                Si el usuario no existe en Firebase Auth, se crea con esta contraseña. Luego puede recuperarla desde “¿Olvidaste tu contraseña?”.
+                Contraseña temporal, luego puede recuperarla desde “¿Olvidaste tu contraseña?”.
               </p>
             </div>
 
@@ -342,7 +341,7 @@ export default function DashboardUsuariosPage() {
                     <SelectValue placeholder="Seleccionar rol" />
                   </SelectTrigger>
                   <SelectContent>
-                    {EMPLOYMENT_ROLES.map((r) => (
+                    {PORTAL_ROLES.map((r) => (
                       <SelectItem key={r} value={r}>
                         {r}
                       </SelectItem>
@@ -352,11 +351,10 @@ export default function DashboardUsuariosPage() {
               </div>
 
               <div className="grid gap-2">
-                <Label>Institucion (solo rol empresa)</Label>
+                <Label>Institucion (opcional)</Label>
                 <Select
                   value={form.companyId || "none"}
                   onValueChange={(v) => setForm((s) => ({ ...s, companyId: v === "none" ? "" : v }))}
-                  disabled={form.role !== "empresa"}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Seleccionar institucion" />
@@ -431,7 +429,7 @@ export default function DashboardUsuariosPage() {
                     <SelectValue placeholder="Seleccionar rol" />
                   </SelectTrigger>
                   <SelectContent>
-                    {EMPLOYMENT_ROLES.map((r) => (
+                    {PORTAL_ROLES.map((r) => (
                       <SelectItem key={r} value={r}>
                         {r}
                       </SelectItem>
@@ -441,11 +439,10 @@ export default function DashboardUsuariosPage() {
               </div>
 
               <div className="grid gap-2">
-                <Label>Institucion (solo rol empresa)</Label>
+                <Label>Institucion (opcional)</Label>
                 <Select
                   value={form.companyId || "none"}
                   onValueChange={(v) => setForm((s) => ({ ...s, companyId: v === "none" ? "" : v }))}
-                  disabled={form.role !== "empresa"}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Seleccionar institucion" />

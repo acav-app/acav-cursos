@@ -94,10 +94,6 @@ function toCourse(doc: FirebaseFirestore.QueryDocumentSnapshot | FirebaseFiresto
 }
 
 function validateCourseBusinessRules(input: Record<string, any>) {
-  const modality = String(input.modality || input.initialModality || "").trim();
-  if (["Presencial", "Híbrido", "Hibrido"].includes(modality) && !String(input.city || "").trim()) {
-    throw err(400, "city_required");
-  }
   if (String(input.contractType || "") === "Otro" && !String(input.customContractType || "").trim()) {
     throw err(400, "custom_contract_type_required");
   }
@@ -213,8 +209,6 @@ export async function listCourses(options?: {
     } else {
       courses = courses.filter((course) => course.status === "activa");
     }
-  } else if (options?.actor?.role === "empresa") {
-    courses = courses.filter((course) => course.companyId === options.actor?.companyId);
   }
 
   const filters = options?.filters || {};
@@ -258,8 +252,7 @@ export async function getCourseById(id: string) {
 
 export async function createCourse(input: unknown, actor: CourseActor) {
   const parsed = CourseCreateSchema.parse(input);
-  const institutionId = actor.role === "empresa" ? actor.companyId : parsed.institutionId || parsed.companyId;
-  if (!institutionId) throw err(400, "institution_required");
+  const institutionId = parsed.institutionId || parsed.companyId;
 
   const courseForValidation = normalizeCourse({
     ...parsed,
@@ -269,23 +262,25 @@ export async function createCourse(input: unknown, actor: CourseActor) {
   });
   validateCourseBusinessRules(courseForValidation as any);
 
-  const institution = await getInstitutionById(institutionId);
-  if (!institution) throw err(404, "institution_not_found");
-  if (actor.role === "empresa" && actor.companyId !== institution.id) throw err(403, "forbidden");
+  const institution = institutionId ? await getInstitutionById(institutionId) : null;
+  if (institutionId && !institution) throw err(404, "institution_not_found");
 
   const db = getAdminDb();
   const ref = db.collection(COURSE_COLLECTIONS.courses).doc();
   const now = nowIso();
-  const status = actor.role === "admin" ? parsed.status || "borrador" : "pendiente_revision";
+  const status = parsed.status || "borrador";
   const slug = await ensureUniqueSlug(COURSE_COLLECTIONS.courses, parsed.slug || parsed.title);
 
   const payload = normalizeCourse(
     removeUndefined({
       ...courseForValidation,
       slug,
-      institutionId: institution.id,
-      institutionName: institution.name,
-      institutionLogoUrl: parsed.institutionLogoUrl || parsed.companyLogoUrl || institution.logoUrl || "",
+      institutionId: institution?.id || institutionId || undefined,
+      companyId: institution?.id || institutionId || undefined,
+      institutionName: institution?.name || parsed.institutionName || parsed.companyName || undefined,
+      companyName: institution?.name || parsed.companyName || parsed.institutionName || undefined,
+      institutionLogoUrl: parsed.institutionLogoUrl || parsed.companyLogoUrl || institution?.logoUrl || undefined,
+      companyLogoUrl: parsed.companyLogoUrl || parsed.institutionLogoUrl || institution?.logoUrl || undefined,
       status,
       createdAt: now,
       updatedAt: now,
@@ -306,16 +301,12 @@ export async function updateCourse(id: string, input: unknown, actor: CourseActo
   if (!existing.exists) throw err(404, "course_not_found");
 
   const current = toCourse(existing);
-  if (actor.role === "empresa" && actor.companyId !== (current.institutionId || current.companyId)) {
+  if (actor.role !== "admin") {
     throw err(403, "forbidden");
   }
 
   const merged = normalizeCourse({ ...current, ...parsed });
   validateCourseBusinessRules(merged);
-
-  if (actor.role === "empresa" && parsed.status && ["activa", "rechazada"].includes(parsed.status)) {
-    throw err(403, "forbidden_status_transition");
-  }
 
   let institutionName = current.institutionName || current.companyName;
   let institutionLogoUrl = current.institutionLogoUrl || current.companyLogoUrl || "";
@@ -323,7 +314,6 @@ export async function updateCourse(id: string, input: unknown, actor: CourseActo
   if (nextInstitutionId && nextInstitutionId !== (current.institutionId || current.companyId)) {
     const institution = await getInstitutionById(nextInstitutionId);
     if (!institution) throw err(404, "institution_not_found");
-    if (actor.role === "empresa" && actor.companyId !== institution.id) throw err(403, "forbidden");
     institutionName = institution.name;
     institutionLogoUrl = institution.logoUrl || "";
   }

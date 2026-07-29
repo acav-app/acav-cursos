@@ -2,6 +2,7 @@ import { z } from "zod";
 import { getAdminAuth, getAdminDb } from "@/lib/firebase-admin";
 import { COURSE_COLLECTIONS } from "@/lib/courses/collections";
 import { PortalRoleSchema, PortalUserProfileSchema, type PortalUserProfile } from "@/lib/courses/schemas";
+import { isAdminRole, normalizePortalRole } from "@/lib/courses/roles";
 import { getInstitutionById } from "@/lib/courses/server/institutions";
 import { err } from "@/lib/courses/server/errors";
 import { nowIso, removeUndefined } from "@/lib/courses/server/utils";
@@ -60,8 +61,7 @@ async function assertNoPortalUserConflicts(input: {
   const db = getAdminDb();
   const uid = String(input.uid || "").trim();
   const email = String(input.email || "").trim().toLowerCase();
-  const role = String(input.role || "").trim();
-  const institutionId = String(input.institutionId || "").trim();
+  const role = normalizePortalRole(input.role);
 
   if (email) {
     const emailSnap = await db
@@ -74,17 +74,7 @@ async function assertNoPortalUserConflicts(input: {
     if (emailConflict) throw err(409, "portal_user_email_already_exists");
   }
 
-  if (role === "empresa" && institutionId) {
-    const institutionSnap = await db
-      .collection(COURSE_COLLECTIONS.userProfiles)
-      .where("role", "==", "empresa")
-      .where("companyId", "==", institutionId)
-      .limit(10)
-      .get();
-
-    const institutionConflict = institutionSnap.docs.find((doc) => doc.id !== uid);
-    if (institutionConflict) throw err(409, "institution_user_already_exists");
-  }
+  void role;
 }
 
 export async function listPortalUsers() {
@@ -96,6 +86,7 @@ export async function listPortalUsers() {
       const parsed = PortalUserProfileSchema.safeParse({
         ...raw,
         uid: raw.uid || raw.id,
+        role: normalizePortalRole(raw.role),
         institutionId: raw.institutionId || raw.companyId,
         institutionName: raw.institutionName || raw.companyName,
       });
@@ -154,10 +145,9 @@ export async function createPortalUserProfile(input: unknown) {
   const uid = String(resolved?.uid || "").trim();
   if (!uid) throw err(400, "uid_required");
 
-  const role = parsed.role;
+  const role = normalizePortalRole(parsed.role);
   const isActive = parsed.isActive !== false;
-  const institutionId = role === "empresa" ? String(parsed.institutionId || parsed.companyId || "").trim() : "";
-  if (role === "empresa" && !institutionId) throw err(400, "institution_required");
+  const institutionId = isAdminRole(role) ? String(parsed.institutionId || parsed.companyId || "").trim() : "";
 
   let institutionName = "";
   if (institutionId) {
@@ -209,7 +199,7 @@ export async function createPortalUserProfile(input: unknown) {
   );
   await ref.set(payload, { merge: true });
   const updated = await ref.get();
-  return PortalUserProfileSchema.parse({ uid: updated.id, ...(updated.data() as any) });
+  return PortalUserProfileSchema.parse({ uid: updated.id, ...(updated.data() as any), role: normalizePortalRole(updated.data()?.role) });
 }
 
 export async function updatePortalUserProfile(uid: string, input: unknown) {
@@ -220,12 +210,11 @@ export async function updatePortalUserProfile(uid: string, input: unknown) {
   if (!existing.exists) throw err(404, "portal_user_not_found");
 
   const current = { uid: existing.id, ...(existing.data() as any) } as PortalUserProfile;
-  const nextRole = parsed.role || current.role;
+  const nextRole = normalizePortalRole(parsed.role || current.role);
   const nextInstitutionId =
-    nextRole === "empresa"
+    isAdminRole(nextRole)
       ? String(parsed.institutionId ?? parsed.companyId ?? current.institutionId ?? current.companyId ?? "").trim()
       : "";
-  if (nextRole === "empresa" && !nextInstitutionId) throw err(400, "institution_required");
 
   let institutionName = current.institutionName || current.companyName || "";
   if (nextInstitutionId) {
@@ -255,7 +244,7 @@ export async function updatePortalUserProfile(uid: string, input: unknown) {
     displayName: nextDisplayName || undefined,
     firstName: nextFirstName || undefined,
     lastName: nextLastName || undefined,
-    role: parsed.role,
+    role: parsed.role ? normalizePortalRole(parsed.role) : undefined,
     institutionId: nextInstitutionId || undefined,
     institutionName: nextInstitutionId ? institutionName || undefined : undefined,
     companyId: nextInstitutionId || undefined,
@@ -273,5 +262,5 @@ export async function updatePortalUserProfile(uid: string, input: unknown) {
     })
   );
   const updated = await ref.get();
-  return PortalUserProfileSchema.parse({ uid: updated.id, ...(updated.data() as any) });
+  return PortalUserProfileSchema.parse({ uid: updated.id, ...(updated.data() as any), role: normalizePortalRole(updated.data()?.role) });
 }

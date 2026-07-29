@@ -17,7 +17,9 @@ const MobileSidebar = ({ collapsed, className }) => {
   const [activeSubmenu, setActiveSubmenu] = useState(null);
   const [activeMultiMenu, setMultiMenu] = useState(null);
   const { actor } = useCourseActor();
-  const menus = filterMenusByRole(menusConfig?.sidebarNav?.classic || [], actor);
+  const locationName = usePathname();
+  const effectiveActor = actor || null;
+  const menus = filterMenusByRole(menusConfig?.sidebarNav?.classic || [], effectiveActor);
 
   const toggleSubmenu = (i) => {
     if (activeSubmenu === i) {
@@ -34,8 +36,6 @@ const MobileSidebar = ({ collapsed, className }) => {
       setMultiMenu(subIndex);
     }
   };
-  const locationName = usePathname();
-
   React.useEffect(() => {
     let subMenuIndex = null;
     let multiMenuIndex = null;

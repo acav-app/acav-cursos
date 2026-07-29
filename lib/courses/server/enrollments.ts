@@ -6,6 +6,7 @@ import {
   type Enrollment,
 } from "@/lib/courses/schemas";
 import type { CourseActor } from "@/lib/courses/server/auth";
+import { isStudentRole } from "@/lib/courses/roles";
 import { getCourseById } from "@/lib/courses/server/courses";
 import { getInstitutionById } from "@/lib/courses/server/institutions";
 import { err } from "@/lib/courses/server/errors";
@@ -48,10 +49,7 @@ export async function listEnrollments(options: {
   const snap = await db.collection(COURSE_COLLECTIONS.enrollments).orderBy("createdAt", "desc").get();
   let enrollments = snap.docs.map(toEnrollment);
 
-  if (options.actor.role === "empresa") {
-    enrollments = enrollments.filter((enrollment) => enrollment.companyId === options.actor.companyId);
-  }
-  if (options.actor.role === "candidato") {
+  if (isStudentRole(options.actor.role)) {
     const actorEmail = String(options.actor.email || "").trim().toLowerCase();
     enrollments = enrollments.filter((enrollment) => String(enrollment.email || "").trim().toLowerCase() === actorEmail);
   }

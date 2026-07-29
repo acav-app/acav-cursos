@@ -17,7 +17,7 @@ const ClassicSidebar = ({ trans }) => {
   const { sidebarBg } = useSidebar();
   const [activeSubmenu, setActiveSubmenu] = useState(null);
   const [activeMultiMenu, setMultiMenu] = useState(null);
-  const { actor, loading } = useCourseActor();
+  const { actor } = useCourseActor();
   const { collapsed, setCollapsed } = useSidebar();
   const { isRtl } = useThemeStore();
   const [hovered, setHovered] = useState(false);
@@ -40,13 +40,7 @@ const ClassicSidebar = ({ trans }) => {
 
   const pathname = usePathname();
   const locationName = getDynamicPath(pathname);
-  const effectiveActor =
-    actor ||
-    (loading && pathname?.includes("/dashboard")
-      ? {
-          role: "admin",
-        }
-      : null);
+  const effectiveActor = actor || null;
   const menus = filterMenusByRole(menusConfig?.sidebarNav?.classic || [], effectiveActor);
 
   React.useEffect(() => {
@@ -78,7 +72,7 @@ const ClassicSidebar = ({ trans }) => {
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       className={cn(
-        "fixed  z-999 top-0  bg-card h-full hover:w-[248px]! border-border border-r  ",
+        "fixed top-0 z-999 h-full overflow-hidden border-r border-border bg-card transition-[width,box-shadow] duration-200 ease-out hover:!w-[248px]",
         {
           "w-[248px]": !collapsed,
           "w-[72px]": collapsed,

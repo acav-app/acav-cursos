@@ -180,7 +180,7 @@ export default function DashboardCursosPage() {
 
       <div className="mt-8 rounded-3xl border border-border/60 bg-card p-6">
         <div className="grid gap-3 md:grid-cols-3">
-          <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar por curso, institucion, ciudad o categoria" />
+          <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar por curso, categoría, modalidad o nivel" />
           <Select value={status} onValueChange={(value) => setStatus(value === "all" ? "" : value)}>
             <SelectTrigger>
               <SelectValue placeholder="Filtrar por estado" />
@@ -224,10 +224,10 @@ export default function DashboardCursosPage() {
                 <div>
                   <div className="text-lg font-semibold text-foreground">{course.title}</div>
                   <div className="text-sm text-muted-foreground">
-                    {course.companyName} · {course.city || "Sin ciudad"} · {course.status}
+                    {course.subRubro || "Sin categoría"} · {course.modality || "Sin modalidad"} · {course.status}
                   </div>
                   <div className="mt-1 text-xs text-muted-foreground">
-                    Cierre: {dateLabel(course.expiresAt)} · Creada: {dateLabel(course.createdAt)}
+                    {course.level || "Sin nivel"}{course.duration ? ` · ${course.duration}` : ""} · Cierre: {dateLabel(course.expiresAt)} · Creada: {dateLabel(course.createdAt)}
                   </div>
                 </div>
 

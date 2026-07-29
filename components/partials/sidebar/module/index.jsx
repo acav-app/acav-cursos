@@ -18,7 +18,7 @@ import { Button } from "@/components/ui/button";
 import { useCourseActor } from "@/components/courses/dashboard/use-course-actor";
 
 const ModuleSidebar = ({ trans }) => {
-  const { actor, loading } = useCourseActor();
+  const { actor } = useCourseActor();
   const { subMenu, setSubmenu, collapsed, setCollapsed, sidebarBg } =
     useSidebar();
   const { isRtl } = useThemeStore();
@@ -36,13 +36,7 @@ const ModuleSidebar = ({ trans }) => {
   const pathname = usePathname();
   const locationName = getDynamicPath(pathname);
   const localize = useLocalizedPath();
-  const effectiveActor =
-    actor ||
-    (loading && pathname?.includes("/dashboard")
-      ? {
-          role: "admin",
-        }
-      : null);
+  const effectiveActor = actor || null;
   const menus = filterMenusByRole(menusConfig?.sidebarNav?.modern || [], effectiveActor);
   const iconMenus = menus.filter((item) => !item?.isHeader);
 

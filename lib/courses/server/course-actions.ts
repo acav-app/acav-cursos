@@ -47,7 +47,7 @@ export async function rejectCourse(id: string, actor: CourseActor, rejectionReas
 export async function pauseCourse(id: string, actor: CourseActor) {
   const course = await getCourseById(id);
   if (!course) throw err(404, "course_not_found");
-  if (actor.role === "empresa" && actor.companyId !== course.companyId) throw err(403, "forbidden");
+  if (actor.role !== "admin") throw err(403, "forbidden");
   if (!["activa"].includes(course.status)) throw err(400, "invalid_status_transition");
   return updateCourse(id, { status: "pausada" }, actor);
 }
@@ -55,7 +55,7 @@ export async function pauseCourse(id: string, actor: CourseActor) {
 export async function resumeCourse(id: string, actor: CourseActor) {
   const course = await getCourseById(id);
   if (!course) throw err(404, "course_not_found");
-  if (actor.role === "empresa" && actor.companyId !== course.companyId) throw err(403, "forbidden");
+  if (actor.role !== "admin") throw err(403, "forbidden");
   if (!["pausada"].includes(course.status)) throw err(400, "invalid_status_transition");
   return updateCourse(id, { status: "activa" }, actor);
 }
@@ -63,7 +63,7 @@ export async function resumeCourse(id: string, actor: CourseActor) {
 export async function closeCourse(id: string, actor: CourseActor, closeReason: string) {
   const course = await getCourseById(id);
   if (!course) throw err(404, "course_not_found");
-  if (actor.role !== "admin" && !(actor.role === "empresa" && actor.companyId === course.companyId)) {
+  if (actor.role !== "admin") {
     throw err(403, "forbidden");
   }
   const reason = String(closeReason || "").trim();
@@ -82,14 +82,14 @@ export async function closeCourse(id: string, actor: CourseActor, closeReason: s
 export async function duplicateCourse(id: string, actor: CourseActor) {
   const course = await getCourseById(id);
   if (!course) throw err(404, "course_not_found");
-  if (actor.role === "empresa" && actor.companyId !== course.companyId) throw err(403, "forbidden");
+  if (actor.role !== "admin") throw err(403, "forbidden");
 
   const db = getAdminDb();
   const ref = db.collection(COURSE_COLLECTIONS.courses).doc();
   const now = nowIso();
   const title = `${course.title} (copia)`;
   const slug = await ensureUniqueSlug(COURSE_COLLECTIONS.courses, title);
-  const status = actor.role === "admin" ? "borrador" : "pendiente_revision";
+  const status = "borrador";
 
   const next = removeUndefined({
     ...course,

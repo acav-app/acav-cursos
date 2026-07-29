@@ -53,10 +53,6 @@ export async function listInstitutions(options?: {
     institutions = institutions.filter((institution) => institution.status === "activa");
   }
 
-  if (options?.actor?.role === "empresa") {
-    institutions = institutions.filter((institution) => institution.id === options.actor?.companyId);
-  }
-
   if (options?.status) {
     institutions = institutions.filter((institution) => institution.status === options.status);
   }
@@ -86,7 +82,7 @@ export async function createInstitution(input: unknown, actor: CourseActor) {
   const ref = db.collection(COURSE_COLLECTIONS.institutions).doc();
   const now = nowIso();
   const slug = await ensureUniqueSlug(COURSE_COLLECTIONS.institutions, parsed.slug || parsed.name);
-  const ownerUserId = normalizeString(parsed.ownerUserId) || (actor.role === "empresa" ? actor.uid : "");
+  const ownerUserId = normalizeString(parsed.ownerUserId) || actor.uid;
 
   const payload = removeUndefined({
     name: parsed.name,
@@ -109,8 +105,8 @@ export async function createInstitution(input: unknown, actor: CourseActor) {
     customSubRubro: parsed.customSubRubro,
     rnvaLicense: parsed.rnvaLicense,
     isAcavMember: parsed.isAcavMember,
-    isVerified: parsed.isVerified ?? actor.role === "admin",
-    status: parsed.status ?? (actor.role === "admin" ? "activa" : "pendiente"),
+    isVerified: parsed.isVerified ?? true,
+    status: parsed.status ?? "activa",
     ownerUserId: ownerUserId || undefined,
     createdAt: now,
     updatedAt: now,

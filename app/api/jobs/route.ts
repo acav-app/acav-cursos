@@ -1,7 +1,6 @@
 import { corsPreflight, errorJson, json } from "@/lib/api-helpers";
 import { assertRole, readOptionalCourseActor, requireCourseActor } from "@/lib/courses/server/auth";
 import { createCourse, listCourses } from "@/lib/courses/server/courses";
-import { notifyAdminNewCourse } from "@/lib/courses/server/notifications";
 
 export const runtime = "nodejs";
 
@@ -12,7 +11,7 @@ export function OPTIONS(request: Request) {
 export async function GET(request: Request) {
   try {
     const actor = await readOptionalCourseActor(request);
-    const canReadInternal = actor?.role === "admin" || actor?.role === "empresa";
+    const canReadInternal = actor?.role === "admin";
     const url = new URL(request.url);
     const jobs = await listCourses({
       publicOnly: !canReadInternal,
@@ -40,12 +39,9 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const actor = await requireCourseActor(request);
-    assertRole(actor, ["admin", "empresa"]);
+    assertRole(actor, ["admin"]);
     const body = await request.json();
     const job = await createCourse(body, actor);
-    if (actor.role === "empresa") {
-      await notifyAdminNewCourse(job);
-    }
     return json({ job }, { status: 201 }, request);
   } catch (e: any) {
     return errorJson(e?.message || "internal_error", e?.status || 500, request);

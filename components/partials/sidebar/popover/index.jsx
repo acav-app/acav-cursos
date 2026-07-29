@@ -17,7 +17,7 @@ import { useCourseActor } from "@/components/courses/dashboard/use-course-actor"
 const PopoverSidebar = ({ trans }) => {
   const { collapsed, sidebarBg } = useSidebar();
   const { layout, isRtl } = useThemeStore();
-  const { actor, loading } = useCourseActor();
+  const { actor } = useCourseActor();
   const [activeSubmenu, setActiveSubmenu] = useState(null);
   const [activeMultiMenu, setMultiMenu] = useState(null);
 
@@ -39,13 +39,7 @@ const PopoverSidebar = ({ trans }) => {
 
   const pathname = usePathname();
   const locationName = getDynamicPath(pathname);
-  const effectiveActor =
-    actor ||
-    (loading && pathname?.includes("/dashboard")
-      ? {
-          role: "admin",
-        }
-      : null);
+  const effectiveActor = actor || null;
   const menus = filterMenusByRole(menusConfig?.sidebarNav?.classic || [], effectiveActor);
 
   React.useEffect(() => {
