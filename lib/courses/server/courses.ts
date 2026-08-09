@@ -45,6 +45,10 @@ function normalizeFinalEvaluation(value: Record<string, any> | undefined): Cours
       passingScore: Number.isFinite(Number(value.passingScore)) ? Number(value.passingScore) : undefined,
       maxAttempts: Number.isFinite(Number(value.maxAttempts)) ? Number(value.maxAttempts) : undefined,
       questions: Array.isArray(value.questions) ? value.questions : [],
+      requireAllResourcesReady: value?.requireAllResourcesReady === false ? false : true,
+      requireAllLessonsEvaluationsCompleted:
+        value?.requireAllLessonsEvaluationsCompleted === false ? false : true,
+      locked: typeof value?.locked === "boolean" ? value.locked : undefined,
     };
   }
 
@@ -55,6 +59,9 @@ function normalizeFinalEvaluation(value: Record<string, any> | undefined): Cours
     passingScore: undefined,
     maxAttempts: undefined,
     questions: [],
+    requireAllResourcesReady: true,
+    requireAllLessonsEvaluationsCompleted: true,
+    locked: undefined,
   };
 }
 

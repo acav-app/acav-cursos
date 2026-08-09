@@ -229,12 +229,55 @@ const schema = z
     promoVideoMimeType: z.string().optional(),
     promoVideoSizeBytes: z.number().optional(),
     promoVideoDurationSeconds: z.number().optional(),
+    promoVideoAsset: z
+      .object({
+        url: z.string().url().optional().or(z.literal("")),
+        storageKey: z.string().optional(),
+        mimeType: z.string().optional(),
+        fileSize: z.number().min(0).optional(),
+        durationSeconds: z.number().min(0).optional(),
+        status: z.enum(["pending", "uploading", "ready", "corrupt"]).optional(),
+        checksum: z.string().optional(),
+        uploadedAt: z.string().optional(),
+        qualities: z
+          .array(
+            z.object({
+              label: z.string().min(1),
+              url: z.string().url(),
+              width: z.number().int().min(0).optional(),
+              height: z.number().int().min(0).optional(),
+            })
+          )
+          .optional(),
+        subtitles: z
+          .array(
+            z.object({
+              src: z.string().url(),
+              label: z.string().min(1),
+              srclang: z.string().min(2),
+              default: z.boolean().optional(),
+            })
+          )
+          .optional(),
+      })
+      .optional()
+      .nullable(),
     attachments: z.array(
       z.object({
         id: z.string().min(1),
-        name: z.string().min(1),
-        url: z.string().url(),
+        name: z.string().min(1).optional(),
+        label: z.string().min(1).optional(),
+        url: z.string().url().or(z.literal("")).optional(),
         sizeBytes: z.number().optional(),
+        fileSize: z.number().min(0).optional(),
+        kind: z.enum(["video", "document", "image", "archive", "file", "link"]).optional(),
+        subKind: z.string().optional(),
+        status: z.enum(["pending", "uploading", "ready", "corrupt"]).optional(),
+        mimeType: z.string().optional(),
+        storageKey: z.string().optional(),
+        checksum: z.string().optional(),
+        uploadedAt: z.string().optional(),
+        previewUrl: z.string().url().optional().or(z.literal("")),
       })
     ),
     price: z.number().min(0, "El precio no puede ser negativo"),
@@ -752,15 +795,27 @@ function buildLegacyModulesFromCurriculum(curriculum) {
 function sanitizeAttachments(attachments) {
   return (Array.isArray(attachments) ? attachments : [])
     .map((attachment) => {
-      const id = String(attachment?.id || "").trim();
-      const name = String(attachment?.name || "").trim();
-      const url = String(attachment?.url || "").trim();
-      if (!id || !name || !url) return null;
+      const id = String(attachment?.id || "").trim() || createEntityId("attachment");
+      const legacyName = String(attachment?.name || attachment?.label || "").trim();
+      const legacyUrl = String(attachment?.url || "").trim();
+      const hasLegacy = legacyName && legacyUrl;
+      const hasNewShape = ["ready", "uploading", "pending", "corrupt"].includes(String(attachment?.status || "")) || Boolean(attachment?.kind);
+      if (!hasLegacy && !hasNewShape) return null;
       return {
         id,
-        name,
-        url,
-        sizeBytes: Number.isFinite(Number(attachment?.sizeBytes)) ? Number(attachment.sizeBytes) : undefined,
+        name: attachment?.name || legacyName || undefined,
+        label: attachment?.label || legacyName || undefined,
+        url: attachment?.url || legacyUrl || "",
+        fileSize: Number.isFinite(Number(attachment?.fileSize ?? attachment?.sizeBytes)) ? Number(attachment?.fileSize ?? attachment?.sizeBytes) : undefined,
+        sizeBytes: Number.isFinite(Number(attachment?.sizeBytes ?? attachment?.fileSize)) ? Number(attachment?.sizeBytes ?? attachment?.fileSize) : undefined,
+        kind: attachment?.kind || "file",
+        subKind: attachment?.subKind || undefined,
+        status: attachment?.status || "pending",
+        mimeType: attachment?.mimeType || undefined,
+        storageKey: attachment?.storageKey || undefined,
+        checksum: attachment?.checksum || undefined,
+        uploadedAt: attachment?.uploadedAt || undefined,
+        previewUrl: attachment?.previewUrl || undefined,
       };
     })
     .filter(Boolean);
@@ -835,6 +890,7 @@ function mapCourseToFormValues(current, defaultValues) {
     promoVideoMimeType: current.videoMimeType || "",
     promoVideoSizeBytes: current.videoSizeBytes || undefined,
     promoVideoDurationSeconds: current.videoDurationSeconds || undefined,
+    promoVideoAsset: current.videoAsset || current.promoVideoAsset || null,
     attachments: sanitizeAttachments(current.attachments),
     price: Number(current.price || 0),
     oldPrice: Number.isFinite(Number(current.oldPrice)) ? Number(current.oldPrice) : undefined,
@@ -1710,6 +1766,271 @@ function PerClassEvaluationField({ value, onChange, resourcesSummary }) {
   );
 }
 
+function CoursePromoVideoSection({
+  promoVideoAsset,
+  promoVideo,
+  promoVideoFileName,
+  promoVideoSizeBytes,
+  busy,
+  onVideoAssetChange,
+  onVideoUrlChange,
+  onVideoFileUpload,
+  errors,
+}) {
+  const hasAsset = promoVideoAsset && typeof promoVideoAsset === "object" && (promoVideoAsset.url || promoVideoAsset.storageKey);
+  const hasUrl = Boolean(promoVideo);
+  const legacyBadge = hasAsset
+    ? resourceStatusBadge(promoVideoAsset.status || "ready")
+    : hasUrl
+      ? resourceStatusBadge("pending")
+      : resourceStatusBadge("pending");
+
+  return (
+    <div className="grid gap-4 rounded-[20px] border border-border/60 bg-background p-4">
+      <div className="grid gap-1 md:grid-cols-[1fr_auto] md:items-center">
+        <div>
+          <Label className="flex items-center gap-2 text-base">
+            <FileVideo className="h-4 w-4 text-[#1B2B50]" />
+            Video principal / promocional
+          </Label>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Subí un MP4 / WebM / MOV para reproducirlo dentro de la plataforma. El video principal se usa en la ficha pública y en el hero de la cursada.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Badge variant="outline" className={cn(legacyBadge.tone)}>
+            {hasAsset ? "Asset subido" : hasUrl ? "URL externa" : "Sin video"}
+          </Badge>
+          <Badge variant="outline" className={cn(legacyBadge.tone)}>
+            Estado: {legacyBadge.label}
+          </Badge>
+        </div>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-3">
+          <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            Upload por input (prioridad alta)
+          </div>
+          <MediaUploader
+            mode="video"
+            multiple={false}
+            maxFiles={1}
+            folderPrefix="courses/promo-videos"
+            value={hasAsset ? [promoVideoAsset] : []}
+            onChange={(next) => {
+              const first = Array.isArray(next) ? next[0] : null;
+              if (!first) {
+                onVideoAssetChange(null);
+                return;
+              }
+              onVideoAssetChange({
+                url: first.url || promoVideoAsset?.url || "",
+                storageKey: first.storageKey || promoVideoAsset?.storageKey || undefined,
+                mimeType: first.mimeType || promoVideoAsset?.mimeType || undefined,
+                fileSize: first.fileSize ?? promoVideoAsset?.fileSize ?? undefined,
+                status: first.status || "pending",
+                checksum: first.checksum || promoVideoAsset?.checksum || undefined,
+                uploadedAt: first.uploadedAt || promoVideoAsset?.uploadedAt || new Date().toISOString(),
+                qualities: promoVideoAsset?.qualities || [],
+                subtitles: promoVideoAsset?.subtitles || [],
+              });
+            }}
+            compact
+          />
+          {hasAsset ? (
+            <div className="rounded-2xl border border-border/60 bg-card px-3 py-2.5">
+              <div className="flex items-center gap-2">
+                <FileVideo className="h-4 w-4 text-[#1B2B50]" />
+                <span className="text-sm font-medium text-foreground">
+                  {promoVideoAsset?.url?.split("/").pop()?.split("?")[0] || promoVideoFileName || "Video subido"}
+                </span>
+                {promoVideoAsset?.mimeType ? (
+                  <Badge variant="outline" className="h-5 px-2 text-[10px] uppercase">
+                    {promoVideoAsset.mimeType.includes("mp4") ? "MP4" : promoVideoAsset.mimeType.includes("webm") ? "WebM" : promoVideoAsset.mimeType.includes("quicktime") ? "MOV" : "Video"}
+                  </Badge>
+                ) : null}
+              </div>
+              <div className="mt-1.5 flex items-center gap-2 text-[11px] text-muted-foreground">
+                <span className="rounded-full bg-slate-100 px-2 py-0.5 font-medium">
+                  {resourceFormatSize(promoVideoAsset?.fileSize ?? promoVideoSizeBytes)}
+                </span>
+                {promoVideoAsset?.checksum ? (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5">
+                    <ShieldCheck className="h-3 w-3" /> SHA-256 {promoVideoAsset.checksum.slice(0, 8)}…
+                  </span>
+                ) : null}
+                {promoVideoAsset?.url ? (
+                  <Button asChild type="button" variant="ghost" size="sm" className="ml-auto h-7 px-2 text-[11px]">
+                    <a href={promoVideoAsset.url} target="_blank" rel="noreferrer">
+                      Abrir archivo
+                    </a>
+                  </Button>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
+          <FieldError error={errors?.promoVideo} />
+        </div>
+
+        <div className="grid gap-3">
+          <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            Upload legacy single-file (fallback)
+          </div>
+          <div className="rounded-[20px] border border-border/60 bg-background p-4">
+            <Input
+              type="file"
+              accept={COURSE_VIDEO_ALLOWED_TYPES.join(",")}
+              onChange={(e) => onVideoFileUpload(e.target.files?.[0])}
+              disabled={busy}
+            />
+            <div className="mt-3 flex items-start gap-2 text-sm text-muted-foreground">
+              <Film className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>Usa MP4, WebM o MOV. Máximo {Math.round(COURSE_VIDEO_MAX_SIZE_BYTES / (1024 * 1024))}MB.</span>
+            </div>
+            {hasUrl && !hasAsset ? (
+              <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-[11px] leading-5 text-amber-800">
+                Estás usando un video por upload legacy. Recomendamos migrar al uploader izquierdo para validación SHA-256, calidad ajustable y subtítulos.
+              </div>
+            ) : null}
+            {hasUrl && !hasAsset ? (
+              <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
+                <span className="rounded-full border border-border/60 bg-card px-3 py-1">{promoVideoFileName || "Video cargado"}</span>
+                <span className="rounded-full border border-border/60 bg-card px-3 py-1">{formatBytes(promoVideoSizeBytes)}</span>
+              </div>
+            ) : null}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CourseAttachmentsField({ attachments, onChange, error }) {
+  const safeAttachments = Array.isArray(attachments) ? attachments : [];
+  const summary = summarizeLessonResources({ resources: safeAttachments });
+  const tone = readinessTone(summary);
+  const toneMap = {
+    success: "bg-emerald-50 text-emerald-700 border-emerald-100",
+    warning: "bg-amber-50 text-amber-700 border-amber-100",
+    destructive: "bg-destructive/10 text-destructive border-destructive/20",
+    secondary: "bg-slate-100 text-slate-700 border-slate-200",
+  };
+
+  const removeAttachment = (index) => {
+    onChange(safeAttachments.filter((_, i) => i !== index));
+  };
+
+  return (
+    <div className="grid gap-4 rounded-[20px] border border-border/60 bg-background p-4">
+      <div className="grid gap-2 md:grid-cols-[1fr_auto] md:items-center">
+        <div className="flex items-center gap-3">
+          <Label className="text-base">Archivos y guías del curso</Label>
+          {summary.hasAny ? (
+            <Badge variant="outline" className={cn("gap-1.5", toneMap[tone])}>
+              {readinessProgressText(summary)}
+            </Badge>
+          ) : null}
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Subida masiva con drag & drop. PDF (PDF.js), DOCX (Mammoth), imágenes, ZIP, videos — todos se renderizan en la ficha del alumno sin descarga previa.
+        </p>
+      </div>
+
+      <MediaUploader
+        folderPrefix="courses/attachments"
+        value={safeAttachments}
+        onChange={onChange}
+      />
+
+      {safeAttachments.length ? (
+        <div className="grid gap-3">
+          {safeAttachments.map((attachment, index) => {
+            const { icon: Icon, tone: iconTone } = resourceKindBadge(attachment.kind);
+            const statusBadge = resourceStatusBadge(attachment.status);
+            const sizeLabel = resourceFormatSize(attachment.fileSize ?? attachment.sizeBytes);
+            const url = attachment.url || "";
+            return (
+              <div
+                key={attachment.id || index}
+                className="grid items-center gap-3 rounded-2xl border border-border/60 bg-card px-4 py-3 md:grid-cols-[auto_minmax(0,1fr)_auto_auto]"
+              >
+                <span className={`inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${iconTone}`}>
+                  <Icon className="h-5 w-5" />
+                </span>
+                <div className="grid gap-1.5">
+                  <div className="flex items-center gap-2">
+                    <span className="truncate text-sm font-medium text-foreground">
+                      {attachment.label || attachment.name || "(Archivo sin nombre)"}
+                    </span>
+                    {attachment.subKind ? (
+                      <Badge variant="outline" className="h-5 px-2 text-[10px] uppercase tracking-wide">
+                        {attachment.subKind}
+                      </Badge>
+                    ) : null}
+                    <Badge variant="outline" className={cn("h-5 px-2 text-[10px]", statusBadge.tone)}>
+                      {statusBadge.label}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                    {sizeLabel ? <span className="rounded-full bg-slate-100 px-2 py-0.5 font-medium">{sizeLabel}</span> : null}
+                    {attachment.mimeType ? <span className="truncate">{attachment.mimeType}</span> : null}
+                    {attachment.checksum ? (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5">
+                            <ShieldCheck className="h-3 w-3" /> Integridad
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom">
+                          <div className="max-w-[340px] break-all text-[11px] leading-5">
+                            Checksum SHA-256 — {attachment.checksum}
+                          </div>
+                        </TooltipContent>
+                      </Tooltip>
+                    ) : null}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 justify-self-end">
+                  {url ? (
+                    <Button
+                      asChild
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      className="shrink-0"
+                      title="Abrir recurso"
+                    >
+                      <a href={url} target="_blank" rel="noreferrer">
+                        <ExternalLink className="h-4 w-4" />
+                      </a>
+                    </Button>
+                  ) : null}
+                  <FilePreview
+                    url={url}
+                    label={attachment.label || attachment.name || "Adjunto"}
+                    kind={attachment.kind || "file"}
+                  />
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => removeAttachment(index)}
+                  className="shrink-0 self-start"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            );
+          })}
+        </div>
+      ) : null}
+      <FieldError error={error} />
+    </div>
+  );
+}
+
 function CurriculumField({ curriculum, onChange, error }) {
   const safeCurriculum = Array.isArray(curriculum) ? curriculum : [];
   const [selectedSectionId, setSelectedSectionId] = useState("");
@@ -2438,6 +2759,7 @@ export default function CourseWizard({ jobId }) {
       promoVideoMimeType: "",
       promoVideoSizeBytes: undefined,
       promoVideoDurationSeconds: undefined,
+      promoVideoAsset: null,
       attachments: [],
       price: 0,
       oldPrice: undefined,
@@ -2801,11 +3123,24 @@ export default function CourseWizard({ jobId }) {
         .join("\n"),
       imageUrl: formValues.coverImage || undefined,
       thumbnailUrl: formValues.thumbnail || undefined,
-      videoUrl: formValues.promoVideo || undefined,
-      videoFileName: formValues.promoVideo ? formValues.promoVideoFileName || undefined : undefined,
-      videoMimeType: formValues.promoVideo ? formValues.promoVideoMimeType || undefined : undefined,
-      videoSizeBytes: formValues.promoVideo ? formValues.promoVideoSizeBytes || undefined : undefined,
-      videoDurationSeconds: formValues.promoVideo ? formValues.promoVideoDurationSeconds || undefined : undefined,
+      videoUrl: formValues.promoVideoAsset?.url || formValues.promoVideo || undefined,
+      videoAsset: formValues.promoVideoAsset || undefined,
+      videoFileName:
+        formValues.promoVideoAsset?.url || formValues.promoVideo
+          ? formValues.promoVideoFileName || undefined
+          : undefined,
+      videoMimeType:
+        formValues.promoVideoAsset?.url || formValues.promoVideo
+          ? formValues.promoVideoAsset?.mimeType || formValues.promoVideoMimeType || undefined
+          : undefined,
+      videoSizeBytes:
+        formValues.promoVideoAsset?.url || formValues.promoVideo
+          ? formValues.promoVideoAsset?.fileSize || formValues.promoVideoSizeBytes || undefined
+          : undefined,
+      videoDurationSeconds:
+        formValues.promoVideoAsset?.url || formValues.promoVideo
+          ? formValues.promoVideoAsset?.durationSeconds || formValues.promoVideoDurationSeconds || undefined
+          : undefined,
       attachments,
       price: isFree ? 0 : Number(formValues.price || 0),
       oldPrice: formValues.oldPrice || undefined,
@@ -3325,48 +3660,29 @@ export default function CourseWizard({ jobId }) {
                   </div>
                 </div>
 
-                <div className="grid gap-3">
-                  <Label>Video promocional</Label>
-                  <div className="rounded-[24px] border border-border/60 bg-background p-4">
-                    <Input type="file" accept={COURSE_VIDEO_ALLOWED_TYPES.join(",")} onChange={(e) => handleVideoUpload(e.target.files?.[0])} disabled={busy} />
-                    <div className="mt-3 flex items-start gap-2 text-sm text-muted-foreground">
-                      <Film className="mt-0.5 h-4 w-4 shrink-0" />
-                      <span>Usa MP4, WebM, OGG o MOV. Máximo {Math.round(COURSE_VIDEO_MAX_SIZE_BYTES / (1024 * 1024))}MB.</span>
-                    </div>
-                    {values.promoVideo ? (
-                      <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
-                        <span className="rounded-full border border-border/60 bg-card px-3 py-1">{values.promoVideoFileName || "Video cargado"}</span>
-                        <span className="rounded-full border border-border/60 bg-card px-3 py-1">{formatBytes(values.promoVideoSizeBytes)}</span>
-                        <span className="rounded-full border border-border/60 bg-card px-3 py-1">{formatDuration(values.promoVideoDurationSeconds)}</span>
-                      </div>
-                    ) : null}
-                  </div>
-                  <FieldError error={errors.promoVideo} />
-                  {values.promoVideo ? <FilePreview url={values.promoVideo} title="Video de presentación" variant="compact" /> : null}
-                </div>
+                <CoursePromoVideoSection
+                  promoVideoAsset={values.promoVideoAsset}
+                  promoVideo={values.promoVideo || ""}
+                  promoVideoFileName={values.promoVideoFileName || ""}
+                  promoVideoSizeBytes={values.promoVideoSizeBytes}
+                  busy={busy}
+                  onVideoAssetChange={(next) => setValue("promoVideoAsset", next, { shouldValidate: true, shouldDirty: true })}
+                  onVideoUrlChange={(next) => setValue("promoVideo", next || "", { shouldValidate: true, shouldDirty: true })}
+                  onVideoFileUpload={handleVideoUpload}
+                  errors={errors}
+                />
+                {(values.promoVideoAsset?.url || values.promoVideo) ? (
+                  <FilePreview
+                    url={values.promoVideoAsset?.url || values.promoVideo || ""}
+                    title="Video principal / promocional"
+                    variant="compact"
+                  />
+                ) : null}
 
-                <div className="grid gap-3">
-                  <Label>Archivos o guías complementarias</Label>
-                  <div className="rounded-[24px] border border-border/60 bg-background p-4">
-                    <Input type="file" onChange={(e) => handleAttachmentUpload(e.target.files?.[0])} disabled={busy} />
-                    <div className="mt-3 text-sm text-muted-foreground">Sube PDFs, plantillas o recursos complementarios.</div>
-                  </div>
-                  {(values.attachments || []).length ? (
-                    <div className="grid gap-3">
-                      {values.attachments.map((attachment) => (
-                        <div key={attachment.id} className="flex items-center justify-between gap-3 rounded-2xl border border-border/60 bg-background px-4 py-3">
-                          <div className="min-w-0">
-                            <div className="truncate font-semibold text-foreground">{attachment.name}</div>
-                            <div className="mt-1 text-xs text-muted-foreground">{formatBytes(attachment.sizeBytes)}</div>
-                          </div>
-                          <Button type="button" variant="ghost" size="icon" onClick={() => removeAttachment(attachment.id)}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
-                  ) : null}
-                </div>
+                <CourseAttachmentsField
+                  attachments={values.attachments || []}
+                  onChange={(next) => setValue("attachments", next, { shouldValidate: true, shouldDirty: true })}
+                />
               </SectionCard>
             ) : null}
 

@@ -20,6 +20,7 @@ import {
   FileText,
   Filter,
   FolderKanban,
+  FolderOpen,
   GraduationCap,
   HelpCircle,
   Info,
@@ -65,6 +66,9 @@ import {
   readinessProgressText,
   readinessTone,
   summarizeLessonResources,
+  buildLessonEvaluationStatesFromEnrollment,
+  perClassEvaluationProgress,
+  finalEvaluationUnlockedReason,
 } from "@/lib/courses/resource-readiness";
 
 function titleCase(value, fallback = "-") {
@@ -564,6 +568,14 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
   const gradebook = useMemo(
     () => (Array.isArray(enrollment?.gradebook) ? enrollment.gradebook : []),
     [enrollment?.gradebook]
+  );
+  const perClassStates = useMemo(
+    () => buildLessonEvaluationStatesFromEnrollment(curriculum, gradebook),
+    [curriculum, gradebook]
+  );
+  const perClassProgress = useMemo(
+    () => perClassEvaluationProgress(curriculum, perClassStates),
+    [curriculum, perClassStates]
   );
   const attachments = useMemo(
     () => (Array.isArray(course?.attachments) ? course.attachments : []),
@@ -1626,6 +1638,8 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
                                       const summary = summarizeLessonResources(lesson);
                                       const hasEval = lesson?.evaluation?.enabled;
                                       const evalUnlocked = isLessonEvaluationUnlocked(lesson);
+                                      const lessonId = String(lesson?.id || "");
+                                      const evalState = lessonId ? perClassStates[lessonId] : undefined;
                                       if (!resources.length && !hasEval) return null;
                                       return (
                                         <div className="w-full md:col-span-3 space-y-3 border-t border-dashed border-slate-200 pt-3">
@@ -1648,12 +1662,62 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
                                               </TooltipContent>
                                             </Tooltip>
                                             {hasEval ? (
-                                              evalUnlocked ? (
+                                              evalState?.passed ? (
                                                 <Tooltip>
                                                   <TooltipTrigger asChild>
                                                     <Badge
                                                       variant="soft"
                                                       color="success"
+                                                      className="rounded-full cursor-help"
+                                                    >
+                                                      <CheckCircle2 className="mr-1 h-3 w-3" />
+                                                      {typeof evalState.percentage === "number"
+                                                        ? `Aprobada · ${evalState.percentage}%`
+                                                        : "Aprobada"}
+                                                    </Badge>
+                                                  </TooltipTrigger>
+                                                  <TooltipContent side="bottom">
+                                                    <div className="max-w-[240px] leading-5 text-[11px]">
+                                                      Rendiste esta evaluación y la aprobaste. ¡Buen trabajo!
+                                                      {typeof evalState.attempts === "number" && evalState.attempts > 1
+                                                        ? ` (${evalState.attempts} intentos realizados)`
+                                                        : evalState.attempts === 1
+                                                        ? " (1 intento realizado)"
+                                                        : ""}
+                                                    </div>
+                                                  </TooltipContent>
+                                                </Tooltip>
+                                              ) : evalState?.submitted && evalState?.passed === false ? (
+                                                <Tooltip>
+                                                  <TooltipTrigger asChild>
+                                                    <Badge
+                                                      variant="soft"
+                                                      color="destructive"
+                                                      className="rounded-full cursor-help"
+                                                    >
+                                                      <Circle className="mr-1 h-3 w-3" />
+                                                      {typeof evalState.percentage === "number"
+                                                        ? `Desaprobada · ${evalState.percentage}%`
+                                                        : "Desaprobada"}
+                                                    </Badge>
+                                                  </TooltipTrigger>
+                                                  <TooltipContent side="bottom">
+                                                    <div className="max-w-[240px] leading-5 text-[11px]">
+                                                      Rendiste esta evaluación pero todavía no la aprobaste.
+                                                      {lesson.evaluation.maxAttempts ? (
+                                                        evalState.attempts && evalState.attempts >= lesson.evaluation.maxAttempts
+                                                          ? ` Usaste tus ${lesson.evaluation.maxAttempts} intentos — consultá a la institución.`
+                                                          : ` Tenés más intentos disponibles.`
+                                                      ) : " Podés volver a intentarlo."}
+                                                    </div>
+                                                  </TooltipContent>
+                                                </Tooltip>
+                                              ) : evalUnlocked ? (
+                                                <Tooltip>
+                                                  <TooltipTrigger asChild>
+                                                    <Badge
+                                                      variant="soft"
+                                                      color="default"
                                                       className="rounded-full cursor-help"
                                                     >
                                                       <ClipboardCheck className="mr-1 h-3 w-3" /> Evaluación habilitada
@@ -1662,7 +1726,7 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
                                                   <TooltipContent side="bottom">
                                                     <div className="max-w-[240px] leading-5 text-[11px]">
                                                       {lesson.evaluation.requireAllResourcesReady === false
-                                                        ? "Evaluación disponible de inmediato."
+                                                        ? "Evaluación disponible de inmediato. Rendila cuando quieras."
                                                         : "Todos los recursos listos — podés rendir la evaluación de la clase."}
                                                     </div>
                                                   </TooltipContent>
@@ -1727,20 +1791,31 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
                                                       {lesson.evaluation.maxAttempts} intentos
                                                     </Badge>
                                                   ) : null}
+                                                  {evalState?.attempts ? (
+                                                    <Badge variant="soft" color="default" className="rounded-full">
+                                                      {evalState.attempts}/{lesson.evaluation.maxAttempts || "∞"} realizados
+                                                    </Badge>
+                                                  ) : null}
                                                 </div>
                                               </div>
                                               <Button
                                                 asChild
-                                                disabled={!evalUnlocked}
+                                                disabled={!evalUnlocked || evalState?.passed === true || (lesson.evaluation.maxAttempts && evalState?.attempts && evalState.attempts >= lesson.evaluation.maxAttempts)}
                                                 className="rounded-2xl bg-[#1B2B50] hover:bg-[#233A6A]"
                                               >
                                                 <a
                                                   href={evalUnlocked ? `#clase-${lesson.id || "eval"}` : undefined}
-                                                  onClick={(e) => !evalUnlocked && e.preventDefault()}
-                                                  aria-disabled={!evalUnlocked}
+                                                  onClick={(e) => (!evalUnlocked || evalState?.passed === true || (lesson.evaluation.maxAttempts && evalState?.attempts && evalState.attempts >= lesson.evaluation.maxAttempts)) && e.preventDefault()}
+                                                  aria-disabled={!evalUnlocked || evalState?.passed === true || (lesson.evaluation.maxAttempts && evalState?.attempts && evalState.attempts >= lesson.evaluation.maxAttempts)}
                                                 >
                                                   <FileQuestion className="mr-2 h-4 w-4" />
-                                                  {evalUnlocked ? "Rendir evaluación" : "Esperando recursos"}
+                                                  {evalState?.passed === true
+                                                    ? "Ya aprobada"
+                                                    : lesson.evaluation.maxAttempts && evalState?.attempts && evalState.attempts >= lesson.evaluation.maxAttempts
+                                                    ? "Sin intentos disponibles"
+                                                    : evalUnlocked
+                                                    ? "Rendir evaluación"
+                                                    : "Esperando recursos"}
                                                 </a>
                                               </Button>
                                             </div>
@@ -2497,27 +2572,16 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
               <div className="mt-4">
                 {course?.finalEvaluation?.enabled ? (
                   (() => {
-                    const perClassStates = {};
                     const unlocked = isFinalEvaluationUnlocked(course, perClassStates);
                     const curriculum = Array.isArray(course.curriculum) ? course.curriculum : [];
                     const evaluatedLessons = curriculum.flatMap((s) =>
                       Array.isArray(s?.lessons) ? s.lessons.filter((l) => l?.evaluation?.enabled) : []
                     );
-                    const lessonsWithMissingResources = curriculum.flatMap((s) =>
-                      Array.isArray(s?.lessons)
-                        ? s.lessons.filter((l) => !summarizeLessonResources(l).allReady)
-                        : []
-                    );
-                    let reason = "";
-                    if (course.finalEvaluation.requireAllResourcesReady !== false && lessonsWithMissingResources.length) {
-                      reason = `Faltan subir ${lessonsWithMissingResources.length} recurso(s) en clases.`;
-                    } else if (
-                      course.finalEvaluation.requireAllLessonsEvaluationsCompleted !== false &&
-                      evaluatedLessons.length &&
-                      !evaluatedLessons.every((l) => perClassStates[l.id]?.passed)
-                    ) {
-                      reason = "Debés aprobar todas las evaluaciones por clase primero.";
-                    }
+                    const progress = perClassProgress;
+                    const summary = summarizeCurriculumResources(curriculum);
+                    const requireResources = course.finalEvaluation.requireAllResourcesReady !== false;
+                    const requireEvaluations = course.finalEvaluation.requireAllLessonsEvaluationsCompleted !== false;
+                    const reason = finalEvaluationUnlockedReason(course, perClassStates);
                     return (
                       <div
                         className={cn(
@@ -2612,6 +2676,78 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
                             </Tooltip>
                           ) : null}
                         </div>
+                        {(requireEvaluations || requireResources) && evaluatedLessons.length + summary.total > 0 ? (
+                          <div className="mt-4 grid gap-2 md:grid-cols-2">
+                            {requireEvaluations && evaluatedLessons.length > 0 ? (
+                              <div className="rounded-2xl border border-slate-200 bg-white p-3">
+                                <div className="flex items-center justify-between gap-2">
+                                  <div className="flex items-center gap-2 text-xs font-semibold text-slate-700">
+                                    <GraduationCap className="h-3.5 w-3.5 text-violet-600" />
+                                    Evaluaciones por clase
+                                  </div>
+                                  <Badge
+                                    variant="soft"
+                                    color={progress.allPassed ? "success" : progress.passed > 0 ? "warning" : "default"}
+                                    className="rounded-full text-[10px]"
+                                  >
+                                    {progress.allPassed
+                                      ? `${progress.passed}/${progress.totalEvaluations} · Todas aprobadas`
+                                      : `${progress.passed}/${progress.totalEvaluations} · ${progress.pending > 0 ? `${progress.pending} sin rendir` : ""}${progress.failed > 0 ? (progress.pending > 0 ? " · " : "") + `${progress.failed} desaprobadas` : ""}`}
+                                  </Badge>
+                                </div>
+                                <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+                                  <div
+                                    className={cn(
+                                      "h-full rounded-full transition-all",
+                                      progress.allPassed
+                                        ? "bg-emerald-500"
+                                        : progress.passed > 0
+                                        ? "bg-amber-500"
+                                        : "bg-slate-300"
+                                    )}
+                                    style={{
+                                      width: `${progress.totalEvaluations > 0 ? Math.round((progress.passed / progress.totalEvaluations) * 100) : 0}%`,
+                                    }}
+                                  />
+                                </div>
+                              </div>
+                            ) : null}
+                            {requireResources ? (
+                              <div className="rounded-2xl border border-slate-200 bg-white p-3">
+                                <div className="flex items-center justify-between gap-2">
+                                  <div className="flex items-center gap-2 text-xs font-semibold text-slate-700">
+                                    <FolderOpen className="h-3.5 w-3.5 text-sky-600" />
+                                    Recursos de cursada
+                                  </div>
+                                  <Badge
+                                    variant="soft"
+                                    color={readinessTone(summary)}
+                                    className="rounded-full text-[10px]"
+                                  >
+                                    {readinessProgressText(summary)}
+                                  </Badge>
+                                </div>
+                                <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+                                  <div
+                                    className={cn(
+                                      "h-full rounded-full transition-all",
+                                      summary.allReady
+                                        ? "bg-emerald-500"
+                                        : summary.corrupt > 0
+                                        ? "bg-rose-500"
+                                        : summary.ready > 0
+                                        ? "bg-amber-500"
+                                        : "bg-slate-300"
+                                    )}
+                                    style={{
+                                      width: `${summary.total > 0 ? Math.round((summary.ready / summary.total) * 100) : 100}%`,
+                                    }}
+                                  />
+                                </div>
+                              </div>
+                            ) : null}
+                          </div>
+                        ) : null}
                         <div className="mt-4">
                           <Button
                             asChild

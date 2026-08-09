@@ -2633,7 +2633,7 @@ html[dir="rtl"] .react-select .select__loading-indicator {
 }
 
 @media (min-width: 1280px) {
-  .semibox-content-wrapper {
+  . {
     margin-left: 56px;
     margin-right: 56px;
   }
