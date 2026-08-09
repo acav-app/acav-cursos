@@ -1,6 +1,9 @@
 import { create } from "zustand";
 import { siteConfig } from "@/config/site";
 import { persist, createJSONStorage } from "zustand/middleware";
+
+const FORCED_LAYOUT = "semibox";
+
 export const useThemeStore = create(
   persist(
     (set) => ({
@@ -8,20 +11,15 @@ export const useThemeStore = create(
       setTheme: (theme) => set({ theme }),
       radius: siteConfig.radius,
       setRadius: (value) => set({ radius: value }),
-      layout: siteConfig.layout,
-      setLayout: (value) => {
-        set({ layout: value });
+      layout: FORCED_LAYOUT,
+      setLayout: (_value) => {
+        set({ layout: FORCED_LAYOUT });
 
-        // If the new layout is "semibox," also set the sidebarType to "popover"
-        if (value === "semibox") {
+        if (FORCED_LAYOUT === "semibox") {
           useSidebar.setState({ sidebarType: "popover" });
         }
-        if (value === "horizontal") {
+        if (FORCED_LAYOUT === "horizontal") {
           useSidebar.setState({ sidebarType: "classic" });
-        }
-        //
-        if (value === "horizontal") {
-          // update  setNavbarType
           useThemeStore.setState({ navbarType: "sticky" });
         }
       },
@@ -42,11 +40,22 @@ export const useThemeStore = create(
             ...state,
             theme: siteConfig.theme,
             radius: siteConfig.radius,
-            layout: siteConfig.layout,
+            layout: FORCED_LAYOUT,
             navbarType: siteConfig.navbarType,
           };
         }
-        return state;
+        return { ...state, layout: FORCED_LAYOUT };
+      },
+      onRehydrateStorage: () => (state) => {
+        if (state) {
+          state.layout = FORCED_LAYOUT;
+          const sidebarStore = useSidebar.getState();
+          if (FORCED_LAYOUT === "semibox" && sidebarStore.sidebarType !== "popover") {
+            sidebarStore.setSidebarType("popover");
+          } else if (FORCED_LAYOUT === "horizontal" && sidebarStore.sidebarType !== "classic") {
+            sidebarStore.setSidebarType("classic");
+          }
+        }
       },
       storage: createJSONStorage(() => localStorage),
     }
@@ -59,7 +68,7 @@ export const useSidebar = create(
       collapsed: false,
       setCollapsed: (value) => set({ collapsed: value }),
       sidebarType:
-        siteConfig.layout === "semibox" ? "popover" : siteConfig.sidebarType,
+        FORCED_LAYOUT === "semibox" ? "popover" : siteConfig.sidebarType,
       setSidebarType: (value) => {
         set({ sidebarType: value });
       },
@@ -78,14 +87,29 @@ export const useSidebar = create(
         const state = persistedState && typeof persistedState === "object" ? persistedState : {};
         if ((version || 0) < 1) {
           const sidebarType =
-            siteConfig.layout === "semibox"
+            FORCED_LAYOUT === "semibox"
               ? "popover"
-              : siteConfig.layout === "horizontal"
+              : FORCED_LAYOUT === "horizontal"
                 ? "classic"
                 : siteConfig.sidebarType;
           return { ...state, sidebarType };
         }
-        return state;
+        const sidebarType =
+          FORCED_LAYOUT === "semibox"
+            ? "popover"
+            : FORCED_LAYOUT === "horizontal"
+              ? "classic"
+              : state.sidebarType || siteConfig.sidebarType;
+        return { ...state, sidebarType };
+      },
+      onRehydrateStorage: () => (state) => {
+        if (state) {
+          if (FORCED_LAYOUT === "semibox") {
+            state.sidebarType = "popover";
+          } else if (FORCED_LAYOUT === "horizontal") {
+            state.sidebarType = "classic";
+          }
+        }
       },
       storage: createJSONStorage(() => localStorage),
     }

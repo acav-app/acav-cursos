@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { ReactToaster } from "@/components/ui/toaster";
 import { Toaster } from "react-hot-toast";
 import { SonnToaster } from "@/components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { useMounted } from "@/hooks/use-mounted";
 
 const inter = Inter({ subsets: ["latin"] });
@@ -26,12 +27,14 @@ const Providers = ({ children }) => {
         enableSystem={false}
         defaultTheme="light"
       >
-        <div className={cn("h-full", `theme-${resolvedTheme}`)}>
-          {children}
-          <ReactToaster />
-        </div>
-        <Toaster />
-        <SonnToaster />
+        <TooltipProvider delayDuration={120}>
+          <div className={cn("h-full", `theme-${resolvedTheme}`)}>
+            {children}
+            <ReactToaster />
+          </div>
+          <Toaster />
+          <SonnToaster />
+        </TooltipProvider>
       </ThemeProvider>
     </div>
   );

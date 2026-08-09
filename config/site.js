@@ -6,7 +6,7 @@ export const siteConfig = {
     "ACAV, cursos, formación, capacitación, turismo, Córdoba, campus, instituciones, inscripciones, certificados, pagos",
   author: "Tucs Digital",
   theme: "violet",
-  layout: "horizontal",
+  layout: "semibox",
   // semi-box, horizontal, vertical
   hideSideBar: false,
   sidebarType: "classic",

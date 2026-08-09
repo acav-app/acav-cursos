@@ -16,7 +16,8 @@ import LayoutLoader from "@/components/layout-loader";
 const DashBoardLayoutProvider = ({ children, trans }) => {
   const { collapsed, sidebarType, setCollapsed, subMenu } = useSidebar();
   const [open, setOpen] = React.useState(false);
-  const { layout } = useThemeStore();
+  const _storeLayout = useThemeStore((s) => s.layout);
+  const layout = "semibox";
   const location = usePathname();
   const isMobile = useMediaQuery("(min-width: 768px)");
   const mounted = useMounted();
