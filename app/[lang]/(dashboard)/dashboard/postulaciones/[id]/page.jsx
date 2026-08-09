@@ -107,7 +107,7 @@ export default function PostulacionDetailPage({ params: { id } }) {
 
   if (!application) {
     return (
-      <div className="py-8 px-2 max-w-6xl mx-auto">
+      <div className="py-8 px-2 mx-auto">
         <div className="rounded-3xl border border-border/60 bg-card p-8">
           <h1 className="text-2xl font-bold text-foreground">Inscripcion no encontrada</h1>
           <div className="mt-4">
@@ -121,7 +121,7 @@ export default function PostulacionDetailPage({ params: { id } }) {
   }
 
   return (
-    <div className="py-8 px-2 max-w-6xl mx-auto">
+    <div className="py-8 px-2 mx-auto">
       <div className="mb-6">
         <Link
           href={buildLocalizedPath("/dashboard/inscripciones")}

@@ -57,6 +57,15 @@ import { authedFetch } from "@/lib/auth/authed-fetch";
 import { cn, useLocalizedPath } from "@/lib/utils";
 import PaymentReceiptUploader from "@/components/courses/dashboard/payment-receipt-uploader";
 import { resolveEducationalStatusMeta, resolvePaymentStatusMeta } from "@/lib/courses/status-meta";
+import VideoPlayer from "@/components/courses/video-player";
+import DocumentPreviewCard from "@/components/courses/document-preview";
+import {
+  isFinalEvaluationUnlocked,
+  isLessonEvaluationUnlocked,
+  readinessProgressText,
+  readinessTone,
+  summarizeLessonResources,
+} from "@/lib/courses/resource-readiness";
 
 function titleCase(value, fallback = "-") {
   const normalized = String(value || "").replaceAll("_", " ").trim();
@@ -1117,24 +1126,16 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
                   {featuredVideo ? (
                     <>
                       {inlineFeaturedVideo ? (
-                        featuredVideoKind === "file" ? (
-                          <video
-                            controls
-                            preload="metadata"
-                            poster={featuredVideo.posterUrl || undefined}
-                            className="absolute inset-0 h-full w-full object-cover"
-                            src={featuredVideo.url}
-                            aria-label={`Video destacado de ${featuredVideo.title}`}
-                          />
-                        ) : (
-                          <iframe
-                            title={`Reproductor de ${featuredVideo.title}`}
-                            src={featuredVideoEmbed || featuredVideo.url}
-                            className="absolute inset-0 h-full w-full"
-                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
-                            allowFullScreen
-                          />
-                        )
+                        <VideoPlayer
+                          src={featuredVideoKind === "file" ? featuredVideo.url : featuredVideoEmbed || featuredVideo.url}
+                          kind={featuredVideoKind === "file" ? "file" : "embed"}
+                          title={featuredVideo.title}
+                          poster={featuredVideo.posterUrl || undefined}
+                          qualities={featuredVideo.qualities || undefined}
+                          subtitles={featuredVideo.subtitles || undefined}
+                          className="absolute inset-0 h-full w-full !rounded-none border-0 shadow-none"
+                          fallbackLabel="Contenido no disponible temporalmente"
+                        />
                       ) : featuredVideo.posterUrl ? (
                         <div
                           className="absolute inset-0 transition duration-500 group-hover:scale-[1.04] group-hover:opacity-90"
@@ -1619,6 +1620,134 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
                                         </TooltipContent>
                                       </Tooltip>
                                     </div>
+
+                                    {(() => {
+                                      const resources = Array.isArray(lesson?.resources) ? lesson.resources : [];
+                                      const summary = summarizeLessonResources(lesson);
+                                      const hasEval = lesson?.evaluation?.enabled;
+                                      const evalUnlocked = isLessonEvaluationUnlocked(lesson);
+                                      if (!resources.length && !hasEval) return null;
+                                      return (
+                                        <div className="w-full md:col-span-3 space-y-3 border-t border-dashed border-slate-200 pt-3">
+                                          <div className="flex flex-wrap items-center gap-2">
+                                            <Tooltip>
+                                              <TooltipTrigger asChild>
+                                                <Badge
+                                                  variant="soft"
+                                                  color={readinessTone(summary)}
+                                                  className="rounded-full cursor-help"
+                                                >
+                                                  <FolderKanban className="mr-1 h-3 w-3" />
+                                                  {readinessProgressText(summary)}
+                                                </Badge>
+                                              </TooltipTrigger>
+                                              <TooltipContent side="bottom">
+                                                <div className="max-w-[240px] leading-5 text-[11px]">
+                                                  Estado de integridad de recursos para esta clase (videos, documentos, imágenes).
+                                                </div>
+                                              </TooltipContent>
+                                            </Tooltip>
+                                            {hasEval ? (
+                                              evalUnlocked ? (
+                                                <Tooltip>
+                                                  <TooltipTrigger asChild>
+                                                    <Badge
+                                                      variant="soft"
+                                                      color="success"
+                                                      className="rounded-full cursor-help"
+                                                    >
+                                                      <ClipboardCheck className="mr-1 h-3 w-3" /> Evaluación habilitada
+                                                    </Badge>
+                                                  </TooltipTrigger>
+                                                  <TooltipContent side="bottom">
+                                                    <div className="max-w-[240px] leading-5 text-[11px]">
+                                                      {lesson.evaluation.requireAllResourcesReady === false
+                                                        ? "Evaluación disponible de inmediato."
+                                                        : "Todos los recursos listos — podés rendir la evaluación de la clase."}
+                                                    </div>
+                                                  </TooltipContent>
+                                                </Tooltip>
+                                              ) : (
+                                                <Tooltip>
+                                                  <TooltipTrigger asChild>
+                                                    <Badge
+                                                      variant="soft"
+                                                      color="warning"
+                                                      className="rounded-full cursor-help"
+                                                    >
+                                                      <Clock3 className="mr-1 h-3 w-3" /> Evaluación bloqueada
+                                                    </Badge>
+                                                  </TooltipTrigger>
+                                                  <TooltipContent side="bottom">
+                                                    <div className="max-w-[240px] leading-5 text-[11px]">
+                                                      {summary.hasAny && !summary.allReady
+                                                        ? "Esperando a que todos los recursos de esta clase se carguen correctamente."
+                                                        : "Evaluación aún no habilitada por la institución."}
+                                                    </div>
+                                                  </TooltipContent>
+                                                </Tooltip>
+                                              )
+                                            ) : null}
+                                          </div>
+
+                                          {resources.length ? (
+                                            <div className="grid gap-3 md:grid-cols-2">
+                                              {resources.map((r, idx) => (
+                                                <DocumentPreviewCard
+                                                  key={r.id || `${lesson.id}_${idx}`}
+                                                  resource={r}
+                                                  compact
+                                                />
+                                              ))}
+                                            </div>
+                                          ) : null}
+
+                                          {hasEval ? (
+                                            <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                                              <div>
+                                                <div className="text-sm font-semibold text-slate-950">
+                                                  {lesson.evaluation.title || `Evaluación · ${lesson.title}`}
+                                                </div>
+                                                {lesson.evaluation.description ? (
+                                                  <p className="mt-1 text-xs text-slate-500">
+                                                    {lesson.evaluation.description}
+                                                  </p>
+                                                ) : null}
+                                                <div className="mt-2 flex flex-wrap gap-2">
+                                                  <Badge variant="soft" color="secondary" className="rounded-full">
+                                                    {(lesson.evaluation.questions || []).length} preguntas
+                                                  </Badge>
+                                                  {lesson.evaluation.passingScore ? (
+                                                    <Badge variant="soft" color="success" className="rounded-full">
+                                                      Mínimo {lesson.evaluation.passingScore}%
+                                                    </Badge>
+                                                  ) : null}
+                                                  {lesson.evaluation.maxAttempts ? (
+                                                    <Badge variant="soft" color="warning" className="rounded-full">
+                                                      {lesson.evaluation.maxAttempts} intentos
+                                                    </Badge>
+                                                  ) : null}
+                                                </div>
+                                              </div>
+                                              <Button
+                                                asChild
+                                                disabled={!evalUnlocked}
+                                                className="rounded-2xl bg-[#1B2B50] hover:bg-[#233A6A]"
+                                              >
+                                                <a
+                                                  href={evalUnlocked ? `#clase-${lesson.id || "eval"}` : undefined}
+                                                  onClick={(e) => !evalUnlocked && e.preventDefault()}
+                                                  aria-disabled={!evalUnlocked}
+                                                >
+                                                  <FileQuestion className="mr-2 h-4 w-4" />
+                                                  {evalUnlocked ? "Rendir evaluación" : "Esperando recursos"}
+                                                </a>
+                                              </Button>
+                                            </div>
+                                          ) : null}
+                                        </div>
+                                      );
+                                    })()}
                                   </div>
                                 );
                               })}
@@ -2054,29 +2183,49 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
                 ) : null}
               </div>
 
-              <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                {resourceCards.map((item) => {
-                  const Icon = item.icon;
-                  return (
-                    <Tooltip key={item.id}>
-                      <TooltipTrigger asChild>
-                        <div key={item.id} className="rounded-[24px] border border-slate-200 bg-[#FCFCFF] p-4 cursor-help transition hover:border-violet-200 hover:bg-violet-50/40">
-                          <span className={cn("inline-flex h-11 w-11 items-center justify-center rounded-2xl", item.accent)}>
-                            <Icon className="h-5 w-5" />
-                          </span>
-                          <div className="mt-4 text-sm font-semibold text-slate-950">{item.title}</div>
-                          <p className="mt-2 text-sm leading-6 text-slate-500">{item.detail}</p>
-                        </div>
-                      </TooltipTrigger>
-                      <TooltipContent side="bottom">
-                        <div className="max-w-[240px] leading-5 text-[11px]">
-                          <div className="font-semibold">{item.title}</div>
-                          <div className="mt-1 text-slate-100/90">{item.detail}</div>
-                        </div>
-                      </TooltipContent>
-                    </Tooltip>
-                  );
-                })}
+              <div className="mt-5">
+                {attachments.length ? (
+                  <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-2">
+                    {attachments.slice(0, 8).map((resource, idx) => (
+                      <DocumentPreviewCard key={resource.id || `${resource.url}_${idx}`} resource={resource} />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                    {resourceCards.map((item) => {
+                      const Icon = item.icon;
+                      return (
+                        <Tooltip key={item.id}>
+                          <TooltipTrigger asChild>
+                            <div
+                              key={item.id}
+                              className="rounded-[24px] border border-slate-200 bg-[#FCFCFF] p-4 cursor-help transition hover:border-violet-200 hover:bg-violet-50/40"
+                            >
+                              <span
+                                className={cn(
+                                  "inline-flex h-11 w-11 items-center justify-center rounded-2xl",
+                                  item.accent
+                                )}
+                              >
+                                <Icon className="h-5 w-5" />
+                              </span>
+                              <div className="mt-4 text-sm font-semibold text-slate-950">
+                                {item.title}
+                              </div>
+                              <p className="mt-2 text-sm leading-6 text-slate-500">{item.detail}</p>
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent side="bottom">
+                            <div className="max-w-[240px] leading-5 text-[11px]">
+                              <div className="font-semibold">{item.title}</div>
+                              <div className="mt-1 text-slate-100/90">{item.detail}</div>
+                            </div>
+                          </TooltipContent>
+                        </Tooltip>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             </section>
           </div>
@@ -2340,63 +2489,148 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
                   </TooltipTrigger>
                   <TooltipContent side="left">
                     <div className="max-w-[230px] leading-5 text-[11px]">
-                      Examen de cierre para acceder al certificado oficial de ACAV.
+                      Examen de cierre para acceder al certificado oficial de ACAV. Se habilita cuando todos los recursos del curso están listos y todas las evaluaciones por clase están aprobadas.
                     </div>
                   </TooltipContent>
                 </Tooltip>
               </div>
               <div className="mt-4">
                 {course?.finalEvaluation?.enabled ? (
-                  <div className="rounded-[22px] border border-slate-200 bg-[#FCFCFF] p-4">
-                    <div className="text-sm font-semibold text-slate-950">
-                      {course.finalEvaluation.title || "Evaluación de cierre"}
-                    </div>
-                    {course.finalEvaluation.description ? (
-                      <p className="mt-2 text-sm leading-6 text-slate-500">{course.finalEvaluation.description}</p>
-                    ) : null}
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <span>
-                            <Badge variant="soft" color="default" className="bg-violet-100 text-violet-700 hover:text-violet-700 cursor-help">
-                              {Array.isArray(course.finalEvaluation.questions) ? course.finalEvaluation.questions.length : 0} preguntas
+                  (() => {
+                    const perClassStates = {};
+                    const unlocked = isFinalEvaluationUnlocked(course, perClassStates);
+                    const curriculum = Array.isArray(course.curriculum) ? course.curriculum : [];
+                    const evaluatedLessons = curriculum.flatMap((s) =>
+                      Array.isArray(s?.lessons) ? s.lessons.filter((l) => l?.evaluation?.enabled) : []
+                    );
+                    const lessonsWithMissingResources = curriculum.flatMap((s) =>
+                      Array.isArray(s?.lessons)
+                        ? s.lessons.filter((l) => !summarizeLessonResources(l).allReady)
+                        : []
+                    );
+                    let reason = "";
+                    if (course.finalEvaluation.requireAllResourcesReady !== false && lessonsWithMissingResources.length) {
+                      reason = `Faltan subir ${lessonsWithMissingResources.length} recurso(s) en clases.`;
+                    } else if (
+                      course.finalEvaluation.requireAllLessonsEvaluationsCompleted !== false &&
+                      evaluatedLessons.length &&
+                      !evaluatedLessons.every((l) => perClassStates[l.id]?.passed)
+                    ) {
+                      reason = "Debés aprobar todas las evaluaciones por clase primero.";
+                    }
+                    return (
+                      <div
+                        className={cn(
+                          "rounded-[22px] border p-4",
+                          unlocked ? "border-slate-200 bg-[#FCFCFF]" : "border-amber-200 bg-amber-50/60"
+                        )}
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="text-sm font-semibold text-slate-950">
+                            {course.finalEvaluation.title || "Evaluación de cierre"}
+                          </div>
+                          {unlocked ? (
+                            <Badge variant="soft" color="success" className="rounded-full">
+                              <CheckCircle2 className="mr-1 h-3 w-3" /> Habilitada
                             </Badge>
-                          </span>
-                        </TooltipTrigger>
-                        <TooltipContent side="bottom">
-                          <div className="text-[11px]">Cantidad de preguntas que incluye el examen final.</div>
-                        </TooltipContent>
-                      </Tooltip>
-                      {course.finalEvaluation.passingScore ? (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <span>
-                              <Badge variant="soft" color="success" className="bg-emerald-100 text-emerald-700 hover:text-emerald-700 cursor-help">
-                                Mínimo {course.finalEvaluation.passingScore}%
-                              </Badge>
-                            </span>
-                          </TooltipTrigger>
-                          <TooltipContent side="bottom">
-                            <div className="text-[11px]">Porcentaje mínimo necesario para aprobar el examen.</div>
-                          </TooltipContent>
-                        </Tooltip>
-                      ) : null}
-                      {course.finalEvaluation.maxAttempts ? (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <span>
-                              <Badge variant="soft" color="warning" className="bg-amber-100 text-amber-700 hover:text-amber-700 cursor-help">
-                                {course.finalEvaluation.maxAttempts} intentos
-                              </Badge>
-                            </span>
-                          </TooltipTrigger>
-                          <TooltipContent side="bottom">
-                            <div className="text-[11px]">Cantidad de oportunidades para rendir el examen.</div>
-                          </TooltipContent>
-                        </Tooltip>
-                      ) : null}
-                    </div>
-                  </div>
+                          ) : (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Badge variant="soft" color="warning" className="rounded-full cursor-help">
+                                  <Clock3 className="mr-1 h-3 w-3" /> Bloqueada
+                                </Badge>
+                              </TooltipTrigger>
+                              <TooltipContent side="bottom">
+                                <div className="max-w-[240px] leading-5 text-[11px]">
+                                  {reason || "Completá todas las clases y evaluaciones para habilitar el examen final."}
+                                </div>
+                              </TooltipContent>
+                            </Tooltip>
+                          )}
+                        </div>
+                        {course.finalEvaluation.description ? (
+                          <p className="mt-2 text-sm leading-6 text-slate-500">
+                            {course.finalEvaluation.description}
+                          </p>
+                        ) : null}
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span>
+                                <Badge
+                                  variant="soft"
+                                  color="default"
+                                  className="bg-violet-100 text-violet-700 hover:text-violet-700 cursor-help"
+                                >
+                                  {Array.isArray(course.finalEvaluation.questions)
+                                    ? course.finalEvaluation.questions.length
+                                    : 0}{" "}
+                                  preguntas
+                                </Badge>
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent side="bottom">
+                              <div className="text-[11px]">
+                                Cantidad de preguntas que incluye el examen final.
+                              </div>
+                            </TooltipContent>
+                          </Tooltip>
+                          {course.finalEvaluation.passingScore ? (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span>
+                                  <Badge
+                                    variant="soft"
+                                    color="success"
+                                    className="bg-emerald-100 text-emerald-700 hover:text-emerald-700 cursor-help"
+                                  >
+                                    Mínimo {course.finalEvaluation.passingScore}%
+                                  </Badge>
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent side="bottom">
+                                <div className="text-[11px]">Porcentaje mínimo necesario para aprobar el examen.</div>
+                              </TooltipContent>
+                            </Tooltip>
+                          ) : null}
+                          {course.finalEvaluation.maxAttempts ? (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span>
+                                  <Badge
+                                    variant="soft"
+                                    color="warning"
+                                    className="bg-amber-100 text-amber-700 hover:text-amber-700 cursor-help"
+                                  >
+                                    {course.finalEvaluation.maxAttempts} intentos
+                                  </Badge>
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent side="bottom">
+                                <div className="text-[11px]">Cantidad de oportunidades para rendir el examen.</div>
+                              </TooltipContent>
+                            </Tooltip>
+                          ) : null}
+                        </div>
+                        <div className="mt-4">
+                          <Button
+                            asChild
+                            disabled={!unlocked}
+                            className="w-full rounded-2xl bg-[#1B2B50] hover:bg-[#233A6A]"
+                          >
+                            <a
+                              href={unlocked ? "#" : undefined}
+                              onClick={(e) => !unlocked && e.preventDefault()}
+                              aria-disabled={!unlocked}
+                            >
+                              <ClipboardCheck className="mr-2 h-4 w-4" />
+                              {unlocked ? "Rendir evaluación final" : "Rendimiento disponible próximamente"}
+                            </a>
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })()
                 ) : (
                   <EmptyBlock
                     title="Sin evaluación final"

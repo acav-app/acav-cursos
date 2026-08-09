@@ -112,6 +112,7 @@ export default function CourseCheckoutForm({ lang, job, variant = "modal", onClo
 
   const amount = Number(job?.price || 0);
   const requiresPayment = !job?.freeCourse && amount > 0;
+  const hasReceipt = Boolean(receiptUrl);
   const steps = useMemo(
     () => [
       {
@@ -365,7 +366,6 @@ export default function CourseCheckoutForm({ lang, job, variant = "modal", onClo
         }),
       }).catch(() => null);
 
-      const hasReceipt = Boolean(receiptUrl);
       const payload = {
         userId: actor?.uid || user?.uid || undefined,
         courseId: job.id,

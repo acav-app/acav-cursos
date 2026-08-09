@@ -9,7 +9,7 @@ export function DashboardPageShellSkeleton({
   rowCount = 4,
 }) {
   return (
-    <div className="mx-auto max-w-6xl px-2 py-8">
+    <div className="mx-auto px-2 py-8">
       <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div className="min-w-0 flex-1">
           <Skeleton className="h-4 w-28 rounded-full" />
@@ -55,7 +55,7 @@ export function DashboardPageShellSkeleton({
 
 export function DashboardDetailSkeleton() {
   return (
-    <div className="mx-auto max-w-6xl px-2 py-8">
+    <div className="mx-auto px-2 py-8">
       <Skeleton className="mb-6 h-5 w-36 rounded-xl" />
 
       <Card className="rounded-3xl border border-border/60 bg-card">
@@ -103,7 +103,7 @@ export function DashboardDetailSkeleton() {
 
 export function DashboardSettingsSkeleton() {
   return (
-    <div className="mx-auto max-w-6xl px-2 py-8">
+    <div className="mx-auto px-2 py-8">
       <Card className="rounded-3xl border border-border/60 bg-card">
         <CardHeader className="space-y-3">
           <Skeleton className="h-4 w-40 rounded-full" />

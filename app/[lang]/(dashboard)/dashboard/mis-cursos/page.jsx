@@ -125,7 +125,7 @@ export default function DashboardMisCursosPage() {
 
   if (actorError) {
     return (
-      <div className="mx-auto max-w-6xl px-2 py-8">
+      <div className="mx-auto px-2 py-8">
         <div className="rounded-3xl border border-border/60 bg-card p-8">
           <h1 className="text-2xl font-semibold text-foreground">No se pudo cargar el perfil</h1>
           <p className="mt-3 text-sm text-muted-foreground">{actorError}</p>
@@ -135,7 +135,7 @@ export default function DashboardMisCursosPage() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl px-2 py-8">
+    <div className="mx-auto px-2 py-8">
       <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
         <div>
           <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-primary">Mis cursos</div>

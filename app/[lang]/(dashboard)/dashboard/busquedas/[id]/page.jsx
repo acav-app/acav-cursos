@@ -9,7 +9,7 @@ export default function EditarCursoPage({ params: { id } }) {
   const buildLocalizedPath = useLocalizedPath();
 
   return (
-    <div className="py-8 px-2 max-w-6xl mx-auto">
+    <div className="py-8 px-2 mx-auto">
       <div className="mb-6">
         <Link
           href={buildLocalizedPath("/dashboard/cursos")}

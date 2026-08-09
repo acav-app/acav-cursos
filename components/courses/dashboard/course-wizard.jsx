@@ -17,7 +17,12 @@ import {
   Clock3,
   Eye,
   ExternalLink,
+  FileArchive,
+  FileQuestion,
+  FileText,
+  FileVideo,
   Film,
+  FolderKanban,
   GripVertical,
   HelpCircle,
   Info,
@@ -27,6 +32,7 @@ import {
   Rocket,
   Save,
   Settings2,
+  ShieldCheck,
   Sparkles,
   Trash2,
   UploadCloud,
@@ -52,7 +58,7 @@ import {
 } from "@/components/ui/select";
 import { useAuth } from "@/provider/auth.provider";
 import { authedFetch } from "@/lib/auth/authed-fetch";
-import { useLocalizedPath } from "@/lib/utils";
+import { cn, useLocalizedPath } from "@/lib/utils";
 import {
   COURSE_LANGUAGES,
   COURSE_LEVELS,
@@ -67,7 +73,13 @@ import ResourceUploader, {
   fileIconFor as resourceFileIconFor,
   formatSize as resourceFormatSize,
 } from "@/components/courses/dashboard/resource-uploader";
+import MediaUploader from "@/components/courses/dashboard/media-uploader";
 import { useCourseActor } from "@/components/courses/dashboard/use-course-actor";
+import {
+  readinessProgressText,
+  readinessTone,
+  summarizeLessonResources,
+} from "@/lib/courses/resource-readiness";
 import {
   Dialog,
   DialogContent,
@@ -1064,99 +1076,140 @@ function DynamicListField({ label, description, items, onChange, placeholder, er
   );
 }
 
+function resourceKindBadge(kind) {
+  switch (kind) {
+    case "video":
+      return { icon: FileVideo, tone: "bg-[#EEF4FF] text-[#1B2B50]" };
+    case "document":
+      return { icon: FileText, tone: "bg-emerald-50 text-emerald-700" };
+    case "image":
+      return { icon: FolderKanban, tone: "bg-purple-50 text-purple-700" };
+    case "archive":
+      return { icon: FileArchive, tone: "bg-amber-50 text-amber-700" };
+    default:
+      return { icon: FileQuestion, tone: "bg-slate-100 text-slate-700" };
+  }
+}
+
+function resourceStatusBadge(status) {
+  switch (status) {
+    case "ready":
+      return { label: "Listo", tone: "bg-emerald-50 text-emerald-700 border border-emerald-100" };
+    case "uploading":
+      return { label: "Subiendo…", tone: "bg-sky-50 text-sky-700 border border-sky-100" };
+    case "corrupt":
+      return { label: "Corrupto", tone: "bg-destructive/10 text-destructive border border-destructive/20" };
+    case "pending":
+    default:
+      return { label: "Pendiente", tone: "bg-slate-100 text-slate-600 border border-slate-200" };
+  }
+}
+
 function LessonResourcesField({ resources, onChange }) {
   const safeResources = Array.isArray(resources) ? resources : [];
-
-  const updateResource = (index, patch) => {
-    const next = [...safeResources];
-    next[index] = { ...next[index], ...patch };
-    onChange(next);
-  };
-
-  const addResource = (entry) => {
-    if (entry && typeof entry === "object" && entry.id && entry.label && entry.url) {
-      onChange([...safeResources, entry]);
-      return;
-    }
-    onChange([
-      ...safeResources,
-      {
-        id: createEntityId("resource"),
-        label: "",
-        url: "",
-      },
-    ]);
-  };
+  const summary = summarizeLessonResources({ resources: safeResources });
 
   const removeResource = (index) => {
     onChange(safeResources.filter((_, currentIndex) => currentIndex !== index));
   };
 
+  const tone = readinessTone(summary);
+  const toneMap = {
+    success: "bg-emerald-50 text-emerald-700 border-emerald-100",
+    warning: "bg-amber-50 text-amber-700 border-amber-100",
+    destructive: "bg-destructive/10 text-destructive border-destructive/20",
+    secondary: "bg-slate-100 text-slate-700 border-slate-200",
+  };
+
   return (
-    <div className="grid gap-3">
-      <div className="flex items-center justify-between gap-3">
-        <Label>Recursos de la clase</Label>
-        <Button type="button" variant="outline" size="sm" onClick={() => addResource(null)}>
-          <Plus className="mr-2 h-4 w-4" />
-          Recurso
-        </Button>
+    <div className="grid gap-4 rounded-[20px] border border-border/60 bg-background p-4">
+      <div className="grid gap-2 md:grid-cols-[1fr_auto] md:items-center">
+        <div className="flex items-center gap-3">
+          <Label className="text-base">Recursos de la clase</Label>
+          {summary.hasAny ? (
+            <Badge variant="outline" className={cn("gap-1.5", toneMap[tone])}>
+              {readinessProgressText(summary)}
+            </Badge>
+          ) : null}
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Subí PDFs, DOCX, imágenes o videos. Los recursos en estado «Listo» serán visibles para el alumno.
+        </p>
       </div>
-      <ResourceUploader onFileReady={(entry) => addResource(entry)} />
+
+      <MediaUploader
+        folderPrefix="courses/lessons/resources"
+        value={safeResources}
+        onChange={onChange}
+      />
+
       {safeResources.length ? (
         <div className="grid gap-3">
           {safeResources.map((resource, index) => {
-            const mimeType = String(resource?.mimeType || "");
-            const sizeLabel = resourceFormatSize(resource?.fileSize);
-            const kindIsFile = String(resource?.kind || "") === "file";
+            const { icon: Icon, tone: iconTone } = resourceKindBadge(resource.kind);
+            const statusBadge = resourceStatusBadge(resource.status);
+            const sizeLabel = resourceFormatSize(resource.fileSize);
             return (
               <div
                 key={resource.id || index}
-                className="grid gap-3 rounded-2xl border border-border/60 bg-card px-4 py-4 md:grid-cols-[auto_minmax(0,1fr)_minmax(0,1.2fr)_auto_auto]"
+                className="grid items-center gap-3 rounded-2xl border border-border/60 bg-card px-4 py-3 md:grid-cols-[auto_minmax(0,1fr)_auto_auto]"
               >
-                <div className="flex items-center justify-center">
-                  <span
-                    className={`inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${
-                      kindIsFile ? "bg-[#EEF4FF] text-[#1B2B50]" : "bg-slate-100 text-slate-700"
-                    }`}
-                  >
-                    {resourceFileIconFor(mimeType || (kindIsFile ? "application/octet-stream" : ""))}
-                  </span>
-                </div>
-                <div className="grid gap-2">
-                  <Input
-                    value={resource.label || ""}
-                    onChange={(event) => updateResource(index, { label: event.target.value })}
-                    placeholder="Guía PDF"
-                  />
-                  {kindIsFile && sizeLabel ? (
-                    <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
-                      <span className="rounded-full bg-slate-100 px-2 py-0.5 font-medium">{sizeLabel}</span>
-                      {mimeType ? <span className="truncate">{mimeType}</span> : null}
-                    </div>
-                  ) : null}
-                </div>
-                <div className="grid gap-2">
-                  <div className="flex gap-2">
-                    <Input
-                      value={resource.url || ""}
-                      onChange={(event) => updateResource(index, { url: event.target.value })}
-                      placeholder="https://..."
-                    />
-                    {resource.url ? (
-                      <Button
-                        asChild
-                        type="button"
-                        variant="outline"
-                        size="icon"
-                        className="shrink-0"
-                        title="Abrir recurso"
-                      >
-                        <a href={resource.url} target="_blank" rel="noreferrer">
-                          <ExternalLink className="h-4 w-4" />
-                        </a>
-                      </Button>
+                <span className={`inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${iconTone}`}>
+                  <Icon className="h-5 w-5" />
+                </span>
+                <div className="grid gap-1.5">
+                  <div className="flex items-center gap-2">
+                    <span className="truncate text-sm font-medium text-foreground">
+                      {resource.label || resource.name || "(Recurso sin nombre)"}
+                    </span>
+                    {resource.subKind ? (
+                      <Badge variant="outline" className="h-5 px-2 text-[10px] uppercase tracking-wide">
+                        {resource.subKind}
+                      </Badge>
+                    ) : null}
+                    <Badge variant="outline" className={cn("h-5 px-2 text-[10px]", statusBadge.tone)}>
+                      {statusBadge.label}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                    {sizeLabel ? <span className="rounded-full bg-slate-100 px-2 py-0.5 font-medium">{sizeLabel}</span> : null}
+                    {resource.mimeType ? <span className="truncate">{resource.mimeType}</span> : null}
+                    {resource.checksum ? (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5">
+                            <ShieldCheck className="h-3 w-3" /> Integridad
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom">
+                          <div className="max-w-[340px] break-all text-[11px] leading-5">
+                            Checksum SHA-256 — {resource.checksum}
+                          </div>
+                        </TooltipContent>
+                      </Tooltip>
                     ) : null}
                   </div>
+                </div>
+                <div className="flex items-center gap-2 justify-self-end">
+                  {resource.url ? (
+                    <Button
+                      asChild
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      className="shrink-0"
+                      title="Abrir recurso"
+                    >
+                      <a href={resource.url} target="_blank" rel="noreferrer">
+                        <ExternalLink className="h-4 w-4" />
+                      </a>
+                    </Button>
+                  ) : null}
+                  <FilePreview
+                    url={resource.url || ""}
+                    label={resource.label || resource.name || "Recurso"}
+                    kind={resource.kind || "file"}
+                  />
                 </div>
                 <Button
                   type="button"
@@ -1171,11 +1224,488 @@ function LessonResourcesField({ resources, onChange }) {
             );
           })}
         </div>
-      ) : (
-        <div className="rounded-2xl border border-dashed border-border/60 bg-background px-4 py-4 text-sm text-muted-foreground">
-          Puedes sumar PDFs, plantillas, videos o enlaces de apoyo por clase.
+      ) : null}
+    </div>
+  );
+}
+
+function LessonEditorHeader({ selectedSection, selectedLesson, onRemove, disabled }) {
+  const summary = summarizeLessonResources(selectedLesson);
+  const tone = readinessTone(summary);
+  const toneMap = {
+    success: "bg-emerald-50 text-emerald-700 border-emerald-100",
+    warning: "bg-amber-50 text-amber-700 border-amber-100",
+    destructive: "bg-destructive/10 text-destructive border-destructive/20",
+    secondary: "bg-slate-100 text-slate-700 border-slate-200",
+  };
+
+  return (
+    <div className="grid gap-4 rounded-[22px] border border-border/60 bg-card p-4 md:grid-cols-[1fr_auto] md:items-start">
+      <div className="grid gap-1">
+        <div className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+          {selectedSection?.title || "Sección"}
         </div>
-      )}
+        <div className="text-lg font-semibold tracking-[-0.03em] text-foreground">
+          {selectedLesson?.title || "Nueva clase"}
+        </div>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Edita un solo elemento a la vez para mantener foco y velocidad.
+        </p>
+      </div>
+      <div className="flex items-start justify-between gap-3 md:justify-end">
+        <div className="flex flex-wrap items-center gap-2">
+          {summary.hasAny ? (
+            <Badge variant="outline" className={cn(toneMap[tone])}>
+              {readinessProgressText(summary)}
+            </Badge>
+          ) : (
+            <Badge variant="outline" className={toneMap.secondary}>
+              Sin recursos cargados
+            </Badge>
+          )}
+          {selectedLesson?.isPreview ? <Badge variant="outline">Clase abierta</Badge> : null}
+        </div>
+        <Button type="button" variant="ghost" size="icon" onClick={onRemove} disabled={disabled}>
+          <Trash2 className="h-4 w-4" />
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function LessonVideoSection({ videoUrl, videoAsset, onVideoUrlChange, onVideoAssetChange }) {
+  const hasAsset = videoAsset && typeof videoAsset === "object" && (videoAsset.url || videoAsset.storageKey);
+  const hasUrl = Boolean(videoUrl);
+  const status = videoAsset?.status || (hasAsset ? "ready" : hasUrl ? "pending" : "pending");
+  const statusBadge = resourceStatusBadge(status);
+
+  return (
+    <div className="grid gap-4 rounded-[20px] border border-border/60 bg-background p-4">
+      <div className="grid gap-1 md:grid-cols-[1fr_auto] md:items-center">
+        <div>
+          <Label className="flex items-center gap-2 text-base">
+            <FileVideo className="h-4 w-4 text-[#1B2B50]" />
+            Video de la clase
+          </Label>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Subí un MP4 / WebM / MOV para reproducirlo dentro de la plataforma, o mantené un enlace externo (YouTube/Vimeo) como alternativa.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Badge variant="outline" className={cn(statusBadge.tone)}>
+            Video: {statusBadge.label}
+          </Badge>
+        </div>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-3">
+          <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            Upload por input (prioridad alta)
+          </div>
+          <MediaUploader
+            mode="video"
+            multiple={false}
+            maxFiles={1}
+            folderPrefix="courses/lessons/videos"
+            value={hasAsset ? [videoAsset] : []}
+            onChange={(next) => {
+              const first = Array.isArray(next) ? next[0] : null;
+              if (!first) {
+                onVideoAssetChange(undefined);
+                return;
+              }
+              onVideoAssetChange({
+                url: first.url || videoAsset?.url || "",
+                storageKey: first.storageKey || videoAsset?.storageKey || undefined,
+                mimeType: first.mimeType || videoAsset?.mimeType || undefined,
+                fileSize: first.fileSize ?? videoAsset?.fileSize ?? undefined,
+                status: first.status || "pending",
+                checksum: first.checksum || videoAsset?.checksum || undefined,
+                uploadedAt: first.uploadedAt || videoAsset?.uploadedAt || new Date().toISOString(),
+              });
+            }}
+            compact
+          />
+          {hasAsset ? (
+            <div className="rounded-2xl border border-border/60 bg-card px-3 py-2.5">
+              <div className="flex items-center gap-2">
+                <FileVideo className="h-4 w-4 text-[#1B2B50]" />
+                <span className="text-sm font-medium text-foreground">
+                  {videoAsset?.url?.split("/").pop()?.split("?")[0] || "Video subido"}
+                </span>
+                {videoAsset?.mimeType ? (
+                  <Badge variant="outline" className="h-5 px-2 text-[10px] uppercase">
+                    {videoAsset.mimeType.includes("mp4") ? "MP4" : videoAsset.mimeType.includes("webm") ? "WebM" : videoAsset.mimeType.includes("quicktime") ? "MOV" : "Video"}
+                  </Badge>
+                ) : null}
+              </div>
+              <div className="mt-1.5 flex items-center gap-2 text-[11px] text-muted-foreground">
+                <span className="rounded-full bg-slate-100 px-2 py-0.5 font-medium">
+                  {resourceFormatSize(videoAsset?.fileSize)}
+                </span>
+                {videoAsset?.checksum ? (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5">
+                    <ShieldCheck className="h-3 w-3" /> SHA-256 {videoAsset.checksum.slice(0, 8)}…
+                  </span>
+                ) : null}
+                {videoAsset?.url ? (
+                  <Button asChild type="button" variant="ghost" size="sm" className="ml-auto h-7 px-2 text-[11px]">
+                    <a href={videoAsset.url} target="_blank" rel="noreferrer">
+                      Abrir archivo
+                    </a>
+                  </Button>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
+        </div>
+
+        <div className="grid gap-3">
+          <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            Enlace externo (fallback)
+          </div>
+          <LessonVideoUploader value={videoUrl || ""} onChange={onVideoUrlChange} />
+          {hasUrl && !hasAsset ? (
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-[11px] leading-5 text-amber-800">
+              Estás usando un enlace externo. Recomendamos migrar a upload por input para garantizar compatibilidad cross-browser y control total del video.
+            </div>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PerClassEvaluationField({ value, onChange, resourcesSummary }) {
+  const evaluation = value && typeof value === "object" ? value : { enabled: false, questions: [] };
+  const questions = Array.isArray(evaluation.questions) ? evaluation.questions : [];
+  const [selectedQuestionId, setSelectedQuestionId] = useState("");
+  const allResourcesReady = resourcesSummary?.hasAny ? resourcesSummary.allReady : true;
+
+  useEffect(() => {
+    const firstQuestion = questions[0];
+    const exists = questions.some((question) => String(question?.id || "") === String(selectedQuestionId || ""));
+    if (!exists && firstQuestion?.id) {
+      setSelectedQuestionId(String(firstQuestion.id));
+    }
+  }, [questions, selectedQuestionId]);
+
+  const updateField = (patch) => {
+    onChange({ ...evaluation, ...patch });
+  };
+
+  const updateQuestion = (index, patch) => {
+    const next = [...questions];
+    next[index] = { ...next[index], ...patch };
+    updateField({ questions: next });
+  };
+
+  const addQuestion = () => {
+    updateField({
+      questions: [
+        ...questions,
+        {
+          id: createEntityId("question"),
+          prompt: "",
+          type: "single_choice",
+          options: ["", ""],
+          correctAnswers: [],
+          explanation: "",
+        },
+      ],
+    });
+  };
+
+  const removeQuestion = (index) => {
+    updateField({ questions: questions.filter((_, currentIndex) => currentIndex !== index) });
+  };
+
+  const updateQuestionOptions = (index, nextOptions) => {
+    updateQuestion(index, { options: nextOptions });
+  };
+
+  const selectedQuestion =
+    questions.find((question) => String(question?.id || "") === String(selectedQuestionId || "")) || questions[0] || null;
+  const selectedQuestionIndex = questions.findIndex((question) => String(question?.id || "") === String(selectedQuestion?.id || ""));
+
+  return (
+    <div className="grid gap-4 rounded-[20px] border border-border/60 bg-background p-4">
+      <div className="grid gap-2 md:grid-cols-[1fr_auto] md:items-center">
+        <div>
+          <Label className="flex items-center gap-2 text-base">
+            <Award className="h-4 w-4 text-purple-600" />
+            Evaluación de la clase
+          </Label>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Configurá preguntas específicas para esta clase. Se bloqueará automáticamente para el alumno hasta que todos los recursos estén «Listos».
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Badge variant="outline" className={allResourcesReady ? "bg-emerald-50 text-emerald-700 border-emerald-100" : "bg-amber-50 text-amber-700 border-amber-100"}>
+            {allResourcesReady ? "Recursos OK · evaluación habilitada" : "Recursos incompletos · evaluación bloqueada"}
+          </Badge>
+          <Switch
+            checked={Boolean(evaluation.enabled)}
+            onCheckedChange={(checked) => updateField({ enabled: checked })}
+          />
+        </div>
+      </div>
+
+      <div className="grid gap-3 md:grid-cols-3">
+        <div className="grid gap-2 rounded-2xl border border-border/60 bg-card px-3 py-3">
+          <Label className="text-xs">Título</Label>
+          <Input
+            value={evaluation.title || ""}
+            onChange={(event) => updateField({ title: event.target.value })}
+            placeholder="Quiz clase 1"
+            className="h-9 text-sm"
+            disabled={!evaluation.enabled}
+          />
+        </div>
+        <div className="grid gap-2 rounded-2xl border border-border/60 bg-card px-3 py-3">
+          <Label className="text-xs">Nota de aprobación (%)</Label>
+          <Input
+            type="number"
+            min="0"
+            max="100"
+            value={evaluation.passingScore ?? 75}
+            onChange={(event) => updateField({ passingScore: Number(event.target.value || 0) || undefined })}
+            className="h-9 text-sm"
+            disabled={!evaluation.enabled}
+          />
+        </div>
+        <div className="grid gap-2 rounded-2xl border border-border/60 bg-card px-3 py-3">
+          <Label className="text-xs">Intentos máximos</Label>
+          <Input
+            type="number"
+            min="1"
+            value={evaluation.maxAttempts ?? 3}
+            onChange={(event) => updateField({ maxAttempts: Number(event.target.value || 0) || undefined })}
+            className="h-9 text-sm"
+            disabled={!evaluation.enabled}
+          />
+        </div>
+      </div>
+
+      <div className="grid gap-3 md:grid-cols-2">
+        <div className="rounded-2xl border border-border/60 bg-card p-3">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              Preguntas
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={addQuestion}
+              disabled={!evaluation.enabled}
+              className="h-8 px-2.5 text-xs"
+            >
+              <Plus className="mr-1.5 h-3.5 w-3.5" />
+              Pregunta
+            </Button>
+          </div>
+          {questions.length ? (
+            <div className="grid gap-1.5">
+              {questions.map((question, index) => (
+                <button
+                  key={question.id || index}
+                  type="button"
+                  onClick={() => setSelectedQuestionId(String(question.id || ""))}
+                  className={cn(
+                    "flex items-center justify-between gap-2 rounded-xl border px-3 py-2 text-left text-xs",
+                    String(selectedQuestion?.id || "") === String(question.id || "")
+                      ? "border-purple-200 bg-purple-50 text-purple-900"
+                      : "border-border/60 bg-background hover:bg-slate-50"
+                  )}
+                  disabled={!evaluation.enabled}
+                >
+                  <span className="truncate">
+                    {index + 1}. {question.prompt || "(Pregunta sin redactar)"}
+                  </span>
+                  <Badge variant="outline" className="h-5 px-2 text-[10px] uppercase">
+                    {question.type === "multiple_choice" ? "Multiple" : question.type === "boolean" ? "V/F" : "Simple"}
+                  </Badge>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-xl border border-dashed border-border/60 bg-background px-3 py-4 text-center text-xs text-muted-foreground">
+              Aún no hay preguntas para esta evaluación.
+            </div>
+          )}
+        </div>
+
+        <div className="rounded-2xl border border-border/60 bg-card p-3">
+          {selectedQuestion ? (
+            <div className="grid gap-2.5">
+              <div className="grid gap-1.5">
+                <Label className="text-xs">Pregunta</Label>
+                <Input
+                  value={selectedQuestion.prompt || ""}
+                  onChange={(event) => updateQuestion(selectedQuestionIndex, { prompt: event.target.value })}
+                  placeholder="¿Cuál era el objetivo de esta clase?"
+                  className="h-9 text-sm"
+                  disabled={!evaluation.enabled}
+                />
+              </div>
+              <div className="grid gap-1.5">
+                <Label className="text-xs">Tipo</Label>
+                <Select
+                  value={selectedQuestion.type || "single_choice"}
+                  onValueChange={(value) => {
+                    if (value === "boolean") {
+                      updateQuestion(selectedQuestionIndex, {
+                        type: "boolean",
+                        options: ["Verdadero", "Falso"],
+                        correctAnswers: Array.isArray(selectedQuestion.correctAnswers) ? selectedQuestion.correctAnswers.slice(0, 1) : [],
+                      });
+                      return;
+                    }
+                    updateQuestion(selectedQuestionIndex, { type: value });
+                  }}
+                  disabled={!evaluation.enabled}
+                >
+                  <SelectTrigger className="h-9 text-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="single_choice">Opción simple</SelectItem>
+                    <SelectItem value="multiple_choice">Múltiple opción</SelectItem>
+                    <SelectItem value="boolean">Verdadero / Falso</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-1.5">
+                <Label className="text-xs">Opciones</Label>
+                <div className="grid gap-1.5">
+                  {Array.isArray(selectedQuestion.options) && selectedQuestion.options.length
+                    ? selectedQuestion.options.map((opt, optIndex) => {
+                        const selectedAnswers = Array.isArray(selectedQuestion.correctAnswers)
+                          ? selectedQuestion.correctAnswers
+                          : [];
+                        const isCorrect =
+                          selectedQuestion.type === "boolean" || selectedQuestion.type === "single_choice"
+                            ? String(selectedAnswers[0] ?? "") === String(optIndex)
+                            : selectedAnswers.includes(String(optIndex));
+                        return (
+                          <div
+                            key={`${selectedQuestion.id || "q"}-opt-${optIndex}`}
+                            className="flex items-center gap-2 rounded-xl border border-border/60 bg-background px-2.5 py-1.5"
+                          >
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => {
+                                const nextOptions = [...(selectedQuestion.options || [])];
+                                nextOptions.splice(optIndex, 1);
+                                updateQuestionOptions(selectedQuestionIndex, nextOptions);
+                                const filtered = (selectedAnswers || []).filter((a) => String(a) !== String(optIndex));
+                                updateQuestion(selectedQuestionIndex, { correctAnswers: filtered });
+                              }}
+                              disabled={!evaluation.enabled || selectedQuestion.type === "boolean"}
+                              className="h-6 w-6 shrink-0 text-muted-foreground"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                            <Input
+                              value={opt}
+                              onChange={(event) => {
+                                const nextOptions = [...(selectedQuestion.options || [])];
+                                nextOptions[optIndex] = event.target.value;
+                                updateQuestionOptions(selectedQuestionIndex, nextOptions);
+                              }}
+                              className="h-8 border-0 bg-transparent px-0 text-sm focus-visible:ring-0"
+                              disabled={!evaluation.enabled}
+                            />
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (selectedQuestion.type === "multiple_choice") {
+                                      const set = new Set(selectedAnswers.map((a) => String(a)));
+                                      if (set.has(String(optIndex))) set.delete(String(optIndex));
+                                      else set.add(String(optIndex));
+                                      updateQuestion(selectedQuestionIndex, { correctAnswers: [...set.values()] });
+                                    } else {
+                                      updateQuestion(selectedQuestionIndex, { correctAnswers: [String(optIndex)] });
+                                    }
+                                  }}
+                                  disabled={!evaluation.enabled}
+                                  className={cn(
+                                    "inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border transition-colors",
+                                    isCorrect
+                                      ? "border-emerald-400 bg-emerald-500 text-white"
+                                      : "border-slate-200 bg-white text-slate-400 hover:border-emerald-300 hover:text-emerald-600"
+                                  )}
+                                >
+                                  <CheckCircle2 className="h-3.5 w-3.5" />
+                                </button>
+                              </TooltipTrigger>
+                              <TooltipContent side="bottom">
+                                <div className="max-w-xs text-[11px] leading-5">
+                                  {selectedQuestion.type === "multiple_choice"
+                                    ? "Marcar como respuesta correcta (pueden ser varias)."
+                                    : "Marcar como respuesta correcta."}
+                                </div>
+                              </TooltipContent>
+                            </Tooltip>
+                          </div>
+                        );
+                      })
+                    : null}
+                  {selectedQuestion.type !== "boolean" ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        updateQuestionOptions(selectedQuestionIndex, [...(selectedQuestion.options || []), ""])
+                      }
+                      disabled={!evaluation.enabled}
+                      className="mt-1 h-8 justify-start px-2.5 text-xs"
+                    >
+                      <Plus className="mr-1.5 h-3.5 w-3.5" />
+                      Agregar opción
+                    </Button>
+                  ) : null}
+                </div>
+              </div>
+              <div className="grid gap-1.5">
+                <Label className="text-xs">Explicación (opcional)</Label>
+                <Textarea
+                  rows={2}
+                  value={selectedQuestion.explanation || ""}
+                  onChange={(event) => updateQuestion(selectedQuestionIndex, { explanation: event.target.value })}
+                  placeholder="Mostrar al alumno al finalizar el intento."
+                  className="text-xs"
+                  disabled={!evaluation.enabled}
+                />
+              </div>
+              <div className="flex justify-end">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => removeQuestion(selectedQuestionIndex)}
+                  disabled={!evaluation.enabled}
+                  className="h-8 px-2.5 text-xs text-destructive"
+                >
+                  <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+                  Eliminar pregunta
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex h-full min-h-[160px] items-center justify-center rounded-xl border border-dashed border-border/60 bg-background px-3 py-4 text-center text-xs text-muted-foreground">
+              Creá una pregunta primero para editarla acá.
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -1377,29 +1907,14 @@ function CurriculumField({ curriculum, onChange, error }) {
         <div className="rounded-[24px] border border-border/60 bg-background p-4 md:p-5">
           {selectedSection && selectedLesson ? (
             <div className="grid gap-5">
-              <div className="grid gap-4 rounded-[22px] border border-border/60 bg-card p-4">
-                <div className="grid gap-4 md:grid-cols-[1fr_auto]">
-                  <div>
-                    <div className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                      {selectedSection.title || "Sección"}
-                    </div>
-                    <div className="mt-2 text-lg font-semibold tracking-[-0.03em] text-foreground">
-                      {selectedLesson.title || "Nueva clase"}
-                    </div>
-                    <p className="mt-1 text-sm text-muted-foreground">Edita un solo elemento a la vez para mantener foco y velocidad.</p>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => removeLesson(selectedSectionIndex, selectedLessonIndex)}
-                    disabled={selectedSectionIndex < 0 || selectedLessonIndex < 0}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
+              <LessonEditorHeader
+                selectedSection={selectedSection}
+                selectedLesson={selectedLesson}
+                onRemove={() => removeLesson(selectedSectionIndex, selectedLessonIndex)}
+                disabled={selectedSectionIndex < 0 || selectedLessonIndex < 0}
+              />
 
-                <div className="grid gap-4 md:grid-cols-2">
+              <div className="grid gap-4 md:grid-cols-2">
                   <div className="grid gap-2">
                     <Label>Título de la sección</Label>
                     <Input
@@ -1417,7 +1932,6 @@ function CurriculumField({ curriculum, onChange, error }) {
                     />
                   </div>
                 </div>
-              </div>
 
               <div className="grid gap-4 rounded-[22px] border border-border/60 bg-card p-4">
                 <div className="grid gap-4 md:grid-cols-[1.2fr_0.8fr_0.5fr]">
@@ -1484,10 +1998,14 @@ function CurriculumField({ curriculum, onChange, error }) {
                   />
                 </div>
 
-                <LessonVideoUploader
-                  value={selectedLesson.videoUrl || ""}
-                  onChange={(nextVideoUrl) =>
+                <LessonVideoSection
+                  videoUrl={selectedLesson.videoUrl || ""}
+                  videoAsset={selectedLesson.videoAsset}
+                  onVideoUrlChange={(nextVideoUrl) =>
                     updateLesson(selectedSectionIndex, selectedLessonIndex, { videoUrl: nextVideoUrl || "" })
+                  }
+                  onVideoAssetChange={(nextVideoAsset) =>
+                    updateLesson(selectedSectionIndex, selectedLessonIndex, { videoAsset: nextVideoAsset })
                   }
                 />
 
@@ -1509,6 +2027,12 @@ function CurriculumField({ curriculum, onChange, error }) {
                 <LessonResourcesField
                   resources={selectedLesson.resources || []}
                   onChange={(resources) => updateLesson(selectedSectionIndex, selectedLessonIndex, { resources })}
+                />
+
+                <PerClassEvaluationField
+                  value={selectedLesson.evaluation}
+                  onChange={(evaluation) => updateLesson(selectedSectionIndex, selectedLessonIndex, { evaluation })}
+                  resourcesSummary={summarizeLessonResources(selectedLesson)}
                 />
               </div>
             </div>

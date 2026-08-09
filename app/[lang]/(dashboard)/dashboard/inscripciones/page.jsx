@@ -168,7 +168,7 @@ export default function DashboardInscripcionesPage() {
 
   if (actorError) {
     return (
-      <div className="py-8 px-2 max-w-6xl mx-auto">
+      <div className="py-8 px-2 mx-auto">
         <div className="rounded-3xl border border-border/60 bg-card p-8">
           <h1 className="text-2xl font-bold text-foreground">No se pudo cargar el perfil</h1>
           <p className="mt-3 text-sm text-muted-foreground">{actorError}</p>
@@ -178,7 +178,7 @@ export default function DashboardInscripcionesPage() {
   }
 
   return (
-    <div className="py-8 px-2 max-w-6xl mx-auto">
+    <div className="py-8 px-2 mx-auto">
       <div>
         <div className="text-sm font-semibold uppercase tracking-[0.2em] text-primary">Inscripciones</div>
         <h1 className="mt-3 text-3xl font-bold text-foreground">Inscripciones a cursos</h1>

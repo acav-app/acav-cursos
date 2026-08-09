@@ -21,6 +21,24 @@ import {
   USER_ACCOUNT_STATUSES,
 } from "@/lib/courses/constants";
 
+export const COURSE_RESOURCE_STATUSES = ["pending", "uploading", "ready", "corrupt", "missing"] as const;
+export type CourseResourceStatus = (typeof COURSE_RESOURCE_STATUSES)[number];
+
+export const COURSE_VIDEO_MIME_TYPES = [
+  "video/mp4",
+  "video/webm",
+  "video/quicktime",
+  "video/x-m4v",
+] as const;
+export const COURSE_DOCUMENT_MIME_TYPES = [
+  "application/pdf",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/msword",
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+] as const;
+
 export const CourseIsoDateString = z.string().min(1);
 
 const OptionalString = z.preprocess(
@@ -74,14 +92,77 @@ const CourseModuleSchema = z.object({
 
 const CourseLessonTypeSchema = z.enum(["video", "text", "live", "quiz", "assignment", "download"]);
 const CourseQuestionTypeSchema = z.enum(["single_choice", "multiple_choice", "true_false", "short_answer"]);
+const CourseResourceStatusSchema = z.enum(COURSE_RESOURCE_STATUSES);
+const CourseResourceKindSchema = z.enum(["video", "document", "image", "archive", "link"]);
+
+export const CourseQuestionSchema = z.object({
+  id: z.string().min(1),
+  prompt: z.string().min(1),
+  type: CourseQuestionTypeSchema.default("single_choice"),
+  options: z.array(z.string().min(1)).default([]),
+  correctAnswers: z.array(z.string().min(1)).default([]),
+  explanation: OptionalString.optional(),
+  points: OptionalNumber.optional(),
+});
+
+export const CourseEvaluationSchema = z.object({
+  enabled: z.boolean().default(false),
+  title: OptionalString.optional(),
+  description: OptionalString.optional(),
+  passingScore: OptionalNumber.optional(),
+  maxAttempts: OptionalNumber.optional(),
+  questions: z.array(CourseQuestionSchema).default([]),
+  requireAllResourcesReady: z.boolean().default(true),
+  locked: z.boolean().optional(),
+});
+
+const CourseVideoAssetSchema = z.object({
+  id: z.string().min(1).optional(),
+  url: z.string().url().optional(),
+  storageKey: z.string().optional(),
+  mimeType: z.enum(COURSE_VIDEO_MIME_TYPES as unknown as [string, ...string[]]).optional(),
+  fileSize: z.number().min(0).optional(),
+  durationSeconds: OptionalNumber.optional(),
+  width: OptionalNumber.optional(),
+  height: OptionalNumber.optional(),
+  status: CourseResourceStatusSchema.default("pending"),
+  checksum: z.string().optional(),
+  uploadedAt: CourseIsoDateString.optional(),
+  qualities: z
+    .array(
+      z.object({
+        label: z.string().min(1),
+        url: z.string().url(),
+        width: OptionalNumber.optional(),
+        height: OptionalNumber.optional(),
+      })
+    )
+    .default([]),
+  subtitles: z
+    .array(
+      z.object({
+        src: z.string().url(),
+        label: z.string().min(1),
+        srclang: z.string().min(2).max(5),
+        default: z.boolean().optional(),
+      })
+    )
+    .default([]),
+});
 
 const CourseLessonResourceSchema = z.object({
   id: z.string().min(1),
   label: z.string().min(1),
   url: z.string().url(),
-  kind: z.enum(["file", "link"]).optional(),
+  kind: CourseResourceKindSchema.default("document"),
+  subKind: z.enum(["pdf", "docx", "doc", "jpg", "jpeg", "png", "webp", "zip", "rar", "other"]).optional(),
   mimeType: z.string().optional(),
   fileSize: z.number().min(0).optional(),
+  status: CourseResourceStatusSchema.default("pending"),
+  checksum: z.string().optional(),
+  storageKey: z.string().optional(),
+  uploadedAt: CourseIsoDateString.optional(),
+  previewUrl: z.string().url().optional(),
 });
 
 const CourseLessonSchema = z.object({
@@ -91,10 +172,12 @@ const CourseLessonSchema = z.object({
   lessonType: CourseLessonTypeSchema.default("video"),
   durationMinutes: OptionalNumber.optional(),
   videoUrl: OptionalUrl.optional(),
+  videoAsset: CourseVideoAssetSchema.optional(),
   thumbnailUrl: OptionalUrl.optional(),
   content: OptionalString.optional(),
   isPreview: z.boolean().optional(),
   resources: z.array(CourseLessonResourceSchema).default([]),
+  evaluation: CourseEvaluationSchema.optional(),
 });
 
 const CourseSectionSchema = z.object({
@@ -104,22 +187,9 @@ const CourseSectionSchema = z.object({
   lessons: z.array(CourseLessonSchema).default([]),
 });
 
-const CourseQuestionSchema = z.object({
-  id: z.string().min(1),
-  prompt: z.string().min(1),
-  type: CourseQuestionTypeSchema.default("single_choice"),
-  options: z.array(z.string().min(1)).default([]),
-  correctAnswers: z.array(z.string().min(1)).default([]),
-  explanation: OptionalString.optional(),
-});
-
-const CourseFinalEvaluationSchema = z.object({
-  enabled: z.boolean().default(false),
-  title: OptionalString.optional(),
-  description: OptionalString.optional(),
-  passingScore: OptionalNumber.optional(),
-  maxAttempts: OptionalNumber.optional(),
-  questions: z.array(CourseQuestionSchema).default([]),
+export const CourseFinalEvaluationSchema = CourseEvaluationSchema.extend({
+  requireAllLessonsEvaluationsCompleted: z.boolean().default(true),
+  requireAllResourcesReady: z.boolean().default(true),
 });
 
 export const PortalRoleSchema = z.enum(PORTAL_ROLES);

@@ -322,7 +322,7 @@ export default function InscripcionDetailPage({ params: { id } }) {
 
   if (!application) {
     return (
-      <div className="mx-auto max-w-6xl px-2 py-8">
+      <div className="mx-auto px-2 py-8">
         <div className="rounded-[28px] border border-[#E5E7EB] bg-white p-8">
           <h1 className="text-[28px] font-semibold tracking-[-0.03em] text-[#0F172A]">Inscripción no encontrada</h1>
           <div className="mt-4">
@@ -337,7 +337,7 @@ export default function InscripcionDetailPage({ params: { id } }) {
 
   if (!isAdmin) {
     return (
-      <div className="mx-auto max-w-6xl px-2 py-8">
+      <div className="mx-auto px-2 py-8">
         <div className="mb-6">
           <Link
             href={buildLocalizedPath("/dashboard/inscripciones")}
@@ -515,7 +515,7 @@ export default function InscripcionDetailPage({ params: { id } }) {
   }
 
   return (
-    <div className="mx-auto max-w-6xl px-2 py-8">
+    <div className="mx-auto px-2 py-8">
       <div className="mb-6">
         <Link
           href={buildLocalizedPath("/dashboard/inscripciones")}

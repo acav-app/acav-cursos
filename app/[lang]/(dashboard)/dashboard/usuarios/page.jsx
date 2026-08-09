@@ -220,7 +220,7 @@ export default function DashboardUsuariosPage() {
 
   if (actorError) {
     return (
-      <div className="py-8 px-2 max-w-6xl mx-auto">
+      <div className="py-8 px-2 mx-auto">
         <div className="rounded-3xl border border-border/60 bg-card p-8">
           <h1 className="text-2xl font-bold text-foreground">No se pudo cargar el perfil</h1>
           <p className="mt-3 text-sm text-muted-foreground">{actorError}</p>
@@ -231,7 +231,7 @@ export default function DashboardUsuariosPage() {
 
   if (actor?.role !== "admin") {
     return (
-      <div className="py-8 px-2 max-w-6xl mx-auto">
+      <div className="py-8 px-2 mx-auto">
         <div className="rounded-3xl border border-border/60 bg-card p-8">
           <div className="text-sm font-semibold uppercase tracking-[0.2em] text-primary">Usuarios</div>
           <h1 className="mt-3 text-2xl font-bold text-foreground">Acceso restringido</h1>
@@ -242,7 +242,7 @@ export default function DashboardUsuariosPage() {
   }
 
   return (
-    <div className="py-8 px-2 max-w-6xl mx-auto">
+    <div className="py-8 px-2 mx-auto">
       <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
           <div className="text-sm font-semibold uppercase tracking-[0.2em] text-primary">Usuarios</div>
