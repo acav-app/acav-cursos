@@ -20,18 +20,26 @@ export const COURSE_STATUSES = [
   "rechazada",
 ] as const;
 
-export const ENROLLMENT_STATUSES = [
+export const EDUCATIONAL_ENROLLMENT_STATUSES = [
   "started",
   "waiting_payment",
   "payment_under_review",
   "active",
   "rejected",
   "cancelled",
+] as const;
+
+export const EMPLOYMENT_APPLICATION_STATUSES = [
   "recibida",
   "vista",
   "preseleccionada",
   "descartada",
   "contactada",
+] as const;
+
+export const ENROLLMENT_STATUSES = [
+  ...EDUCATIONAL_ENROLLMENT_STATUSES,
+  ...EMPLOYMENT_APPLICATION_STATUSES,
 ] as const;
 
 export const PAYMENT_STATUSES = [

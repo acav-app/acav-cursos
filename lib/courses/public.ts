@@ -148,6 +148,11 @@ export function mapCourseForCard(course: any) {
     requirementsList,
     attachments: Array.isArray(course?.attachments) ? course.attachments : [],
     modules: Array.isArray(course?.modules) ? course.modules : [],
+    curriculum: Array.isArray(course?.curriculum) ? course.curriculum : [],
+    finalEvaluation:
+      course?.finalEvaluation && typeof course.finalEvaluation === "object"
+        ? course.finalEvaluation
+        : { enabled: false, questions: [] },
     learningObjectives: Array.isArray(course?.learningObjectives) ? course.learningObjectives : [],
     targetAudience: Array.isArray(course?.targetAudience) ? course.targetAudience : [],
     imageUrl,

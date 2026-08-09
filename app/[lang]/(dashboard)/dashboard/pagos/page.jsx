@@ -55,7 +55,7 @@ function resolvePaymentMeta(enrollment) {
     return {
       label: "Acreditado",
       tone: "success",
-      helper: paidAt ? `Registrado el ${dateLabel(paidAt)}.` : "Pago confirmado dentro del campus.",
+      helper: paidAt ? `Confirmado el ${dateLabel(paidAt)}.` : "Pago confirmado.",
       amountLabel: formatCurrency(amount),
       receiptUrl,
     };
@@ -65,7 +65,7 @@ function resolvePaymentMeta(enrollment) {
     return {
       label: "Pendiente",
       tone: "warning",
-      helper: "Todavía no se confirmó la acreditación.",
+      helper: "A la espera de revisión.",
       amountLabel: formatCurrency(amount),
       receiptUrl,
     };
@@ -75,7 +75,7 @@ function resolvePaymentMeta(enrollment) {
     return {
       label: "Sin acreditar",
       tone: "destructive",
-      helper: "El cobro requiere revisión o un nuevo intento.",
+      helper: "Requiere una nueva gestión.",
       amountLabel: formatCurrency(amount),
       receiptUrl,
     };
@@ -85,7 +85,7 @@ function resolvePaymentMeta(enrollment) {
     return {
       label: "Sin cargo",
       tone: "info",
-      helper: "La inscripción cerró sin una acreditación registrada.",
+      helper: "Inscripción cerrada.",
       amountLabel: formatCurrency(amount),
       receiptUrl,
     };
@@ -94,7 +94,7 @@ function resolvePaymentMeta(enrollment) {
   return {
     label: "Conciliación manual",
     tone: "info",
-    helper: "El módulo consolida seguimiento manual hasta integrar pasarela de pagos.",
+    helper: "Pendiente de confirmación.",
     amountLabel: formatCurrency(amount),
     receiptUrl,
   };
@@ -260,16 +260,12 @@ export default function DashboardPagosPage() {
       <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
           <div className="text-sm font-semibold uppercase tracking-[0.2em] text-primary">Pagos</div>
-          <h1 className="mt-3 text-3xl font-bold text-foreground">Seguimiento financiero</h1>
+          <h1 className="mt-3 text-3xl font-bold text-foreground">Pagos</h1>
           <p className="mt-2 text-sm text-muted-foreground">
             {actor?.role === "admin"
-              ? "Centraliza conciliación, comprobantes y revisión manual de cobros."
-              : "Consulta el estado financiero de cada inscripción desde una vista simple y completamente integrada al panel."}
+              ? "Revisa estados y resuelve pagos pendientes."
+              : "Consulta el estado de tus pagos desde una vista simple."}
           </p>
-        </div>
-
-        <div className="rounded-2xl border border-border/60 bg-card px-4 py-3 text-sm text-muted-foreground">
-          Sin pasarela activa: el control se realiza en forma manual.
         </div>
       </div>
 
@@ -322,10 +318,10 @@ export default function DashboardPagosPage() {
         </div>
 
         <div className="mt-6 grid gap-4 md:grid-cols-4">
-          <MetricCard icon={Wallet} label="Registros" value={String(summary.total)} helper="Inscripciones con seguimiento financiero" />
-          <MetricCard icon={CreditCard} label="Acreditados" value={String(summary.credited)} helper="Pagos confirmados por el campus" />
-          <MetricCard icon={Receipt} label="Pendientes" value={String(summary.pending)} helper="Registros todavía en conciliación" />
-          <MetricCard icon={Wallet} label="Sin cargo" value={String(summary.noCharge)} helper="Inscripciones cerradas sin cobro" />
+          <MetricCard icon={Wallet} label="Registros" value={String(summary.total)} helper="Total visible" />
+          <MetricCard icon={CreditCard} label="Acreditados" value={String(summary.credited)} helper="Pagos confirmados" />
+          <MetricCard icon={Receipt} label="Pendientes" value={String(summary.pending)} helper="En revisión" />
+          <MetricCard icon={Wallet} label="Sin cargo" value={String(summary.noCharge)} helper="Sin cobro" />
         </div>
 
         <div className="mt-2 text-sm text-muted-foreground">{filtered.length} resultado(s)</div>
@@ -349,7 +345,7 @@ export default function DashboardPagosPage() {
                       {row.companyName || "Institución"} · {[row.firstName, row.lastName].filter(Boolean).join(" ").trim() || row.candidateName || row.email}
                     </p>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      {row.email || "Sin email"} · {dateLabel(row.createdAt)} · Estado de inscripción: {row.status || "sin estado"}
+                      {dateLabel(row.createdAt)} · {row.email || "Sin email"}
                     </p>
                     <p className="mt-4 rounded-2xl border border-border/50 bg-card px-4 py-3 text-sm text-muted-foreground">
                       {row.paymentMeta.helper}

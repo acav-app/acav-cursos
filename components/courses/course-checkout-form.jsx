@@ -10,12 +10,19 @@ import {
   Building2,
   CheckCircle2,
   ChevronRight,
+  Clock3,
   Copy,
   CreditCard,
+  FileText,
+  HelpCircle,
+  Info,
   Landmark,
   Loader2,
   Receipt,
   ShieldCheck,
+  Sparkles,
+  Trash2,
+  Upload,
   User,
   X,
 } from "lucide-react";
@@ -24,10 +31,18 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { useAuth } from "@/provider/auth.provider";
 import { useCourseActor } from "@/components/courses/dashboard/use-course-actor";
 import { APPLICATION_CREATED_EVENT } from "@/components/courses/course-enroll-button";
 import { authedFetch } from "@/lib/auth/authed-fetch";
+import { uploadToR2 } from "@/components/courses/dashboard/upload";
+import { normalizePublicR2Url } from "@/lib/r2/normalize-public-url";
 
 const FALLBACK_PAYMENT_SETTINGS = {
   paymentAlias: "acav.cursos",
@@ -91,6 +106,9 @@ export default function CourseCheckoutForm({ lang, job, variant = "modal", onClo
   const [createdEnrollmentId, setCreatedEnrollmentId] = useState("");
   const [copyState, setCopyState] = useState("");
   const [draftReady, setDraftReady] = useState(false);
+  const [receiptFile, setReceiptFile] = useState(null);
+  const [receiptUrl, setReceiptUrl] = useState("");
+  const [receiptUploading, setReceiptUploading] = useState(false);
 
   const amount = Number(job?.price || 0);
   const requiresPayment = !job?.freeCourse && amount > 0;
@@ -287,6 +305,46 @@ export default function CourseCheckoutForm({ lang, job, variant = "modal", onClo
     }
   };
 
+  const handleReceiptFileChange = async (event) => {
+    const file = event.target.files?.[0] || null;
+    if (!file) return;
+
+    const maxSize = 10 * 1024 * 1024;
+    if (file.size > maxSize) {
+      toast.error("El comprobante no puede superar los 10MB.", { position: "top-right" });
+      return;
+    }
+    const allowed = new Set([
+      "application/pdf",
+      "image/jpeg",
+      "image/jpg",
+      "image/png",
+      "image/webp",
+    ]);
+    if (!allowed.has(file.type)) {
+      toast.error("Solo se admiten PDF, JPG, PNG o WEBP.", { position: "top-right" });
+      return;
+    }
+
+    try {
+      setReceiptFile(file);
+      setReceiptUploading(true);
+      const url = await uploadToR2(file, "payment-receipts");
+      setReceiptUrl(normalizePublicR2Url(url));
+      toast.success("Comprobante cargado correctamente.", { position: "top-right" });
+    } catch (error) {
+      setReceiptFile(null);
+      toast.error(error?.message || "No pudimos subir el comprobante.", { position: "top-right" });
+    } finally {
+      setReceiptUploading(false);
+    }
+  };
+
+  const handleRemoveReceipt = () => {
+    setReceiptFile(null);
+    setReceiptUrl("");
+  };
+
   const onSubmit = async (values) => {
     if (!user) {
       toast.error("Necesitas iniciar sesión para continuar.", { position: "top-right" });
@@ -307,6 +365,7 @@ export default function CourseCheckoutForm({ lang, job, variant = "modal", onClo
         }),
       }).catch(() => null);
 
+      const hasReceipt = Boolean(receiptUrl);
       const payload = {
         userId: actor?.uid || user?.uid || undefined,
         courseId: job.id,
@@ -317,10 +376,19 @@ export default function CourseCheckoutForm({ lang, job, variant = "modal", onClo
         city: values.city,
         province: values.province,
         acceptedPrivacy: true,
-        status: requiresPayment ? "waiting_payment" : "active",
-        paymentStatus: requiresPayment ? "pending" : "approved",
+        status: requiresPayment
+          ? hasReceipt
+            ? "payment_under_review"
+            : "waiting_payment"
+          : "active",
+        paymentStatus: requiresPayment
+          ? hasReceipt
+            ? "under_review"
+            : "pending"
+          : "approved",
         paymentMethod: values.paymentMethod,
         paymentReference: values.paymentReference || undefined,
+        paymentReceiptUrl: receiptUrl || undefined,
         paymentAmount: amount || 0,
         paymentCurrency: "ARS",
       };
@@ -336,9 +404,13 @@ export default function CourseCheckoutForm({ lang, job, variant = "modal", onClo
       }
       notifyApplicationCreated(job.id);
       setSubmitted(true);
-      toast.success(requiresPayment ? "Inscripción iniciada. Pago pendiente." : "Inscripción confirmada.", {
-        position: "top-right",
-      });
+      if (!requiresPayment) {
+        toast.success("Inscripción confirmada.", { position: "top-right" });
+      } else if (hasReceipt) {
+        toast.success("Comprobante recibido. En revisión.", { position: "top-right" });
+      } else {
+        toast.success("Inscripción iniciada. Pago pendiente.", { position: "top-right" });
+      }
     } catch (error) {
       if (error?.message === "enrollment_already_exists" || error?.message === "application_already_exists") {
         notifyApplicationCreated(job.id);
@@ -366,19 +438,47 @@ export default function CourseCheckoutForm({ lang, job, variant = "modal", onClo
         ) : null}
 
         <div className="mx-auto flex w-full max-w-[620px] flex-col items-center text-center">
-          <div className="inline-flex items-center gap-2 rounded-full bg-[#ECFDF3] px-3 py-1 text-[11px] font-bold text-[#127A45]">
-            <CheckCircle2 className="h-3.5 w-3.5" />
-            {requiresPayment ? "Pago pendiente" : "Inscripción activa"}
+          <div
+            className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-[11px] font-bold ${
+              !requiresPayment
+                ? "bg-[#ECFDF3] text-[#127A45]"
+                : hasReceipt
+                  ? "bg-[#FFF8E6] text-[#92610C]"
+                  : "bg-[#EEF4FF] text-[#2356B8]"
+            }`}
+          >
+            {!requiresPayment ? (
+              <>
+                <CheckCircle2 className="h-3.5 w-3.5" />
+                Inscripción activa
+              </>
+            ) : hasReceipt ? (
+              <>
+                <Receipt className="h-3.5 w-3.5" />
+                Comprobante en revisión
+              </>
+            ) : (
+              <>
+                <CreditCard className="h-3.5 w-3.5" />
+                Pago pendiente
+              </>
+            )}
           </div>
 
           <h2 className="mt-4 text-[32px] font-semibold tracking-[-0.03em] text-[#0F172A]">
-            {requiresPayment ? "Tu inscripción ya quedó iniciada" : "Tu acceso ya quedó confirmado"}
+            {!requiresPayment
+              ? "Tu acceso ya quedó confirmado"
+              : hasReceipt
+                ? "Recibimos tu comprobante de pago"
+                : "Tu inscripción ya quedó iniciada"}
           </h2>
 
           <p className="mt-3 max-w-[560px] text-sm leading-6 text-[#667085]">
-            {requiresPayment
-              ? "Registramos tu inscripción. El pago queda pendiente y podrás continuar el seguimiento desde tu panel."
-              : "La inscripción se activó automáticamente y ya puedes continuar desde tu panel."}
+            {!requiresPayment
+              ? "La inscripción se activó automáticamente y ya puedes continuar desde tu panel."
+              : hasReceipt
+                ? "El equipo administrativo está validando tu pago. Recibirás una novedad apenas se apruebe."
+                : "Registramos tu inscripción. El pago queda pendiente y podrás continuar el seguimiento desde tu panel."}
           </p>
 
           <div className="mt-8 grid w-full gap-3 rounded-[22px] border border-[#E6EBF4] bg-[#FAFBFD] p-5 text-left text-sm md:grid-cols-3">
@@ -392,7 +492,9 @@ export default function CourseCheckoutForm({ lang, job, variant = "modal", onClo
             </div>
             <div>
               <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#94A3B8]">Estado</div>
-              <div className="mt-1 font-semibold text-[#0F172A]">{requiresPayment ? "Esperando pago" : "Activo"}</div>
+              <div className="mt-1 font-semibold text-[#0F172A]">
+                {!requiresPayment ? "Activo" : hasReceipt ? "En revisión" : "Esperando pago"}
+              </div>
             </div>
           </div>
 
@@ -424,22 +526,40 @@ export default function CourseCheckoutForm({ lang, job, variant = "modal", onClo
         <div className="border-b border-[#EEF2F7] px-5 py-5 md:px-7">
           <div className="flex items-start justify-between gap-4">
             <div className="flex min-w-0 items-start gap-4">
-              <div className="flex h-[58px] w-[58px] shrink-0 items-center justify-center rounded-[14px] border border-[#E5EAF2] bg-[#F8FAFC] text-[#2563EB]">
+              <div className="flex h-[58px] w-[58px] shrink-0 items-center justify-center rounded-[14px] border border-[#E5EAF2] bg-gradient-to-br from-[#EEF4FF] to-[#F8FBFF] text-[#1B2B50] shadow-[0_12px_28px_rgba(27,43,80,0.08)]">
                 <Building2 className="h-6 w-6" />
               </div>
               <div className="min-w-0">
-                <div className="inline-flex items-center gap-1 rounded-full border border-[#DCE6F7] bg-[#F8FBFF] px-2.5 py-1 text-[11px] font-bold text-[#1B2B50]">
-                  <CreditCard className="h-3 w-3" />
-                  Checkout del curso
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge variant="soft" color="info" className="rounded-full">
+                    <Sparkles className="mr-1 h-3 w-3" />
+                    Inscripción simple, 3 pasos
+                  </Badge>
+                  {job?.institutionPlanTier || job?.accreditations?.length ? (
+                    <Badge variant="soft" color="success" className="rounded-full">
+                      Certificado oficial
+                    </Badge>
+                  ) : null}
                 </div>
                 <h2 className="mt-2 truncate text-[28px] font-semibold tracking-[-0.03em] text-[#0F172A]">
                   {job?.title || "Inscripción"}
                 </h2>
-                <p className="mt-1 text-sm text-[#667085]">Un proceso corto: perfil, pago y confirmación.</p>
-                <div className="mt-3 flex flex-wrap gap-2 text-[13px] text-[#667085]">
-                  <span>{job?.companyName || "ACAV"}</span>
-                  {amount > 0 ? <span>· {formatCurrency(amount)}</span> : <span>· Gratuito</span>}
-                  {job?.duration ? <span>· {job.duration}</span> : null}
+                <p className="mt-1 text-sm text-[#667085]">Completá el proceso y accedé a tu cursada en segundos.</p>
+                <div className="mt-3 flex flex-wrap items-center gap-3 text-[13px] text-[#667085]">
+                  <span className="inline-flex items-center gap-1">
+                    <Landmark className="h-3.5 w-3.5 text-[#1B2B50]" />
+                    {job?.companyName || "ACAV"}
+                  </span>
+                  <span className="h-1 w-1 rounded-full bg-slate-300" />
+                  <span className="font-semibold text-[#0F172A]">
+                    {amount > 0 ? formatCurrency(amount) : "Gratuito"}
+                  </span>
+                  {job?.duration ? (
+                    <>
+                      <span className="h-1 w-1 rounded-full bg-slate-300" />
+                      <span>{job.duration}</span>
+                    </>
+                  ) : null}
                 </div>
               </div>
             </div>
@@ -460,7 +580,7 @@ export default function CourseCheckoutForm({ lang, job, variant = "modal", onClo
         <div className="border-b border-[#EEF2F7] px-5 py-4 md:px-7">
           <div className="mb-3 flex items-center justify-between gap-4 text-xs font-semibold uppercase tracking-[0.16em] text-[#94A3B8]">
             <span>Paso {currentStep + 1} de {steps.length}</span>
-            <span>{Math.round(progressValue)}%</span>
+            <span>{Math.round(progressValue)}% completado</span>
           </div>
           <Progress value={progressValue} size="sm" color="primary" className="bg-slate-100 [&>div]:bg-[#1B2B50]" />
 
@@ -476,16 +596,29 @@ export default function CourseCheckoutForm({ lang, job, variant = "modal", onClo
                   onClick={() => {
                     if (index <= currentStep) setCurrentStep(index);
                   }}
-                  className="flex items-center gap-3 text-left"
+                  className="flex items-center gap-3 rounded-2xl border border-transparent px-3 py-2 text-left transition hover:bg-slate-50"
+                  disabled={index > currentStep}
                 >
-                  <span
-                    className={[
-                      "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold transition",
-                      completed ? "bg-[#DBEAFE] text-[#2563EB]" : active ? "bg-[#1B2B50] text-white" : "bg-[#F1F5F9] text-[#94A3B8]",
-                    ].join(" ")}
-                  >
-                    {completed ? <CheckCircle2 className="h-4 w-4" /> : <StepIcon className="h-4 w-4" />}
-                  </span>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span
+                        className={[
+                          "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold transition",
+                          completed
+                            ? "bg-[#1B2B50] text-white shadow-[0_10px_24px_rgba(27,43,80,0.24)]"
+                            : active
+                              ? "bg-[#1B2B50] text-white"
+                              : "bg-[#F1F5F9] text-[#94A3B8]",
+                        ].join(" ")}
+                      >
+                        {completed ? <CheckCircle2 className="h-4 w-4" /> : <StepIcon className="h-4 w-4" />}
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom">
+                      <div className="font-semibold">{step.title}</div>
+                      <div className="mt-1 text-[11px] leading-5 text-slate-100/90">{step.description}</div>
+                    </TooltipContent>
+                  </Tooltip>
                   <span className="min-w-0">
                     <span className={`block text-[13px] font-semibold ${active ? "text-[#1B2B50]" : "text-[#94A3B8]"}`}>{step.title}</span>
                     <span className="mt-1 block text-[11px] leading-5 text-[#94A3B8]">{step.description}</span>
@@ -497,13 +630,26 @@ export default function CourseCheckoutForm({ lang, job, variant = "modal", onClo
         </div>
 
         <div className="flex-1 overflow-y-auto px-5 py-6 md:px-7 md:py-7">
-          <div className="mb-5 rounded-[20px] border border-[#E5EAF2] bg-[#FAFBFD] p-5">
+          <div className="mb-5 rounded-[20px] border border-[#E5EAF2] bg-gradient-to-br from-[#F8FBFF] via-white to-[#FAFBFD] p-5">
             <div className="flex items-start gap-4">
-              <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#1B2B50] text-white">
+              <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#1B2B50] text-white shadow-[0_12px_30px_rgba(27,43,80,0.24)]">
                 <ActiveIcon className="h-5 w-5" />
               </span>
-              <div>
-                <div className="text-xs font-extrabold uppercase tracking-[0.18em] text-slate-400">Paso activo</div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <div className="text-xs font-extrabold uppercase tracking-[0.18em] text-slate-400">Paso activo</div>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button type="button" className="inline-flex h-5 w-5 items-center justify-center rounded-full text-slate-400 transition hover:text-slate-700">
+                        <HelpCircle className="h-4 w-4" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="right">
+                      <div className="font-semibold">¿Qué hago en este paso?</div>
+                      <div className="mt-1 text-[11px] leading-5 text-slate-100/90">{steps[currentStep].description}</div>
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
                 <h3 className="mt-2 text-xl font-semibold tracking-[-0.03em] text-[#1B2B50]">{steps[currentStep].title}</h3>
                 <p className="mt-1 text-sm leading-6 text-slate-500">{steps[currentStep].description}</p>
               </div>
@@ -513,6 +659,30 @@ export default function CourseCheckoutForm({ lang, job, variant = "modal", onClo
           {currentStep === 0 ? (
             <div className="grid gap-6">
               <div className="rounded-[20px] border border-[#E5EAF2] bg-white p-5">
+                <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <div className="text-base font-semibold text-[#0F172A]">Tus datos personales</div>
+                    <p className="mt-1 text-xs leading-5 text-[#667085]">
+                      Los campos de tu perfil se completan automáticamente. Modificá solo lo que necesites.
+                    </p>
+                  </div>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="inline-flex items-center gap-1.5 rounded-full border border-[#DCE6F7] bg-[#F8FBFF] px-2.5 py-1 text-[11px] font-semibold text-[#1B2B50]">
+                        <Info className="h-3 w-3" />
+                        ¿Por qué pedimos esto?
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom">
+                      <div className="max-w-xs leading-5">
+                        <div className="font-semibold">Para validar tu certificado</div>
+                        <div className="mt-1 text-[11px] text-slate-100/90">
+                          Estos datos se usan solo para identificar tu certificación oficial y comunicar novedades de tu cursada.
+                        </div>
+                      </div>
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="grid gap-2">
                     <Label>Nombre</Label>
@@ -529,7 +699,10 @@ export default function CourseCheckoutForm({ lang, job, variant = "modal", onClo
                     <Input value={emailValue || ""} readOnly className="h-12 rounded-[14px] bg-slate-50" {...register("email", { setValueAs: normalizeEmail })} />
                   </div>
                   <div className="grid gap-2">
-                    <Label>Teléfono</Label>
+                    <Label>
+                      Teléfono{" "}
+                      <span className="text-[11px] font-normal text-destructive">*</span>
+                    </Label>
                     <Input
                       placeholder="+54 9 351..."
                       className="h-12 rounded-[14px]"
@@ -541,99 +714,372 @@ export default function CourseCheckoutForm({ lang, job, variant = "modal", onClo
                 </div>
                 <div className="mt-4 grid gap-4 md:grid-cols-2">
                   <div className="grid gap-2">
-                    <Label>Ciudad</Label>
-                    <Input placeholder="Ciudad" className="h-12 rounded-[14px]" {...register("city", { setValueAs: toTitleCase })} />
+                    <Label>
+                      Ciudad{" "}
+                      <span className="text-[11px] font-normal text-destructive">*</span>
+                    </Label>
+                    <Input placeholder="Ej. Córdoba" className="h-12 rounded-[14px]" {...register("city", { setValueAs: toTitleCase })} />
                     {errors.city ? <p className="text-sm text-destructive">{errors.city.message}</p> : null}
                   </div>
                   <div className="grid gap-2">
-                    <Label>Provincia</Label>
-                    <Input placeholder="Provincia" className="h-12 rounded-[14px]" {...register("province", { setValueAs: toTitleCase })} />
+                    <Label>
+                      Provincia{" "}
+                      <span className="text-[11px] font-normal text-destructive">*</span>
+                    </Label>
+                    <Input placeholder="Ej. Córdoba" className="h-12 rounded-[14px]" {...register("province", { setValueAs: toTitleCase })} />
                     {errors.province ? <p className="text-sm text-destructive">{errors.province.message}</p> : null}
                   </div>
                 </div>
               </div>
 
-              <div className="rounded-[20px] border border-[#DCE6F7] bg-[#F8FBFF] p-5 text-sm text-[#52607A]">
-                Estos datos quedan guardados en tu perfil para no volver a pedirlos en futuras compras.
+              <div className="rounded-[20px] border border-[#DCE6F7] bg-gradient-to-br from-[#F8FBFF] to-white p-5 text-sm text-[#52607A]">
+                <div className="flex items-start gap-3">
+                  <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-white text-[#1B2B50] ring-1 ring-[#DCE6F7]">
+                    <CheckCircle2 className="h-4 w-4" />
+                  </span>
+                  <div>
+                    <div className="font-semibold text-[#1B2B50]">Tu perfil se actualiza automáticamente</div>
+                    <p className="mt-1 text-xs leading-5 text-slate-500">
+                      Cuando confirmes, guardamos estos datos en tu cuenta para la próxima inscripción y no tengas que volver a escribirlos.
+                    </p>
+                  </div>
+                </div>
               </div>
             </div>
           ) : null}
 
           {currentStep === 1 ? (
             <div className="grid gap-6">
-              <div className="rounded-[20px] border border-[#E5EAF2] bg-white p-5">
-                <div className="grid gap-3">
-                  <div className="text-sm font-semibold text-[#0F172A]">Resumen de compra</div>
-                  <div className="grid gap-3 text-sm text-[#475467] md:grid-cols-2">
-                    <div><span className="font-semibold text-[#0F172A]">Curso:</span> {job.title}</div>
-                    <div><span className="font-semibold text-[#0F172A]">Institución:</span> {job.companyName || "ACAV"}</div>
-                    <div><span className="font-semibold text-[#0F172A]">Alumno:</span> {`${firstNameValue} ${lastNameValue}`.trim()}</div>
-                    <div><span className="font-semibold text-[#0F172A]">Importe:</span> {requiresPayment ? formatCurrency(amount) : "Gratuito"}</div>
+              {requiresPayment ? (
+                <>
+                  <div className="rounded-[20px] border border-[#E5EAF2] bg-white p-5">
+                    <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <div className="text-base font-semibold text-[#0F172A]">Resumen del curso</div>
+                        <p className="mt-1 text-xs leading-5 text-[#667085]">Revisá antes de realizar la transferencia.</p>
+                      </div>
+                      <Badge variant="soft" color="warning" className="rounded-full">
+                        <Landmark className="mr-1 h-3 w-3" />
+                        Pago por transferencia
+                      </Badge>
+                    </div>
+                    <div className="grid gap-3 text-sm text-[#475467] md:grid-cols-2">
+                      <div className="rounded-[16px] border border-[#E5EAF2] bg-[#FAFBFD] p-4">
+                        <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">Curso</div>
+                        <div className="mt-1 font-semibold text-[#0F172A]">{job.title}</div>
+                      </div>
+                      <div className="rounded-[16px] border border-[#E5EAF2] bg-[#FAFBFD] p-4">
+                        <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">Alumno</div>
+                        <div className="mt-1 font-semibold text-[#0F172A]">{`${firstNameValue} ${lastNameValue}`.trim()}</div>
+                      </div>
+                      <div className="rounded-[16px] border border-[#E5EAF2] bg-[#FAFBFD] p-4">
+                        <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">Institución</div>
+                        <div className="mt-1 font-semibold text-[#0F172A]">{job.companyName || "ACAV"}</div>
+                      </div>
+                      <div className="rounded-[16px] border border-[#2356B8]/30 bg-gradient-to-br from-[#EEF4FF] to-white p-4">
+                        <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#1B2B50]/70">Importe a transferir</div>
+                        <div className="mt-1 text-[22px] font-bold tracking-tight text-[#1B2B50]">{formatCurrency(amount)}</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="rounded-[20px] border border-[#E5EAF2] bg-white p-5">
+                    <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <div className="text-base font-semibold text-[#0F172A]">Datos para la transferencia</div>
+                        <p className="mt-1 text-xs leading-5 text-[#667085]">Usá el botón copiar y luego pegá en tu banco.</p>
+                      </div>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="inline-flex h-7 w-7 items-center justify-center rounded-full text-slate-400 hover:text-slate-700">
+                            <Info className="h-4 w-4" />
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom">
+                          <div className="max-w-xs leading-5">
+                            El importe es el mismo para cualquier método de envío. Si tu banco acepta alias, CBU o CVU, usá el que te sea más cómodo.
+                          </div>
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+                    <div className="grid gap-3">
+                      {[
+                        ["Alias", settings.paymentAlias],
+                        ["CBU", settings.paymentCbu],
+                        ["CVU", settings.paymentCvu],
+                        ["Titular", settings.paymentAccountHolder],
+                      ].map(([label, value]) => (
+                        <div key={label} className="flex flex-col gap-3 rounded-[16px] border border-[#E5EAF2] bg-[#FAFBFD] px-4 py-3 md:flex-row md:items-center md:justify-between">
+                          <div className="min-w-0 flex-1">
+                            <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">{label}</div>
+                            <div className="mt-0.5 truncate font-medium text-[#0F172A]">{value}</div>
+                          </div>
+                          <Button type="button" variant="outline" className="rounded-xl" onClick={() => handleCopy(label, value)}>
+                            <Copy className="mr-2 h-4 w-4" />
+                            {copyState === label ? "Copiado ✓" : `Copiar ${label}`}
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="mt-5 rounded-[16px] border border-[#DCE6F7] bg-gradient-to-br from-[#F8FBFF] to-white p-4 text-sm leading-6 text-[#52607A]">
+                      <div className="flex items-start gap-3">
+                        <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-white text-[#1B2B50] ring-1 ring-[#DCE6F7]">
+                          <Landmark className="h-4 w-4" />
+                        </span>
+                        <div>
+                          <div className="font-semibold text-[#1B2B50]">Instrucciones para tu banco</div>
+                          <p className="mt-1 text-xs leading-5 text-slate-500">{settings.paymentInstructions}</p>
+                        </div>
+                      </div>
+                    </div>
+                    <input type="hidden" {...register("paymentMethod")} value="transferencia" readOnly />
+                  </div>
+                </>
+              ) : (
+                <div className="rounded-[20px] border border-emerald-200 bg-gradient-to-br from-emerald-50 to-white p-5 text-sm text-emerald-800">
+                  <div className="flex items-start gap-3">
+                    <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white text-emerald-700 ring-1 ring-emerald-200">
+                      <CheckCircle2 className="h-5 w-5" />
+                    </span>
+                    <div>
+                      <div className="text-base font-semibold text-emerald-900">Este curso no requiere pago</div>
+                      <p className="mt-1 text-xs leading-5 text-emerald-700">
+                        Confirmá tus datos en el próximo paso y te damos acceso de inmediato a todo el contenido.
+                      </p>
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
 
-              <div className="rounded-[20px] border border-[#E5EAF2] bg-white p-5">
-                <div className="text-sm font-semibold text-[#0F172A]">Datos bancarios</div>
-                <div className="mt-4 grid gap-3">
-                  {[
-                    ["Alias", settings.paymentAlias],
-                    ["CBU", settings.paymentCbu],
-                    ["CVU", settings.paymentCvu],
-                    ["Titular", settings.paymentAccountHolder],
-                    ["Importe", requiresPayment ? formatCurrency(amount) : "Gratuito"],
-                  ].map(([label, value]) => (
-                    <div key={label} className="flex flex-col gap-3 rounded-[16px] border border-[#E5EAF2] bg-[#FAFBFD] px-4 py-3 md:flex-row md:items-center md:justify-between">
-                      <div>
-                        <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#94A3B8]">{label}</div>
-                        <div className="mt-1 font-medium text-[#0F172A]">{value}</div>
+              {requiresPayment ? (
+                <div className="rounded-[20px] border border-[#E5EAF2] bg-white p-5">
+                  <div className="flex items-start gap-3">
+                    <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#FFF8E6] text-[#92610C] ring-1 ring-[#FDE68A]">
+                      <Receipt className="h-4 w-4" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <div className="text-sm font-semibold text-[#0F172A]">Adjuntar comprobante</div>
+                        <Badge variant="soft" color="secondary" className="rounded-full">opcional</Badge>
                       </div>
-                      {label !== "Titular" && label !== "Importe" ? (
-                        <Button type="button" variant="outline" className="rounded-xl" onClick={() => handleCopy(label, value)}>
-                          <Copy className="mr-2 h-4 w-4" />
-                          {copyState === label ? "Copiado" : `Copiar ${label}`}
-                        </Button>
-                      ) : null}
+                      <p className="mt-1 text-xs leading-5 text-[#667085]">
+                        Si ya hiciste la transferencia, subí el comprobante y aceleramos la aprobación. También podés adjuntarlo después desde tu panel.
+                      </p>
                     </div>
-                  ))}
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button type="button" className="inline-flex h-7 w-7 items-center justify-center rounded-full text-slate-400 hover:text-slate-700">
+                          <HelpCircle className="h-4 w-4" />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent side="left">
+                        <div className="max-w-xs leading-5">
+                          Si no tienes el comprobante a mano, no te preocupes: podés subirlo más tarde desde tu ficha de inscripción.
+                        </div>
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
+
+                  <div className="mt-5">
+                    {receiptUrl ? (
+                      <div className="rounded-[18px] border border-emerald-200 bg-emerald-50 p-4">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex min-w-0 items-center gap-3">
+                            <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white text-emerald-700 ring-1 ring-emerald-200">
+                              <FileText className="h-4 w-4" />
+                            </span>
+                            <div className="min-w-0">
+                              <div className="truncate text-sm font-semibold text-emerald-900">
+                                {receiptFile?.name || "Comprobante adjunto"}
+                              </div>
+                              <div className="mt-0.5 text-xs text-emerald-700">
+                                Se envía con tu inscripción para validación manual.
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            <Button
+                              asChild
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="rounded-xl border-emerald-200 text-emerald-700 hover:bg-emerald-100"
+                            >
+                              <a href={receiptUrl} target="_blank" rel="noreferrer">
+                                Ver
+                              </a>
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="rounded-xl border-rose-200 text-rose-700 hover:bg-rose-50"
+                              onClick={handleRemoveReceipt}
+                            >
+                              <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+                              Quitar
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <label
+                        className={`group flex cursor-pointer flex-col items-center justify-center gap-3 rounded-[18px] border border-dashed px-6 py-7 text-center transition ${
+                          receiptUploading
+                            ? "border-amber-300 bg-amber-50/50"
+                            : "border-[#DCE6F7] bg-gradient-to-br from-[#F8FBFF] to-white hover:border-[#2356B8]/40 hover:bg-[#EEF4FF]/60"
+                        }`}
+                      >
+                        <span
+                          className={`inline-flex h-12 w-12 items-center justify-center rounded-2xl ${
+                            receiptUploading ? "bg-white text-amber-600 ring-1 ring-amber-200" : "bg-white text-[#1B2B50] ring-1 ring-[#DCE6F7]"
+                          }`}
+                        >
+                          {receiptUploading ? (
+                            <Loader2 className="h-5 w-5 animate-spin" />
+                          ) : (
+                            <Upload className="h-5 w-5" />
+                          )}
+                        </span>
+                        <div className="min-w-0">
+                          <div className="text-sm font-semibold text-[#1B2B50]">
+                            {receiptUploading ? "Subiendo comprobante..." : "Seleccionar comprobante"}
+                          </div>
+                          <div className="mt-1 text-xs leading-5 text-[#667085]">
+                            PDF, JPG, PNG o WEBP · máximo 10MB
+                          </div>
+                        </div>
+                        <input
+                          type="file"
+                          accept="application/pdf,image/jpeg,image/jpg,image/png,image/webp"
+                          className="hidden"
+                          disabled={receiptUploading}
+                          onChange={handleReceiptFileChange}
+                        />
+                      </label>
+                    )}
+                  </div>
                 </div>
-                <div className="mt-4 rounded-[16px] border border-[#DCE6F7] bg-[#F8FBFF] p-4 text-sm leading-6 text-[#52607A]">
-                  {settings.paymentInstructions}
-                </div>
-                <input type="hidden" {...register("paymentMethod")} value="transferencia" readOnly />
-              </div>
+              ) : null}
             </div>
           ) : null}
 
           {currentStep === 2 ? (
             <div className="grid gap-6">
-              {requiresPayment ? (
-                <div className="rounded-[20px] border border-[#E5EAF2] bg-white p-5">
-                  <div className="rounded-[16px] border border-[#DCE6F7] bg-[#F8FBFF] p-4 text-sm leading-6 text-[#52607A]">
-                    No te pediremos el comprobante dentro de este modal. Primero dejamos iniciada tu inscripción y luego podrás seguir el estado del pago desde tu panel.
+              <div className="rounded-[20px] border border-[#E5EAF2] bg-white p-5">
+                <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <div className="text-base font-semibold text-[#0F172A]">Resumen de tu inscripción</div>
+                    <p className="mt-1 text-xs leading-5 text-[#667085]">Confirmá los datos antes de finalizar.</p>
                   </div>
+                  {receiptUrl ? (
+                    <Badge variant="soft" color="success" className="rounded-full">
+                      <FileText className="mr-1 h-3 w-3" />
+                      Comprobante incluido
+                    </Badge>
+                  ) : requiresPayment ? (
+                    <Badge variant="soft" color="warning" className="rounded-full">
+                      <Clock3 className="mr-1 h-3 w-3" />
+                      Pago pendiente
+                    </Badge>
+                  ) : (
+                    <Badge variant="soft" color="success" className="rounded-full">
+                      <CheckCircle2 className="mr-1 h-3 w-3" />
+                      Acceso inmediato
+                    </Badge>
+                  )}
+                </div>
+                <div className="grid gap-3 text-sm md:grid-cols-2">
+                  <div className="rounded-[16px] border border-[#E5EAF2] bg-[#FAFBFD] p-4">
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">Curso</div>
+                    <div className="mt-1 font-semibold text-[#0F172A]">{job.title}</div>
+                    {job.duration ? <div className="mt-1 text-xs text-slate-500">{job.duration}</div> : null}
+                  </div>
+                  <div className="rounded-[16px] border border-[#E5EAF2] bg-[#FAFBFD] p-4">
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">Alumno</div>
+                    <div className="mt-1 font-semibold text-[#0F172A]">{`${firstNameValue} ${lastNameValue}`.trim()}</div>
+                    <div className="mt-1 truncate text-xs text-slate-500">{emailValue}</div>
+                  </div>
+                  <div className="rounded-[16px] border border-[#E5EAF2] bg-[#FAFBFD] p-4">
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">Institución</div>
+                    <div className="mt-1 font-semibold text-[#0F172A]">{job.companyName || "ACAV"}</div>
+                  </div>
+                  <div className={`rounded-[16px] border p-4 ${requiresPayment ? "border-[#2356B8]/30 bg-gradient-to-br from-[#EEF4FF] to-white" : "border-emerald-200 bg-gradient-to-br from-emerald-50 to-white"}`}>
+                    <div className={`text-[11px] font-semibold uppercase tracking-[0.16em] ${requiresPayment ? "text-[#1B2B50]/70" : "text-emerald-700"}`}>Importe</div>
+                    <div className={`mt-1 text-[22px] font-bold tracking-tight ${requiresPayment ? "text-[#1B2B50]" : "text-emerald-800"}`}>
+                      {amount > 0 ? formatCurrency(amount) : "Gratuito"}
+                    </div>
+                  </div>
+                </div>
 
-                  <div className="mt-4 grid gap-2">
-                    <Label>Referencia (opcional)</Label>
-                    <Input placeholder="Últimos números, banco o aclaración" className="h-12 rounded-[14px]" {...register("paymentReference")} />
+                {requiresPayment ? (
+                  <div className="mt-4 grid gap-3 md:grid-cols-2">
+                    <div className="grid gap-2">
+                      <Label className="flex items-center gap-1.5">
+                        Referencia de pago
+                        <Badge variant="soft" color="secondary" className="rounded-full text-[10px]">opcional</Badge>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button type="button" className="inline-flex h-4 w-4 items-center justify-center text-slate-400 hover:text-slate-700">
+                              <HelpCircle className="h-3.5 w-3.5" />
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent side="right">
+                            <div className="max-w-xs leading-5 text-[11px]">
+                              Podés anotar últimos dígitos de la operación, banco o cualquier dato que ayude a identificar tu transferencia.
+                            </div>
+                          </TooltipContent>
+                        </Tooltip>
+                      </Label>
+                      <Input placeholder="Ej. últimos 4 números, banco Nación" className="h-12 rounded-[14px]" {...register("paymentReference")} />
+                    </div>
+                    <div className="rounded-[16px] border border-[#DCE6F7] bg-gradient-to-br from-[#F8FBFF] to-white p-4">
+                      <div className="flex items-start gap-3">
+                        <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-white text-[#1B2B50] ring-1 ring-[#DCE6F7]">
+                          <Landmark className="h-4 w-4" />
+                        </span>
+                        <div className="min-w-0">
+                          <div className="text-sm font-semibold text-[#0F172A]">
+                            {receiptUrl ? "Comprobante adjuntado ✓" : "Recordá transferir los datos bancarios"}
+                          </div>
+                          <p className="mt-1 text-xs leading-5 text-slate-500">
+                            {receiptUrl
+                              ? "Tu comprobante se envía junto a la inscripción para validación manual."
+                              : "Podés adjuntar el comprobante después desde tu panel de inscripciones."}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              ) : (
-                <div className="rounded-[20px] border border-emerald-200 bg-emerald-50 p-5 text-sm text-emerald-800">
-                  Este curso no requiere pago. Solo confirma tus datos y activaremos tu acceso.
-                </div>
-              )}
+                ) : null}
+              </div>
 
               <div className="rounded-[20px] border border-[#DCE6F7] bg-[#F8FBFF] p-5">
                 <div className="flex items-start gap-3">
-                  <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white text-[#1B2B50]">
+                  <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white text-[#1B2B50] ring-1 ring-[#DCE6F7]">
                     <ShieldCheck className="h-4 w-4" />
                   </span>
-                  <div>
-                    <div className="text-sm font-semibold text-[#0F172A]">Confirmación final</div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <div className="text-sm font-semibold text-[#0F172A]">Confirmación final</div>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button type="button" className="inline-flex h-4 w-4 items-center justify-center text-slate-400 hover:text-slate-700">
+                            <HelpCircle className="h-3.5 w-3.5" />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="right">
+                          <div className="max-w-xs leading-5 text-[11px]">
+                            {requiresPayment
+                              ? "Tu inscripción queda creada y el equipo administrativo valida el pago."
+                              : "El curso se activa instantáneamente y podés empezar la cursada."}
+                          </div>
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
                     <p className="mt-1 text-xs leading-5 text-[#667085]">
                       {requiresPayment
-                        ? "Crearemos tu inscripción con el pago pendiente para que puedas continuar el seguimiento desde tu panel."
+                        ? "Crearemos tu inscripción para que puedas continuar el seguimiento desde tu panel."
                         : "Al confirmar, tu curso quedará disponible de inmediato."}
                     </p>
                   </div>
@@ -670,7 +1116,11 @@ export default function CourseCheckoutForm({ lang, job, variant = "modal", onClo
                         <Label htmlFor="acceptedSecurity-checkout" className="text-sm font-semibold text-[#0F172A]">
                           Confirmo la validez de la información
                         </Label>
-                        <p className="text-xs leading-5 text-[#667085]">Comprendo que el curso se activará luego de validar los datos y el pago.</p>
+                        <p className="text-xs leading-5 text-[#667085]">
+                          {requiresPayment
+                            ? "Comprendo que el curso se activará luego de validar el comprobante de pago."
+                            : "Comprendo que mis datos se validan para emitir el certificado."}
+                        </p>
                         {errors.acceptedSecurity ? <p className="text-sm text-destructive">{errors.acceptedSecurity.message}</p> : null}
                       </div>
                     </div>
@@ -683,32 +1133,76 @@ export default function CourseCheckoutForm({ lang, job, variant = "modal", onClo
 
         <div className="flex flex-col gap-4 border-t border-[#EEF2F7] bg-[#FCFDFE] px-5 py-4 md:flex-row md:items-center md:justify-between md:px-7">
           <div className="flex items-center gap-3 text-sm text-[#667085]">
-            <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#EEF4FF] text-[#2563EB]">
-              <ShieldCheck className="h-4 w-4" />
-            </span>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#EEF4FF] text-[#2563EB] cursor-help">
+                  <ShieldCheck className="h-4 w-4" />
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="top">
+                <div className="max-w-xs leading-5 text-[11px]">
+                  Tu progreso se guarda automáticamente en este navegador. Si cerrás esta ventana, tus datos estarán cuando vuelvas.
+                </div>
+              </TooltipContent>
+            </Tooltip>
             <span>{draftReady ? "Tu progreso se guarda temporalmente en este dispositivo." : "Preparando borrador temporal..."}</span>
           </div>
 
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={currentStep > 0 ? goBack : onClose || (() => {})}
-              className="h-11 rounded-xl border-[#D7DEEA] px-6 text-[#344054]"
-            >
-              {currentStep > 0 ? "Volver" : "Cerrar"}
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={currentStep > 0 ? goBack : onClose || (() => {})}
+                    className="h-11 rounded-xl border-[#D7DEEA] px-6 text-[#344054]"
+                  >
+                    {currentStep > 0 ? "Volver" : "Cerrar"}
+                  </Button>
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="top">
+                <div className="text-[11px]">
+                  {currentStep > 0 ? "Volver al paso anterior sin perder lo cargado." : "Cerrar este formulario. Tus datos se guardan como borrador."}
+                </div>
+              </TooltipContent>
+            </Tooltip>
 
             {currentStep < steps.length - 1 ? (
-              <Button type="button" onClick={goNext} className="h-11 rounded-xl bg-[#1B2B50] px-6 font-semibold text-white hover:bg-[#133778]">
-                Continuar
-                <ChevronRight className="ml-2 h-4 w-4" />
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span>
+                    <Button type="button" onClick={goNext} className="h-11 rounded-xl bg-[#1B2B50] px-6 font-semibold text-white hover:bg-[#133778]">
+                      Continuar
+                      <ChevronRight className="ml-2 h-4 w-4" />
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side="top">
+                  <div className="text-[11px]">
+                    Valida los campos actuales y avanza al siguiente paso.
+                  </div>
+                </TooltipContent>
+              </Tooltip>
             ) : (
-              <Button type="submit" className={`h-11 rounded-xl bg-[#1B2B50] px-6 font-semibold text-white hover:bg-[#133778] ${submitting ? "pointer-events-none" : ""}`}>
-                {submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                {submitting ? "Confirmando..." : "Confirmar inscripción"}
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span>
+                    <Button type="submit" className={`h-11 rounded-xl bg-[#1B2B50] px-6 font-semibold text-white hover:bg-[#133778] ${submitting ? "pointer-events-none" : ""}`}>
+                      {submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                      {submitting ? "Confirmando..." : "Confirmar inscripción"}
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side="top">
+                  <div className="max-w-xs text-[11px] leading-5">
+                    {requiresPayment
+                      ? "Crea tu inscripción y envía los datos para validación. Si adjuntaste comprobante, empieza la revisión."
+                      : "Activa tu curso inmediatamente y accedé al contenido."}
+                  </div>
+                </TooltipContent>
+              </Tooltip>
             )}
           </div>
         </div>

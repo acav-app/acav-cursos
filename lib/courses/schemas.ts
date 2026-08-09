@@ -72,6 +72,56 @@ const CourseModuleSchema = z.object({
   lessons: z.array(z.string().min(1)).default([]),
 });
 
+const CourseLessonTypeSchema = z.enum(["video", "text", "live", "quiz", "assignment", "download"]);
+const CourseQuestionTypeSchema = z.enum(["single_choice", "multiple_choice", "true_false", "short_answer"]);
+
+const CourseLessonResourceSchema = z.object({
+  id: z.string().min(1),
+  label: z.string().min(1),
+  url: z.string().url(),
+  kind: z.enum(["file", "link"]).optional(),
+  mimeType: z.string().optional(),
+  fileSize: z.number().min(0).optional(),
+});
+
+const CourseLessonSchema = z.object({
+  id: z.string().min(1),
+  title: z.string().min(1),
+  description: OptionalString.optional(),
+  lessonType: CourseLessonTypeSchema.default("video"),
+  durationMinutes: OptionalNumber.optional(),
+  videoUrl: OptionalUrl.optional(),
+  thumbnailUrl: OptionalUrl.optional(),
+  content: OptionalString.optional(),
+  isPreview: z.boolean().optional(),
+  resources: z.array(CourseLessonResourceSchema).default([]),
+});
+
+const CourseSectionSchema = z.object({
+  id: z.string().min(1),
+  title: z.string().min(1),
+  description: OptionalString.optional(),
+  lessons: z.array(CourseLessonSchema).default([]),
+});
+
+const CourseQuestionSchema = z.object({
+  id: z.string().min(1),
+  prompt: z.string().min(1),
+  type: CourseQuestionTypeSchema.default("single_choice"),
+  options: z.array(z.string().min(1)).default([]),
+  correctAnswers: z.array(z.string().min(1)).default([]),
+  explanation: OptionalString.optional(),
+});
+
+const CourseFinalEvaluationSchema = z.object({
+  enabled: z.boolean().default(false),
+  title: OptionalString.optional(),
+  description: OptionalString.optional(),
+  passingScore: OptionalNumber.optional(),
+  maxAttempts: OptionalNumber.optional(),
+  questions: z.array(CourseQuestionSchema).default([]),
+});
+
 export const PortalRoleSchema = z.enum(PORTAL_ROLES);
 export const UserAccountStatusSchema = z.enum(USER_ACCOUNT_STATUSES);
 export const InstitutionStatusSchema = z.enum(INSTITUTION_STATUSES);
@@ -169,10 +219,19 @@ export const CourseCreateSchema = z.object({
   customScheduleAvailability: OptionalString.optional(),
   shortDescription: z.string().max(180).optional(),
   description: z.string().min(1),
-  requirements: z.string().min(1),
+  requirements: OptionalString.optional(),
   learningObjectives: OptionalStringArray.optional(),
   targetAudience: OptionalStringArray.optional(),
   modules: z.array(CourseModuleSchema).default([]),
+  curriculum: z.array(CourseSectionSchema).default([]),
+  finalEvaluation: CourseFinalEvaluationSchema.default({
+    enabled: false,
+    title: undefined,
+    description: undefined,
+    passingScore: undefined,
+    maxAttempts: undefined,
+    questions: [],
+  }),
   duration: OptionalString.optional(),
   classes: z.number().int().min(0).optional(),
   benefits: OptionalString.optional(),
@@ -234,6 +293,11 @@ export type Course = z.infer<typeof CourseSchema>;
 export type CourseCreateInput = z.infer<typeof CourseCreateSchema>;
 export type CourseUpdateInput = z.infer<typeof CourseUpdateSchema>;
 export type CourseModuleInput = z.infer<typeof CourseModuleSchema>;
+export type CourseSectionInput = z.infer<typeof CourseSectionSchema>;
+export type CourseLessonInput = z.infer<typeof CourseLessonSchema>;
+export type CourseLessonResourceInput = z.infer<typeof CourseLessonResourceSchema>;
+export type CourseQuestionInput = z.infer<typeof CourseQuestionSchema>;
+export type CourseFinalEvaluationInput = z.infer<typeof CourseFinalEvaluationSchema>;
 
 const EnrollmentBaseSchema = z.object({
   userId: z.string().min(1).optional(),
@@ -248,14 +312,14 @@ const EnrollmentBaseSchema = z.object({
   companyName: z.string().min(1).optional(),
   amount: z.number().nonnegative().optional(),
   currency: z.string().min(1).optional(),
-  firstName: z.string().min(1),
-  lastName: z.string().min(1),
+  firstName: OptionalString.optional(),
+  lastName: OptionalString.optional(),
   studentName: OptionalString.optional(),
   candidateName: OptionalString.optional(),
   email: z.string().email(),
-  phone: z.string().min(1),
-  city: z.string().min(1),
-  province: z.string().min(1),
+  phone: OptionalString.optional(),
+  city: OptionalString.optional(),
+  province: OptionalString.optional(),
   cvUrl: OptionalUrl.optional(),
   linkedinUrl: OptionalUrl.optional(),
   portfolioUrl: OptionalUrl.optional(),
@@ -268,6 +332,43 @@ const EnrollmentBaseSchema = z.object({
   paymentAmount: OptionalNumber.optional(),
   paymentCurrency: OptionalString.optional(),
   progress: z.number().min(0).max(100).optional(),
+  lessonProgress: z
+    .array(
+      z.object({
+        lessonId: z.string().min(1),
+        completedAt: CourseIsoDateString.optional(),
+      })
+    )
+    .optional(),
+  activitySubmissions: z
+    .array(
+      z.object({
+        lessonId: z.string().min(1),
+        title: OptionalString.optional(),
+        note: OptionalString.optional(),
+        linkUrl: OptionalUrl.optional(),
+        status: z.enum(["pending", "submitted", "reviewed"]).optional(),
+        submittedAt: CourseIsoDateString.optional(),
+        reviewedAt: CourseIsoDateString.optional(),
+        feedback: OptionalString.optional(),
+      })
+    )
+    .optional(),
+  gradebook: z
+    .array(
+      z.object({
+        sourceType: z.enum(["lesson", "final_evaluation"]),
+        sourceId: z.string().min(1),
+        title: z.string().min(1),
+        score: OptionalNumber.optional(),
+        maxScore: OptionalNumber.optional(),
+        weight: z.number().min(0).max(1).optional(),
+        status: z.enum(["pending", "graded", "passed", "failed"]).optional(),
+        reviewedAt: CourseIsoDateString.optional(),
+        feedback: OptionalString.optional(),
+      })
+    )
+    .optional(),
   approvedAt: CourseIsoDateString.optional(),
   approvedBy: OptionalString.optional(),
   acceptedPrivacy: z.boolean().refine((value) => value === true, {
@@ -290,6 +391,44 @@ export const EnrollmentUpdateSchema = z.object({
   status: EnrollmentStatusSchema.optional(),
   paymentStatus: PaymentStatusSchema.optional(),
   message: OptionalString.optional(),
+  progress: z.number().min(0).max(100).optional(),
+  lessonProgress: z
+    .array(
+      z.object({
+        lessonId: z.string().min(1),
+        completedAt: CourseIsoDateString.optional(),
+      })
+    )
+    .optional(),
+  activitySubmissions: z
+    .array(
+      z.object({
+        lessonId: z.string().min(1),
+        title: OptionalString.optional(),
+        note: OptionalString.optional(),
+        linkUrl: OptionalUrl.optional(),
+        status: z.enum(["pending", "submitted", "reviewed"]).optional(),
+        submittedAt: CourseIsoDateString.optional(),
+        reviewedAt: CourseIsoDateString.optional(),
+        feedback: OptionalString.optional(),
+      })
+    )
+    .optional(),
+  gradebook: z
+    .array(
+      z.object({
+        sourceType: z.enum(["lesson", "final_evaluation"]),
+        sourceId: z.string().min(1),
+        title: z.string().min(1),
+        score: OptionalNumber.optional(),
+        maxScore: OptionalNumber.optional(),
+        weight: z.number().min(0).max(1).optional(),
+        status: z.enum(["pending", "graded", "passed", "failed"]).optional(),
+        reviewedAt: CourseIsoDateString.optional(),
+        feedback: OptionalString.optional(),
+      })
+    )
+    .optional(),
   reviewComment: OptionalString.optional(),
   reviewedBy: OptionalString.optional(),
   approvedBy: OptionalString.optional(),

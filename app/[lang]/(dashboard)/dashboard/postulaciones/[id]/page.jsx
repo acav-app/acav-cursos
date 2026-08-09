@@ -18,7 +18,7 @@ import {
 import { useAuth } from "@/provider/auth.provider";
 import { authedFetch } from "@/lib/auth/authed-fetch";
 import { useLocalizedPath } from "@/lib/utils";
-import { ENROLLMENT_STATUSES } from "@/lib/courses/constants";
+import { EMPLOYMENT_APPLICATION_STATUSES, ENROLLMENT_STATUSES } from "@/lib/courses/constants";
 import { DashboardDetailSkeleton } from "@/components/courses/dashboard/page-skeletons";
 
 function dateLabel(iso) {
@@ -172,7 +172,7 @@ export default function PostulacionDetailPage({ params: { id } }) {
                   <SelectValue placeholder="Seleccionar estado" />
                 </SelectTrigger>
                 <SelectContent>
-                  {ENROLLMENT_STATUSES.map((s) => (
+                  {EMPLOYMENT_APPLICATION_STATUSES.map((s) => (
                     <SelectItem key={s} value={s}>
                       {s}
                     </SelectItem>

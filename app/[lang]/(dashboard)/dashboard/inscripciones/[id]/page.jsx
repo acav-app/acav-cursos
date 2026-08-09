@@ -32,8 +32,9 @@ import { useAuth } from "@/provider/auth.provider";
 import { useCourseActor } from "@/components/courses/dashboard/use-course-actor";
 import { authedFetch } from "@/lib/auth/authed-fetch";
 import { useLocalizedPath } from "@/lib/utils";
-import { ENROLLMENT_STATUSES, PAYMENT_STATUSES } from "@/lib/courses/constants";
+import { EDUCATIONAL_ENROLLMENT_STATUSES, ENROLLMENT_STATUSES, PAYMENT_STATUSES } from "@/lib/courses/constants";
 import { DashboardDetailSkeleton } from "@/components/courses/dashboard/page-skeletons";
+import PaymentReceiptUploader from "@/components/courses/dashboard/payment-receipt-uploader";
 
 function dateLabel(iso) {
   const d = new Date(String(iso || ""));
@@ -209,6 +210,21 @@ export default function InscripcionDetailPage({ params: { id } }) {
   const paymentMethodLabel = titleCase(application?.paymentMethod || application?.payment?.method, "Transferencia");
   const paymentReferenceLabel = String(application?.paymentReference || application?.payment?.reference || "").trim() || "Sin referencia";
   const paymentReceiptUrl = String(application?.paymentReceiptUrl || application?.payment?.receiptUrl || "").trim();
+  const hasPaymentAmount =
+    application?.paymentAmount != null ||
+    application?.payment?.amount != null ||
+    application?.amount != null;
+  const hasPaymentMetadata = Boolean(
+    application?.paymentMethod ||
+      application?.payment?.method ||
+      application?.paymentReference ||
+      application?.payment?.reference ||
+      hasPaymentAmount ||
+      paymentReceiptUrl
+  );
+  const allowedStatuses = hasPaymentMetadata
+    ? EDUCATIONAL_ENROLLMENT_STATUSES
+    : ENROLLMENT_STATUSES;
   const studentNotice = useMemo(() => buildStudentNotice(status, paymentStatus), [paymentStatus, status]);
 
   const handleSave = async () => {
@@ -362,6 +378,24 @@ export default function InscripcionDetailPage({ params: { id } }) {
               </div>
             </Alert>
 
+            {status !== "active" ? (
+              <div className="mt-6">
+                <PaymentReceiptUploader
+                  enrollmentId={id}
+                  initialReceiptUrl={paymentReceiptUrl}
+                  initialReference={String(application?.paymentReference || application?.payment?.reference || "").trim()}
+                  enrollmentStatus={status}
+                  paymentStatus={paymentStatus}
+                  onUpdated={(updated) => {
+                    if (!updated) return;
+                    setApplication(updated);
+                    setStatus(updated.status || status);
+                    setPaymentStatus(updated.paymentStatus || updated.payment?.status || paymentStatus);
+                  }}
+                />
+              </div>
+            ) : null}
+
             <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
               <div className="grid gap-6">
                 <div className="rounded-[28px] border border-[#E5E7EB] bg-[#FAFAFA] p-6">
@@ -459,6 +493,11 @@ export default function InscripcionDetailPage({ params: { id } }) {
                   </div>
 
                   <div className="mt-5 grid gap-3">
+                    {String(status || "").trim().toLowerCase() === "active" ? (
+                      <Button asChild className="rounded-2xl bg-[#0F172A] text-white hover:bg-[#1E293B]">
+                        <Link href={buildLocalizedPath(`/dashboard/mis-cursos/${id}`)}>Entrar a la cursada</Link>
+                      </Button>
+                    ) : null}
                     <Button asChild className="rounded-2xl bg-[#0F172A] text-white hover:bg-[#1E293B]">
                       <Link href={buildLocalizedPath("/dashboard/inscripciones")}>Ver todas mis inscripciones</Link>
                     </Button>
@@ -531,7 +570,7 @@ export default function InscripcionDetailPage({ params: { id } }) {
                   <SelectValue placeholder="Seleccionar estado" />
                 </SelectTrigger>
                 <SelectContent>
-                  {ENROLLMENT_STATUSES.map((item) => (
+                  {allowedStatuses.map((item) => (
                     <SelectItem key={item} value={item}>
                       {item}
                     </SelectItem>

@@ -32,7 +32,31 @@ type NormalizedCourse = Record<string, any> & {
   learningObjectives?: any[];
   targetAudience?: any[];
   modules?: any[];
+  curriculum?: any[];
+  finalEvaluation?: Course["finalEvaluation"];
 };
+
+function normalizeFinalEvaluation(value: Record<string, any> | undefined): Course["finalEvaluation"] {
+  if (value && typeof value === "object") {
+    return {
+      enabled: Boolean(value.enabled),
+      title: value.title || "",
+      description: value.description || "",
+      passingScore: Number.isFinite(Number(value.passingScore)) ? Number(value.passingScore) : undefined,
+      maxAttempts: Number.isFinite(Number(value.maxAttempts)) ? Number(value.maxAttempts) : undefined,
+      questions: Array.isArray(value.questions) ? value.questions : [],
+    };
+  }
+
+  return {
+    enabled: false,
+    title: "",
+    description: "",
+    passingScore: undefined,
+    maxAttempts: undefined,
+    questions: [],
+  };
+}
 
 function normalizeCourse(course: Record<string, any>): NormalizedCourse {
   const institutionId = course?.institutionId || course?.companyId || "";
@@ -67,6 +91,8 @@ function normalizeCourse(course: Record<string, any>): NormalizedCourse {
     learningObjectives: Array.isArray(course?.learningObjectives) ? course.learningObjectives : [],
     targetAudience: Array.isArray(course?.targetAudience) ? course.targetAudience : [],
     modules: Array.isArray(course?.modules) ? course.modules : [],
+    curriculum: Array.isArray(course?.curriculum) ? course.curriculum : [],
+    finalEvaluation: normalizeFinalEvaluation(course?.finalEvaluation),
   }) as NormalizedCourse;
 }
 
@@ -131,6 +157,31 @@ export function toPublicCourse(course: Course): Course {
   const initialModality = resolveCourseModality(normalized.initialModality || normalized.workMode);
   const workMode = resolveCourseModality(normalized.workMode || normalized.initialModality);
   const modality = resolveCourseSalesModality(normalized.modality || normalized.initialModality || normalized.workMode);
+  const modules = Array.isArray(normalized.modules) ? normalized.modules : [];
+  const publicModules = modules.map((m) => {
+    const raw = m as Record<string, any>;
+    const rawLessons = Array.isArray(raw?.lessons)
+      ? raw.lessons
+      : Array.isArray(raw?.lessonIds)
+        ? raw.lessonIds
+        : [];
+    const safeLessons = rawLessons
+      .map((item: any) => {
+        if (typeof item === "string") return item.trim();
+        if (item && typeof item.id === "string") return String(item.id).trim();
+        return "";
+      })
+      .filter(Boolean);
+    return removeUndefined({
+      id: String(raw?.id || ""),
+      title: String(raw?.title || ""),
+      description: String(raw?.description || raw?.summary || ""),
+      lessons: safeLessons,
+      summary: String(raw?.summary || ""),
+      duration: String(raw?.duration || ""),
+      lessonsCount: Number(raw?.lessonsCount || safeLessons.length || 0) || undefined,
+    });
+  });
   return {
     id: String(normalized.id || ""),
     slug: String(normalized.slug || ""),
@@ -156,7 +207,9 @@ export function toPublicCourse(course: Course): Course {
     requirements: normalized.requirements || "",
     learningObjectives: Array.isArray(normalized.learningObjectives) ? normalized.learningObjectives : [],
     targetAudience: Array.isArray(normalized.targetAudience) ? normalized.targetAudience : [],
-    modules: Array.isArray(normalized.modules) ? normalized.modules : [],
+    modules: publicModules,
+    curriculum: [],
+    finalEvaluation: normalizeFinalEvaluation({ enabled: false }),
     duration: normalized.duration || "",
     classes: Number(normalized.classes || 0),
     benefits: normalized.benefits || "",
@@ -171,7 +224,7 @@ export function toPublicCourse(course: Course): Course {
     contactEmail: normalized.contactEmail || "",
     mustSendCvByEmail: Boolean(normalized.mustSendCvByEmail),
     emailSubject: normalized.emailSubject || "",
-    attachments: Array.isArray(normalized.attachments) ? normalized.attachments : [],
+    attachments: [],
     price: Number(normalized.price || 0),
     oldPrice: normalized.oldPrice === undefined ? undefined : Number(normalized.oldPrice || 0),
     freeCourse: Boolean(normalized.freeCourse),

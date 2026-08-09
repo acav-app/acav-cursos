@@ -243,6 +243,137 @@ export async function notifyStudentEnrollmentConfirmation(enrollment: any) {
   });
 }
 
+export async function notifyStudentPaymentApproved(enrollment: any) {
+  const settings = await getCourseSettings();
+  if (!settings.notifyStudentOnEnrollment) return { ok: true, skipped: true };
+  const to = normalizeEmail(enrollment?.email);
+  if (!to) return { ok: true, skipped: true };
+
+  const studentName =
+    [enrollment?.firstName, enrollment?.lastName].filter(Boolean).join(" ").trim() ||
+    enrollment?.studentName ||
+    "";
+
+  const subject = `Pago aprobado — Acceso habilitado: ${enrollment.courseTitle || enrollment.jobTitle}`;
+  const text = [
+    studentName ? `Hola ${studentName}.` : "Hola.",
+    "",
+    `Tu pago para el curso «${enrollment.courseTitle || enrollment.jobTitle}» fue aprobado y tu acceso ya está habilitado.`,
+    "",
+    "Podés ingresar a la cursada desde tu panel, sección Mis Cursos:",
+    `${String(process.env.NEXT_PUBLIC_SITE_URL || "")}/dashboard/mis-cursos/${enrollment.id}`,
+    "",
+    "Cualquier duda respondé a este correo.",
+  ].join("\n");
+
+  return sendCourseEmail({
+    type: "enrollment-payment-approved-student",
+    to,
+    subject,
+    text,
+    relatedEnrollmentId: enrollment.id,
+    relatedCourseId: enrollment.courseId || enrollment.jobId,
+  });
+}
+
+export async function notifyStudentPaymentRejected(
+  enrollment: any,
+  reviewComment = "",
+  mode: "resubmit" | "rejected" = "rejected"
+) {
+  const settings = await getCourseSettings();
+  if (!settings.notifyStudentOnEnrollment) return { ok: true, skipped: true };
+  const to = normalizeEmail(enrollment?.email);
+  if (!to) return { ok: true, skipped: true };
+
+  const studentName =
+    [enrollment?.firstName, enrollment?.lastName].filter(Boolean).join(" ").trim() ||
+    enrollment?.studentName ||
+    "";
+
+  const title = String(enrollment.courseTitle || enrollment.jobTitle || "").trim();
+
+  if (mode === "resubmit") {
+    const subject = `Tu comprobante necesita una actualización — ${title}`;
+    const text = [
+      studentName ? `Hola ${studentName}.` : "Hola.",
+      "",
+      `Revisamos tu comprobante para el curso «${title}» y necesitamos que subas una versión corregida o nueva.`,
+      reviewComment ? `Observaciones: ${reviewComment}` : "",
+      "",
+      "Ingresá a tu inscripción y adjuntá el nuevo archivo desde el panel:",
+      `${String(process.env.NEXT_PUBLIC_SITE_URL || "")}/dashboard/inscripciones/${enrollment.id}`,
+    ]
+      .filter(Boolean)
+      .join("\n");
+
+    return sendCourseEmail({
+      type: "enrollment-payment-resubmit-student",
+      to,
+      subject,
+      text,
+      relatedEnrollmentId: enrollment.id,
+      relatedCourseId: enrollment.courseId || enrollment.jobId,
+    });
+  }
+
+  const subject = `Inscripción rechazada — ${title}`;
+  const text = [
+    studentName ? `Hola ${studentName}.` : "Hola.",
+    "",
+    `Lamentablemente tu inscripción al curso «${title}» fue rechazada.`,
+    reviewComment ? `Motivo: ${reviewComment}` : "",
+    "",
+    "Si querés saber más detalles respondé a este correo.",
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  return sendCourseEmail({
+    type: "enrollment-rejected-student",
+    to,
+    subject,
+    text,
+    relatedEnrollmentId: enrollment.id,
+    relatedCourseId: enrollment.courseId || enrollment.jobId,
+  });
+}
+
+export async function notifyStudentReceiptRequested(enrollment: any, reviewComment = "") {
+  const settings = await getCourseSettings();
+  if (!settings.notifyStudentOnEnrollment) return { ok: true, skipped: true };
+  const to = normalizeEmail(enrollment?.email);
+  if (!to) return { ok: true, skipped: true };
+
+  const studentName =
+    [enrollment?.firstName, enrollment?.lastName].filter(Boolean).join(" ").trim() ||
+    enrollment?.studentName ||
+    "";
+  const title = String(enrollment.courseTitle || enrollment.jobTitle || "").trim();
+
+  const subject = `Adjuntá tu comprobante para avanzar — ${title}`;
+  const text = [
+    studentName ? `Hola ${studentName}.` : "Hola.",
+    "",
+    `Tu inscripción al curso «${title}» está pendiente de comprobante de pago.`,
+    reviewComment ? `Aclaración: ${reviewComment}` : "",
+    "",
+    "Ingresá a tu inscripción, adjuntá el comprobante y lo revisaremos a la brevedad:",
+    `${String(process.env.NEXT_PUBLIC_SITE_URL || "")}/dashboard/inscripciones/${enrollment.id}`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  return sendCourseEmail({
+    type: "enrollment-receipt-requested-student",
+    to,
+    subject,
+    text,
+    relatedEnrollmentId: enrollment.id,
+    relatedCourseId: enrollment.courseId || enrollment.jobId,
+  });
+}
+
 export async function sendInstitutionWelcomeEmail(input: {
   to: string;
   firstName?: string;

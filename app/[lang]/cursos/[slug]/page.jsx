@@ -2,8 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
   ArrowLeft,
-  ArrowRight,
   BadgeCheck,
+  BookOpen,
   Briefcase,
   Building2,
   CheckCircle2,
@@ -20,7 +20,6 @@ import FlyerPreviewLightbox from "@/components/courses/flyer-preview-lightbox";
 import CourseEnrollButton from "@/components/courses/course-enroll-button";
 import CourseDetailActions from "@/components/courses/course-detail-actions";
 import { MotionHoverCard, MotionReveal, MotionStagger, MotionStaggerItem } from "@/components/courses/public-motion";
-import PublicResourcesSection from "@/components/courses/public-resources-section";
 import PublicCoursesShell from "@/components/courses/public-shell";
 import { getPublicCourseBySlug, getPublicCourseSettings, getPublicCourses, getPublicInstitutions, mapCourseForCard } from "@/lib/courses/public";
 import { normalizePublicR2Url } from "@/lib/r2/normalize-public-url";
@@ -131,8 +130,15 @@ export default async function CursoDetailPage({ params: { lang, slug } }) {
   const oldPricingLabel = course?.oldPrice ? formatCurrency(course.oldPrice) : "";
   const learningObjectives = Array.isArray(course?.learningObjectives) ? course.learningObjectives.filter(Boolean) : [];
   const targetAudience = Array.isArray(course?.targetAudience) ? course.targetAudience.filter(Boolean) : [];
+  const curriculum = Array.isArray(course?.curriculum)
+    ? course.curriculum.filter((item) => item?.title || item?.description || item?.lessons?.length)
+    : [];
   const modules = Array.isArray(course?.modules) ? course.modules.filter((item) => item?.title || item?.description || item?.lessons?.length) : [];
-  const attachments = Array.isArray(course?.attachments) ? course.attachments.filter((item) => item?.url && item?.name) : [];
+  const totalSections = curriculum.length || modules.length;
+  const totalLessons = curriculum.length
+    ? curriculum.reduce((total, section) => total + (Array.isArray(section?.lessons) ? section.lessons.length : 0), 0)
+    : modules.reduce((total, section) => total + (Array.isArray(section?.lessons) ? section.lessons.filter(Boolean).length : 0), 0);
+  const hasFinalEvaluation = Boolean(course?.finalEvaluation?.enabled);
   const modalityLabel = course?.modalityLabel || course?.modality || course?.modalidad || "A definir";
   const durationLabel = course?.durationLabel || course?.duration || course?.contractType || "A definir";
   const academyLabel = course?.instructorName || course?.institutionName || course?.companyName || "ACAV Cursos";
@@ -222,32 +228,29 @@ export default async function CursoDetailPage({ params: { lang, slug } }) {
                 </MotionStaggerItem>
               ) : null}
 
-              {modules.length ? (
+              {(totalSections || totalLessons || hasFinalEvaluation) ? (
                 <MotionStaggerItem>
-                  <CardSection icon={FileText} title="Módulos del curso">
-                    <div className="grid gap-4">
-                      {modules.map((module, index) => (
-                        <div key={module.id || `${module.title}-${index}`} className="rounded-[20px] border border-slate-200 bg-[#FBFCFE] p-5">
-                          <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">
-                            Módulo {index + 1}
-                          </div>
-                          <h3 className="mt-2 text-[15px] font-semibold tracking-[-0.02em] text-[#1B2B50] md:text-base">{module.title}</h3>
-                          {module.description ? (
-                            <p className="mt-2 text-sm leading-7 text-slate-600">{module.description}</p>
-                          ) : null}
-                          {Array.isArray(module.lessons) && module.lessons.filter(Boolean).length ? (
-                            <ul className="mt-4 grid gap-2 text-sm leading-6 text-slate-600">
-                              {module.lessons.filter(Boolean).map((lesson) => (
-                                <li key={lesson} className="flex gap-3">
-                                  <span className="mt-[11px] h-1.5 w-1.5 shrink-0 rounded-full bg-[#2356B8]" />
-                                  <span>{lesson}</span>
-                                </li>
-                              ))}
-                            </ul>
-                          ) : null}
+                  <CardSection icon={BookOpen} title="Estructura general">
+                    <div className="grid gap-3 md:grid-cols-3">
+                      <div className="rounded-[20px] border border-slate-200 bg-[#FBFCFE] p-5">
+                        <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">Módulos</div>
+                        <div className="mt-3 text-[28px] font-semibold tracking-[-0.03em] text-[#1B2B50]">{totalSections || "-"}</div>
+                      </div>
+                      <div className="rounded-[20px] border border-slate-200 bg-[#FBFCFE] p-5">
+                        <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">Clases</div>
+                        <div className="mt-3 text-[28px] font-semibold tracking-[-0.03em] text-[#1B2B50]">{totalLessons || "-"}</div>
+                      </div>
+                      <div className="rounded-[20px] border border-slate-200 bg-[#FBFCFE] p-5">
+                        <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">Evaluación</div>
+                        <div className="mt-3 text-sm font-semibold text-[#1B2B50]">
+                          {hasFinalEvaluation ? "Incluye cierre evaluativo" : "Sin examen final obligatorio"}
                         </div>
-                      ))}
+                      </div>
                     </div>
+                    <p className="mt-4 text-sm leading-7 text-slate-600">
+                      El contenido completo de la cursada, las clases, materiales, actividades y evaluaciones se habilitan
+                      únicamente dentro del dashboard del alumno una vez que la inscripción queda activa.
+                    </p>
                   </CardSection>
                 </MotionStaggerItem>
               ) : null}
@@ -314,31 +317,9 @@ export default async function CursoDetailPage({ params: { lang, slug } }) {
                 </MotionStaggerItem>
               ) : null}
 
-
-              {attachments.length ? (
-                <MotionStaggerItem>
-                  <CardSection icon={FileText} title="Archivos adicionales">
-                    <div className="grid gap-3">
-                      {attachments.map((item) => (
-                        <a
-                          key={item.id}
-                          href={item.url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="flex items-center justify-between gap-4 rounded-[18px] border border-slate-200 bg-[#FBFCFE] px-4 py-3 text-sm font-medium text-[#1B2B50] transition hover:border-[#BFD1F2] hover:bg-white"
-                        >
-                          <span className="truncate">{item.name}</span>
-                          <ArrowRight className="h-4 w-4 shrink-0 text-slate-400" />
-                        </a>
-                      ))}
-                    </div>
-                  </CardSection>
-                </MotionStaggerItem>
-              ) : null}
-
               {flyerUrl ? (
                 <MotionStaggerItem>
-                  <CardSection icon={FileText} title="Programa o ficha del curso">
+                  <CardSection icon={FileText} title="Ficha informativa">
                     <div className="grid gap-4 lg:grid-cols-[minmax(0,1.1fr)_minmax(260px,.9fr)]">
                       <FlyerPreviewLightbox
                         src={flyerUrl}

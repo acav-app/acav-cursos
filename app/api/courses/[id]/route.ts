@@ -30,7 +30,8 @@ export async function GET(request: Request, ctx: { params: { id: string } }) {
     }
 
     if (!canManageCourse(actor, course)) {
-      return errorJson("forbidden", 403, request);
+      if (course.status !== "activa") return errorJson("course_not_found", 404, request);
+      return json({ course: toPublicCourse(course) }, { status: 200 }, request);
     }
 
     return json({ course }, { status: 200 }, request);

@@ -1,5 +1,22 @@
 import { getAdminDb } from "@/lib/firebase-admin";
 
+const APP_TIME_ZONE = "America/Argentina/Buenos_Aires";
+
+function formatDayInTimeZone(date: Date) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: APP_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+
+  const year = parts.find((part) => part.type === "year")?.value || "0000";
+  const month = parts.find((part) => part.type === "month")?.value || "01";
+  const day = parts.find((part) => part.type === "day")?.value || "01";
+
+  return `${year}-${month}-${day}`;
+}
+
 export function nowIso() {
   return new Date().toISOString();
 }
@@ -36,7 +53,7 @@ export function ensureDateIsTodayOrFuture(isoDate: string) {
   }
 
   const inputDay = rawValue.slice(0, 10);
-  const todayDay = new Date().toISOString().slice(0, 10);
+  const todayDay = formatDayInTimeZone(new Date());
 
   if (inputDay < todayDay) {
     const error = new Error("expires_at_must_be_future") as Error & { status?: number };

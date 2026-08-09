@@ -11,9 +11,15 @@ import type { CourseActor } from "@/lib/courses/server/auth";
 import { isStudentRole } from "@/lib/courses/roles";
 import { getCourseById } from "@/lib/courses/server/courses";
 import { getInstitutionById } from "@/lib/courses/server/institutions";
+import { getPortalUserProfileByUid } from "@/lib/courses/server/users";
 import { err } from "@/lib/courses/server/errors";
 import { createPayment, updatePayment } from "@/lib/courses/server/payments";
 import { nowIso, removeUndefined } from "@/lib/courses/server/utils";
+import {
+  notifyStudentPaymentApproved,
+  notifyStudentPaymentRejected,
+  notifyStudentReceiptRequested,
+} from "@/lib/courses/server/email";
 
 function normalizeEnrollment(enrollment: Record<string, any>) {
   const courseId = enrollment?.courseId || enrollment?.jobId || "";
@@ -99,8 +105,23 @@ export async function createEnrollment(input: unknown) {
   const course = await getCourseById(courseId);
   if (!course) throw err(404, "course_not_found");
   if (course.status !== "activa") throw err(400, "course_not_active");
-  const normalizedEmail = String(parsed.email || "").trim().toLowerCase();
-  const studentName = `${parsed.firstName} ${parsed.lastName}`.trim();
+
+  const profileSnapshot = parsed.userId ? await getPortalUserProfileByUid(parsed.userId).catch(() => null) : null;
+  const firstName = String(parsed.firstName || profileSnapshot?.firstName || "").trim();
+  const lastName = String(parsed.lastName || profileSnapshot?.lastName || "").trim();
+  const normalizedEmail = String(parsed.email || profileSnapshot?.email || "").trim().toLowerCase();
+  const phone = String(parsed.phone || profileSnapshot?.phone || "").trim();
+  const city = String(parsed.city || profileSnapshot?.city || "").trim();
+  const province = String(parsed.province || profileSnapshot?.province || "").trim();
+
+  if (!firstName) throw err(400, "firstName_required");
+  if (!lastName) throw err(400, "lastName_required");
+  if (!normalizedEmail) throw err(400, "email_required");
+  if (!phone) throw err(400, "phone_required");
+  if (!city) throw err(400, "city_required");
+  if (!province) throw err(400, "province_required");
+
+  const studentName = `${firstName} ${lastName}`.trim();
   const paymentAmount = Number(parsed.paymentAmount ?? parsed.amount ?? course.price ?? 0) || 0;
   const paymentCurrency = String(parsed.paymentCurrency || parsed.currency || "ARS").trim() || "ARS";
   const paymentMethod = String(parsed.paymentMethod || (paymentAmount > 0 ? "transferencia" : "manual")).trim();
@@ -145,13 +166,13 @@ export async function createEnrollment(input: unknown) {
       institutionName: course.companyName,
       institutionContactEmail: course.contactEmail,
       institutionNotificationEmail: institution?.email || course.contactEmail,
-      firstName: parsed.firstName,
-      lastName: parsed.lastName,
+      firstName,
+      lastName,
       studentName,
       email: normalizedEmail,
-      phone: parsed.phone,
-      city: parsed.city,
-      province: parsed.province,
+      phone,
+      city,
+      province,
       cvUrl: parsed.cvUrl || undefined,
       linkedinUrl: parsed.linkedinUrl,
       portfolioUrl: parsed.portfolioUrl,
@@ -231,9 +252,55 @@ export async function updateEnrollment(id: string, input: unknown) {
     }
   }
 
-  await ref.set(payload, { merge: true });
-  const updated = await ref.get();
-  return toEnrollment(updated);
+  const sanitizedPayload = normalizeEnrollment(removeUndefined(payload as Record<string, any>));
+
+  await ref.set(sanitizedPayload, { merge: true });
+  const updatedSnapshot = await ref.get();
+  const updated = toEnrollment(updatedSnapshot);
+
+  const currentStatus = String(current.status || "").trim().toLowerCase();
+  const currentPayStatus = String(current.paymentStatus || current.payment?.status || "").trim().toLowerCase();
+  const updatedStatus = String(updated.status || "").trim().toLowerCase();
+  const updatedPayStatus = String(updated.paymentStatus || updated.payment?.status || "").trim().toLowerCase();
+
+  try {
+    const becameApproved =
+      updatedStatus === "active" &&
+      updatedPayStatus === "approved" &&
+      !(currentStatus === "active" && currentPayStatus === "approved");
+
+    const paymentRejected =
+      updatedPayStatus === "rejected" &&
+      currentPayStatus !== "rejected" &&
+      updatedStatus !== "rejected" &&
+      (parsed.reviewComment || parsed.reviewedBy || nextStatus === "waiting_payment");
+
+    const enrollmentRejectedHard =
+      updatedStatus === "rejected" && currentStatus !== "rejected" && !paymentRejected;
+
+    if (becameApproved) {
+      await notifyStudentPaymentApproved(updated).catch(() => null);
+    } else if (paymentRejected || enrollmentRejectedHard) {
+      const reviewComment = parsed.reviewComment || updated?.payment?.reviewComment || "";
+      const mode = paymentRejected ? "resubmit" : "rejected";
+      await notifyStudentPaymentRejected(updated, reviewComment, mode).catch(() => null);
+    }
+
+    const adminRequestedReceipt =
+      parsed.reviewedBy &&
+      updatedPayStatus === "rejected" &&
+      (nextStatus === "waiting_payment" || currentStatus === "payment_under_review") &&
+      !becameApproved;
+
+    if (adminRequestedReceipt && !paymentRejected) {
+      const reviewComment = parsed.reviewComment || updated?.payment?.reviewComment || "";
+      await notifyStudentReceiptRequested(updated, reviewComment).catch(() => null);
+    }
+  } catch {
+    // Las notificaciones no deben romper el flujo principal.
+  }
+
+  return updated;
 }
 
 export async function bulkPreselectInstitutionEnrollments(input: {

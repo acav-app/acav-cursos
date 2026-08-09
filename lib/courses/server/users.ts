@@ -272,3 +272,20 @@ export async function updatePortalUserProfile(uid: string, input: unknown) {
   const updated = await ref.get();
   return PortalUserProfileSchema.parse({ uid: updated.id, ...(updated.data() as any), role: normalizePortalRole(updated.data()?.role) });
 }
+
+export async function getPortalUserProfileByUid(uid: string) {
+  const uidValue = String(uid || "").trim();
+  if (!uidValue) return null;
+  const db = getAdminDb();
+  const ref = db.collection(COURSE_COLLECTIONS.userProfiles).doc(uidValue);
+  const snap = await ref.get();
+  if (!snap.exists) return null;
+  const parsed = PortalUserProfileSchema.safeParse({
+    uid: snap.id,
+    ...(snap.data() as any),
+    role: normalizePortalRole(snap.data()?.role),
+    institutionId: (snap.data() as any)?.institutionId || (snap.data() as any)?.companyId,
+    institutionName: (snap.data() as any)?.institutionName || (snap.data() as any)?.companyName,
+  });
+  return parsed.success ? parsed.data : null;
+}
