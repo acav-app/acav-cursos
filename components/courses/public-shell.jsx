@@ -205,55 +205,61 @@ export default function PublicCoursesShell({
                 </DropdownMenuTrigger>
                 <DropdownMenuContent
                   align="end"
-                  className="w-64 rounded-2xl border border-slate-200 p-2"
+                  className="w-64 overflow-hidden rounded-2xl border border-slate-200 p-0"
                 >
-                  <DropdownMenuLabel className="px-3 py-2">
-                    <div className="text-sm font-semibold text-slate-900">
-                      {displayName}
+                  <div className="flex flex-col gap-0.5 px-2 pb-1 pt-2">
+                    <DropdownMenuItem asChild className="rounded-xl px-3 py-2">
+                      <ViewTransitionLink href={`/${lang}/dashboard`}>
+                        <User className="mr-2 h-4 w-4 shrink-0" />
+                        Mi panel
+                      </ViewTransitionLink>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild className="rounded-xl px-3 py-2">
+                      <ViewTransitionLink href={`/${lang}/dashboard/mis-cursos`}>
+                        <Bookmark className="mr-2 h-4 w-4 shrink-0" />
+                        Mis Cursos
+                      </ViewTransitionLink>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild className="rounded-xl px-3 py-2">
+                      <ViewTransitionLink href={`/${lang}/dashboard/certificados`}>
+                        <Award className="mr-2 h-4 w-4 shrink-0" />
+                        Mis Certificados
+                      </ViewTransitionLink>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild className="rounded-xl px-3 py-2">
+                      <ViewTransitionLink href={`/${lang}/dashboard/pagos`}>
+                        <CreditCard className="mr-2 h-4 w-4 shrink-0" />
+                        Historial de Pagos
+                      </ViewTransitionLink>
+                    </DropdownMenuItem>
+                  </div>
+                  <DropdownMenuSeparator className="mx-2" />
+                  <div className="px-2 pb-2 pt-1">
+                    <DropdownMenuItem
+                      className="rounded-xl px-3 py-2 text-red-600 focus:text-red-600"
+                      onSelect={handleLogout}
+                    >
+                      <LogIn className="mr-2 h-4 w-4 shrink-0" />
+                      Cerrar Sesión
+                    </DropdownMenuItem>
+                  </div>
+                  <div className="mt-auto border-t border-border/60 bg-slate-50/60 px-4 py-3">
+                    <div className="flex items-center gap-3">
+                      <Avatar className="h-9 w-9 shrink-0 border border-white/15">
+                        <AvatarFallback className="bg-[#DD4913] text-sm font-extrabold text-white">
+                          {avatarLetter}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-sm font-semibold text-slate-900">
+                          {displayName}
+                        </div>
+                        <div className="truncate text-xs text-slate-500">
+                          {actor?.email || user?.email || ""}
+                        </div>
+                      </div>
                     </div>
-                    <div className="mt-1 text-xs text-slate-500">
-                      {actor?.email || user?.email || ""}
-                    </div>
-                  </DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem asChild className="rounded-xl px-3 py-2">
-                    <ViewTransitionLink href={`/${lang}/dashboard`}>
-                      <User className="mr-2 h-4 w-4" />
-                      Mi panel
-                    </ViewTransitionLink>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild className="rounded-xl px-3 py-2">
-                    <ViewTransitionLink href={`/${lang}/dashboard/mis-cursos`}>
-                      <Bookmark className="mr-2 h-4 w-4" />
-                      Mis Cursos
-                    </ViewTransitionLink>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild className="rounded-xl px-3 py-2">
-                    <ViewTransitionLink href={`/${lang}/dashboard/inscripciones`}>
-                      <Briefcase className="mr-2 h-4 w-4" />
-                      Mis Inscripciones
-                    </ViewTransitionLink>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild className="rounded-xl px-3 py-2">
-                    <ViewTransitionLink href={`/${lang}/dashboard/certificados`}>
-                      <Award className="mr-2 h-4 w-4" />
-                      Mis Certificados
-                    </ViewTransitionLink>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild className="rounded-xl px-3 py-2">
-                    <ViewTransitionLink href={`/${lang}/dashboard/pagos`}>
-                      <CreditCard className="mr-2 h-4 w-4" />
-                      Historial de Pagos
-                    </ViewTransitionLink>
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    className="rounded-xl px-3 py-2 text-red-600 focus:text-red-600"
-                    onSelect={handleLogout}
-                  >
-                    <LogIn className="mr-2 h-4 w-4" />
-                    Cerrar Sesión
-                  </DropdownMenuItem>
+                  </div>
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : isDashboardRole ? (

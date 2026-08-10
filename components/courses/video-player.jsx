@@ -1,8 +1,8 @@
 "use client";
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import Plyr from "plyr";
 import "plyr/dist/plyr.css";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, PlayCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
@@ -21,6 +21,18 @@ const DEFAULT_CONTROLS = [
   "fullscreen",
 ];
 
+function normalizeKey(str) {
+  return String(str || "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .slice(0, 48);
+}
+
 export default function VideoPlayer({
   src,
   poster,
@@ -38,19 +50,41 @@ export default function VideoPlayer({
 }) {
   const containerRef = useRef(null);
   const playerRef = useRef(null);
-  const videoIdRef = useRef(`plyr_${Math.random().toString(36).slice(2, 10)}`);
+  const [posterVisible, setPosterVisible] = useState(Boolean(poster) && !autoPlay);
+
+  const instanceKey = useMemo(() => {
+    const srcHash = normalizeKey(src || "fallback-x");
+    const kindHash = normalizeKey(kind || "file");
+    return `plyr-${srcHash}-${kindHash}`;
+  }, [src, kind]);
 
   useEffect(() => {
     if (!containerRef.current || !src) return undefined;
     const mount = containerRef.current;
-    const vidId = videoIdRef.current;
+    const vidId = instanceKey;
 
     let videoEl = mount.querySelector(`video#${vidId}`);
     let iframeEl = mount.querySelector(`iframe#${vidId}`);
 
     const clean = () => {
       try {
-        if (playerRef.current?.destroy) playerRef.current.destroy();
+        if (playerRef.current?.destroy) {
+          try {
+            playerRef.current.pause?.();
+          } catch {
+            /* noop */
+          }
+          try {
+            const plyrContainer = playerRef.current.elements?.container;
+            if (plyrContainer && mount.contains(plyrContainer)) {
+              playerRef.current.destroy();
+            } else {
+              playerRef.current = null;
+            }
+          } catch {
+            /* destroy may race with React reconciler removing children */
+          }
+        }
       } catch {
         /* noop */
       }
@@ -65,6 +99,8 @@ export default function VideoPlayer({
           keyboard: { focused: true, global: true },
           tooltips: { controls: true, seek: true },
           ratio: "16:9",
+          vimeo: { byline: false, portrait: false, title: false },
+          youtube: { rel: 0, noCookie: true, showinfo: false },
         });
       } else if (videoEl) {
         playerRef.current = new Plyr(videoEl, {
@@ -98,21 +134,39 @@ export default function VideoPlayer({
           speed: { selected: 1, options: [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2] },
           captions: { active: subtitles?.some((s) => s.default), update: true, language: "auto" },
           storage: { enabled: true, key: "acav.cursos.plyr" },
-          vimeo: { byline: false, portrait: false, title: false },
-          youtube: { rel: 0, noCookie: true, showinfo: false },
         });
         if (onReady) {
           playerRef.current.on("ready", () => onReady?.(playerRef.current));
         }
-        if (onPlay) playerRef.current.on("play", () => onPlay?.());
+        playerRef.current.on("play", () => {
+          setPosterVisible(false);
+          onPlay?.();
+        });
         if (onEnded) playerRef.current.on("ended", () => onEnded?.());
+      }
+      if (autoPlay && kind === "embed") {
+        try {
+          setTimeout(() => playerRef.current?.play?.(), 350);
+        } catch {
+          /* autoplay may be blocked by browser */
+        }
       }
     } catch (err) {
       console.warn("Plyr init failed:", err);
     }
 
     return clean;
-  }, [src, kind, subtitles, qualities, autoPlay, onReady, onPlay, onEnded]);
+  }, [instanceKey, src, kind, subtitles, qualities, autoPlay, onReady, onPlay, onEnded]);
+
+  function handleStartFromPoster() {
+    if (!posterVisible) return;
+    setPosterVisible(false);
+    try {
+      playerRef.current?.play?.();
+    } catch {
+      /* noop */
+    }
+  }
 
   if (!src) {
     return (
@@ -142,20 +196,22 @@ export default function VideoPlayer({
 
   return (
     <div
+      key={instanceKey}
       ref={containerRef}
       className={cn(
-        "group relative overflow-hidden rounded-[24px] border border-slate-200 bg-black/5 shadow-[0_16px_50px_rgba(15,23,42,0.08)]",
+        "group relative overflow-hidden rounded-[24px] border border-slate-200 bg-black shadow-[0_16px_50px_rgba(15,23,42,0.08)]",
         className
       )}
     >
       {title ? (
-        <div className="absolute left-3 top-3 z-10 rounded-full bg-black/60 px-3 py-1 text-[11px] font-semibold text-white backdrop-blur">
+        <div className="absolute left-3 top-3 z-30 rounded-full bg-black/60 px-3 py-1 text-[11px] font-semibold text-white backdrop-blur">
           {title}
         </div>
       ) : null}
+
       {kind === "embed" ? (
         <iframe
-          id={videoIdRef.current}
+          id={instanceKey}
           src={src}
           title={title || "video"}
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
@@ -164,11 +220,10 @@ export default function VideoPlayer({
         />
       ) : (
         <video
-          id={videoIdRef.current}
+          id={instanceKey}
           playsInline
-          poster={poster || undefined}
           preload="metadata"
-          className="aspect-video h-full w-full"
+          className="aspect-video h-full w-full bg-black"
         >
           {sources.map((s, i) => (
             <source key={`${s.src}_${i}`} src={s.src} type={s.type} />
@@ -185,6 +240,30 @@ export default function VideoPlayer({
           ))}
         </video>
       )}
+
+      {poster && posterVisible ? (
+        <button
+          type="button"
+          onClick={handleStartFromPoster}
+          className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-4 text-center transition hover:backdrop-brightness-105 focus:outline-none focus:ring-4 focus:ring-white/40"
+          style={{
+            backgroundImage: `linear-gradient(180deg, rgba(15,23,42,0.15) 0%, rgba(15,23,42,0.35) 55%, rgba(15,23,42,0.65) 100%), url(${poster})`,
+            backgroundPosition: "center",
+            backgroundRepeat: "no-repeat",
+            backgroundSize: "cover",
+          }}
+          aria-label={title ? `Reproducir ${title}` : "Reproducir video"}
+        >
+          <span className="pointer-events-none inline-flex h-20 w-20 items-center justify-center rounded-full bg-white/95 text-[#6D4CFF] shadow-[0_18px_50px_rgba(15,23,42,0.35)] ring-4 ring-white/30 transition group-hover:scale-105">
+            <PlayCircle className="h-10 w-10" />
+          </span>
+          {title ? (
+            <span className="pointer-events-none rounded-full bg-black/55 px-4 py-1.5 text-sm font-semibold text-white backdrop-blur max-w-[85%] truncate">
+              {title}
+            </span>
+          ) : null}
+        </button>
+      ) : null}
     </div>
   );
 }

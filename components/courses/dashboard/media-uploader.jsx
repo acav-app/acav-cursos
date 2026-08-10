@@ -76,6 +76,8 @@ export default function MediaUploader({
   value = [],
   onChange,
   compact = false,
+  hideExistingItems = false,
+  helperText,
 }) {
   const [queue, setQueue] = useState([]);
   const queueRef = useRef([]);
@@ -163,7 +165,11 @@ export default function MediaUploader({
         const ts = new Date().toISOString().replace(/[:.]/g, "-");
         const extension = String(file.name || "").split(".").pop() || "bin";
         const key = `${folderPrefix}/${ts}_${id}.${extension}`;
-        const { url, etag } = await uploadToR2WithProgress(file, key, (pct) => setProgress(pct * 100));
+        const { url, etag } = await uploadToR2WithProgress(
+          file,
+          { folder: folderPrefix, key },
+          (p) => setProgress(typeof p === "number" ? p * 100 : p?.ratio != null ? p.ratio * 100 : (p?.percent ?? 0))
+        );
         if (!url) throw new Error("No se pudo generar la URL pública del recurso.");
         const uploadedAt = new Date().toISOString();
         const ready = {
@@ -236,14 +242,14 @@ export default function MediaUploader({
       <div
         {...getRootProps()}
         className={cn(
-          "relative cursor-pointer rounded-2xl border-2 border-dashed px-4 py-6 transition-all",
+          "relative cursor-pointer rounded-2xl border-2 border-dashed px-4 py-6 transition-all overflow-hidden",
           isDragActive
             ? "border-[#6C5CE7] bg-[#EEF4FF]"
             : "border-slate-200 bg-slate-50/60 hover:bg-slate-50",
           compact && "py-4"
         )}
       >
-        <input {...getInputProps()} />
+        <input {...getInputProps()} className="sr-only" />
         <div className="flex items-start gap-4">
           <span className="inline-flex h-11 w-11 flex-none items-center justify-center rounded-2xl bg-[#EEF4FF] text-[#2356B8]">
             {isDragActive ? <Upload className="h-5 w-5" /> : <IconMode className="h-5 w-5" />}
@@ -252,21 +258,24 @@ export default function MediaUploader({
             <div className="text-sm font-semibold text-[#1B2B50]">
               {isDragActive ? "Soltá los archivos acá" : "Arrastrá archivos o hacé clic para elegir"}
             </div>
-            <div className="mt-1 text-xs text-slate-500">
-              {mode === "video"
-                ? "MP4 · WebM · MOV · hasta 4 GB"
-                : mode === "document"
-                  ? "PDF · DOCX · JPG · PNG · WebP · hasta 200 MB"
-                  : "Videos, documentos e imágenes · formatos estándar"}
-            </div>
+            {helperText !== "" ? (
+              <div className="mt-1 text-xs text-slate-500">
+                {helperText ??
+                  (mode === "video"
+                    ? "MP4 · WebM · MOV · hasta 4 GB"
+                    : mode === "document"
+                      ? "PDF · DOCX · JPG · PNG · WebP · hasta 200 MB"
+                      : "Videos, documentos e imágenes · formatos estándar")}
+              </div>
+            ) : null}
           </div>
-          <Badge variant="soft" color="secondary" className="rounded-full">
+          <Badge variant="soft" color="secondary" className="rounded-full shrink-0">
             {(value?.length || 0) + (queue?.length || 0)}/{maxFiles}
           </Badge>
         </div>
       </div>
 
-      {(queue?.length || value?.length) ? (
+      {(queue?.length || (!hideExistingItems && value?.length)) ? (
         <div className="space-y-2">
           {queue.map((q) => (
             <div
@@ -320,66 +329,68 @@ export default function MediaUploader({
             </div>
           ))}
 
-          {(value || []).map((r) => (
-            <div
-              key={r.id}
-              className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2"
-            >
-              <span
-                className={cn(
-                  "inline-flex h-9 w-9 items-center justify-center rounded-lg",
-                  r.kind === "video"
-                    ? "bg-violet-100 text-violet-700"
-                    : r.kind === "image"
-                      ? "bg-emerald-100 text-emerald-700"
-                      : "bg-blue-100 text-blue-700"
-                )}
-              >
-                {r.kind === "video" ? (
-                  <FileVideo className="h-4 w-4" />
-                ) : r.kind === "image" ? (
-                  <ImageIcon className="h-4 w-4" />
-                ) : (
-                  <FileText className="h-4 w-4" />
-                )}
-              </span>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <span className="truncate text-sm font-medium text-[#1B2B50]">{r.label}</span>
-                  <Badge
-                    variant="soft"
-                    color={
-                      r.status === "ready"
-                        ? "success"
-                        : COURSE_RESOURCE_STATUSES.includes(r.status)
-                          ? "warning"
-                          : "secondary"
-                    }
-                    className="rounded-full"
-                  >
-                    {r.status === "ready" ? (
-                      <>
-                        <CheckCircle2 className="mr-1 h-3 w-3" /> Listo
-                      </>
-                    ) : (
-                      r.status
+          {!hideExistingItems
+            ? (value || []).map((r) => (
+                <div
+                  key={r.id}
+                  className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2"
+                >
+                  <span
+                    className={cn(
+                      "inline-flex h-9 w-9 items-center justify-center rounded-lg",
+                      r.kind === "video"
+                        ? "bg-violet-100 text-violet-700"
+                        : r.kind === "image"
+                          ? "bg-emerald-100 text-emerald-700"
+                          : "bg-blue-100 text-blue-700"
                     )}
-                  </Badge>
-                  <span className="text-xs text-slate-500">
-                    {r.fileSize ? `${(r.fileSize / 1024 / 1024).toFixed(2)} MB` : ""}
+                  >
+                    {r.kind === "video" ? (
+                      <FileVideo className="h-4 w-4" />
+                    ) : r.kind === "image" ? (
+                      <ImageIcon className="h-4 w-4" />
+                    ) : (
+                      <FileText className="h-4 w-4" />
+                    )}
                   </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="truncate text-sm font-medium text-[#1B2B50]">{r.label}</span>
+                      <Badge
+                        variant="soft"
+                        color={
+                          r.status === "ready"
+                            ? "success"
+                            : COURSE_RESOURCE_STATUSES.includes(r.status)
+                              ? "warning"
+                              : "secondary"
+                        }
+                        className="rounded-full"
+                      >
+                        {r.status === "ready" ? (
+                          <>
+                            <CheckCircle2 className="mr-1 h-3 w-3" /> Listo
+                          </>
+                        ) : (
+                          r.status
+                        )}
+                      </Badge>
+                      <span className="text-xs text-slate-500">
+                        {r.fileSize ? `${(r.fileSize / 1024 / 1024).toFixed(2)} MB` : ""}
+                      </span>
+                    </div>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={() => removeUploaded(r.id)}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
                 </div>
-              </div>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-sm"
-                onClick={() => removeUploaded(r.id)}
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
-          ))}
+              ))
+            : null}
         </div>
       ) : null}
     </div>

@@ -130,14 +130,6 @@ const LogInForm = () => {
             </div>
           </div>
         </div>
-        <div className="mt-4 text-3xl font-bold tracking-tight text-default-900">
-          {companyFlow ? "Registro confidencial para instituciones" : "Iniciá sesión o creá tu perfil"}
-        </div>
-        <p className="mt-2 text-sm leading-7 text-default-600">
-          {companyFlow
-            ? "Acceso al portal de instituciones"
-            : "Accedé al portal de cursos ACAV o registrate para inscribirte a las capacitaciones disponibles."}
-        </p>
       </div>
 
       {companyFlow ? (

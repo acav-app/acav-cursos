@@ -113,7 +113,7 @@ export const CourseEvaluationSchema = z.object({
   maxAttempts: OptionalNumber.optional(),
   questions: z.array(CourseQuestionSchema).default([]),
   requireAllResourcesReady: z.boolean().default(true),
-  locked: z.boolean().optional(),
+  locked: z.boolean().default(false),
 });
 
 const CourseVideoAssetSchema = z.object({
@@ -158,7 +158,7 @@ const CourseLessonResourceSchema = z.object({
   subKind: z.enum(["pdf", "docx", "doc", "jpg", "jpeg", "png", "webp", "zip", "rar", "other"]).optional(),
   mimeType: z.string().optional(),
   fileSize: z.number().min(0).optional(),
-  status: CourseResourceStatusSchema.default("pending"),
+  status: CourseResourceStatusSchema.default("ready"),
   checksum: z.string().optional(),
   storageKey: z.string().optional(),
   uploadedAt: CourseIsoDateString.optional(),

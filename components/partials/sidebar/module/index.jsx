@@ -8,7 +8,6 @@ import MenuItem from "./menu-item";
 import NestedMenus from "./nested-menus";
 import Image from "next/image";
 import Link from "next/link";
-import FooterMenu from "./footer-menu";
 import { SiteLogo } from "@/components/svg";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useMediaQuery } from "@/hooks/use-media-query";
@@ -16,6 +15,7 @@ import MenuOverlayPortal from "./MenuOverlayPortal";
 import { ChevronLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useCourseActor } from "@/components/courses/dashboard/use-course-actor";
+import SidebarProfileFooter from "../common/profile-footer";
 
 const ModuleSidebar = ({ trans }) => {
   const { actor } = useCourseActor();
@@ -164,7 +164,7 @@ const ModuleSidebar = ({ trans }) => {
             </Link>
           </div>
           {/* end logo */}
-          <ScrollArea className=" pt-6 grow ">
+          <ScrollArea className=" pt-6 grow h-[calc(100%-80px-120px)]">
             {iconMenus.map((item, i) => (
               <div
                 key={i}
@@ -181,7 +181,7 @@ const ModuleSidebar = ({ trans }) => {
               </div>
             ))}
           </ScrollArea>
-          <FooterMenu />
+          <SidebarProfileFooter compact />
         </div>
         {/* end small menu */}
 
@@ -219,7 +219,7 @@ const ModuleSidebar = ({ trans }) => {
               </Button>
             )}
           </h2>
-          <ScrollArea className="h-[calc(100%-40px)]  grow ">
+          <ScrollArea className="h-[calc(100%-40px-180px)]  grow ">
             <div className="px-4 " dir={isRtl ? "rtl" : "ltr"}>
               <ul>
                 {currentSubMenu?.map((childItem, j) => (
@@ -246,6 +246,7 @@ const ModuleSidebar = ({ trans }) => {
               </ul>
             </div>
           </ScrollArea>
+          <SidebarProfileFooter />
         </div>
         {/* end main panel */}
       </div>

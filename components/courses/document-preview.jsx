@@ -111,15 +111,6 @@ function CardShell({ resource, icon, children, compact, className, actions, foot
             {resource?.label || "Recurso"}
           </div>
           <div className="mt-0.5 flex items-center gap-2">
-            {resource?.status === "ready" ? (
-              <Badge variant="soft" color="success" className="rounded-full">
-                <CheckCircle2 className="mr-1 h-3 w-3" /> Listo
-              </Badge>
-            ) : (
-              <Badge variant="soft" color="warning" className="rounded-full">
-                {resource?.status || "pending"}
-              </Badge>
-            )}
             {typeof resource?.fileSize === "number" ? (
               <span className="text-xs text-slate-500">{formatBytes(resource.fileSize)}</span>
             ) : null}

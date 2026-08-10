@@ -11,6 +11,7 @@ import { readSavedCourses, writeSavedCourses } from "@/lib/courses/client/saved-
 import { useLocalizedPath } from "@/lib/utils";
 import { useAuth } from "@/provider/auth.provider";
 import { authedFetch } from "@/lib/auth/authed-fetch";
+import EnrollmentTrackingDialog from "@/components/courses/dashboard/enrollment-tracking-dialog";
 
 function dateLabel(value) {
   const date = new Date(String(value || ""));
@@ -45,6 +46,8 @@ export default function DashboardMisCursosPage() {
   const [savedCourses, setSavedCourses] = useState([]);
   const [enrollments, setEnrollments] = useState([]);
   const [loadingEnrollments, setLoadingEnrollments] = useState(true);
+  const [trackingOpen, setTrackingOpen] = useState(false);
+  const [selectedEnrollment, setSelectedEnrollment] = useState(null);
 
   useEffect(() => {
     const syncSaved = () => {
@@ -62,129 +65,99 @@ export default function DashboardMisCursosPage() {
   }, []);
 
   useEffect(() => {
-    let alive = true;
-
-    async function loadEnrollments() {
-      if (!user || actor?.role !== "alumno") {
-        if (alive) {
-          setEnrollments([]);
-          setLoadingEnrollments(false);
-        }
-        return;
-      }
-
+    let cancelled = false;
+    (async () => {
       try {
         setLoadingEnrollments(true);
-        const data = await authedFetch(user, "/api/enrollments", { method: "GET" });
-        if (!alive) return;
-        setEnrollments(Array.isArray(data?.enrollments) ? data.enrollments : []);
-      } catch (error) {
-        if (!alive) return;
-        toast.error(error?.message || "No pudimos cargar tus cursos.", { position: "top-right" });
+        const resp = await authedFetch(`/api/enrollments?studentId=${encodeURIComponent(user?.id || actor?.id || "")}`);
+        if (!resp) return;
+        if (!resp.ok) return;
+        const data = await resp.json();
+        if (cancelled) return;
+        const items = Array.isArray(data) ? data : Array.isArray(data?.data) ? data.data : [];
+        setEnrollments(items);
+      } catch (e) {
+        console.error("[mis-cursos] falló carga de inscripciones", e);
       } finally {
-        if (alive) setLoadingEnrollments(false);
+        if (!cancelled) setLoadingEnrollments(false);
       }
-    }
-
-    loadEnrollments();
+    })();
     return () => {
-      alive = false;
+      cancelled = true;
     };
-  }, [actor?.role, user]);
+  }, [user?.id, actor?.id]);
 
-  const summary = useMemo(() => {
-    const total = savedCourses.length;
-    const categories = new Set(savedCourses.map((item) => String(item?.subRubro || item?.categoryLabel || "").trim()).filter(Boolean)).size;
-    const modalities = new Set(savedCourses.map((item) => String(item?.modality || item?.modalityLabel || "").trim()).filter(Boolean)).size;
-    return { total, categories, modalities };
-  }, [savedCourses]);
-
-  const activeEnrollments = useMemo(
-    () => enrollments.filter((item) => String(item?.status || "").trim().toLowerCase() === "active"),
-    [enrollments]
-  );
-
-  const pendingEnrollments = useMemo(
-    () => enrollments.filter((item) => String(item?.status || "").trim().toLowerCase() !== "active"),
-    [enrollments]
-  );
-
-  const removeSavedCourse = (courseId) => {
-    const next = savedCourses.filter((item) => String(item?.id || "") !== String(courseId || ""));
+  const removeSaved = (courseId) => {
+    const next = readSavedCourses().filter((c) => String(c?.id) !== String(courseId));
     writeSavedCourses(next);
     setSavedCourses(next);
+    toast.success("Curso removido de guardados");
   };
 
-  if (actorLoading) {
-    return <DashboardPageShellSkeleton showHeaderAction={false} filterColumns={3} rowCount={4} />;
-  }
+  const activeEnrollments = useMemo(
+    () =>
+      enrollments.filter((e) =>
+        ["active", "aprobado", "aprobada", "confirmed", "pagado", "pagada", "paid", "inscrito", "inscripto"].includes(
+          String(e?.status || "").toLowerCase()
+        )
+      ),
+    [enrollments]
+  );
+  const pendingEnrollments = useMemo(
+    () =>
+      enrollments.filter((e) => {
+        const s = String(e?.status || "").toLowerCase();
+        return Boolean(s) && !activeEnrollments.includes(e);
+      }),
+    [enrollments, activeEnrollments]
+  );
 
-  if (loadingEnrollments && actor?.role === "alumno") {
-    return <DashboardPageShellSkeleton showHeaderAction={false} filterColumns={3} rowCount={4} />;
-  }
+  const openTrackingFor = (enrollment) => {
+    setSelectedEnrollment(enrollment);
+    setTrackingOpen(true);
+  };
+
+  if (actorLoading || loadingEnrollments) return <DashboardPageShellSkeleton />;
 
   if (actorError) {
     return (
-      <div className="mx-auto px-2 py-8">
-        <div className="rounded-3xl border border-border/60 bg-card p-8">
-          <h1 className="text-2xl font-semibold text-foreground">No se pudo cargar el perfil</h1>
-          <p className="mt-3 text-sm text-muted-foreground">{actorError}</p>
+      <div className="mx-auto max-w-5xl px-3 py-10 md:px-4">
+        <div className="rounded-[28px] border border-border/60 bg-card p-8">
+          <h1 className="text-2xl font-semibold text-foreground">No se pudo cargar tu perfil</h1>
+          <p className="mt-3 text-sm text-muted-foreground">{String(actorError || "Volvé a intentar en unos segundos.")}</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="mx-auto px-2 py-8">
-      <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
-        <div>
-          <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-primary">Mis cursos</div>
-          <h1 className="mt-3 text-[30px] font-semibold tracking-[-0.03em] text-foreground">
-            {actor?.role === "alumno" ? "Cursadas y accesos" : "Guardados para revisar"}
-          </h1>
-          <p className="mt-2 max-w-2xl text-sm leading-7 text-muted-foreground">
-            {actor?.role === "alumno"
-              ? "Accede a tus cursos activos, sigue las inscripciones pendientes y mantén aparte tu shortlist personal."
-              : "Una vista sobria para retomar cursos guardados, comparar opciones y volver a entrar al detalle sin ruido visual."}
-          </p>
-        </div>
-        <Button asChild variant="outline" className="rounded-2xl">
-          <Link href={buildLocalizedPath("/cursos")}>
-            Ver catálogo
-            <ExternalLink className="ml-2 h-4 w-4" />
-          </Link>
-        </Button>
-      </div>
-
-      <section className="mt-8 grid gap-4 md:grid-cols-3">
-        <div className="rounded-[24px] border border-border/60 bg-card p-5">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-            {actor?.role === "alumno" ? "Cursos activos" : "Guardados"}
+    <div className="mx-auto px-3 py-8 md:px-4">
+      {actor?.role === "alumno" ? (
+        <section className="rounded-[30px] border border-border/60 bg-card p-6 shadow-[0_20px_55px_rgba(15,23,42,0.05)] sm:p-8">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0 max-w-2xl">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                Panel alumno
+              </div>
+              <h1 className="mt-3 text-[30px] font-semibold tracking-[-0.03em] text-foreground">
+                Cursadas y accesos
+              </h1>
+              <p className="mt-2 max-w-2xl text-sm leading-7 text-muted-foreground">
+                Accede a tus cursos activos, sigue las inscripciones pendientes y mantén aparte tu shortlist personal.
+              </p>
+            </div>
+            <Button asChild variant="outline" className="rounded-2xl">
+              <Link href={buildLocalizedPath("/cursos")}>
+                <Bookmark className="mr-2 h-4 w-4" />
+                Explorar catálogo
+              </Link>
+            </Button>
           </div>
-          <div className="mt-3 text-3xl font-semibold tracking-[-0.03em] text-foreground">
-            {actor?.role === "alumno" ? activeEnrollments.length : summary.total}
-          </div>
-        </div>
-        <div className="rounded-[24px] border border-border/60 bg-card p-5">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-            {actor?.role === "alumno" ? "Pendientes" : "Categorías"}
-          </div>
-          <div className="mt-3 text-3xl font-semibold tracking-[-0.03em] text-foreground">
-            {actor?.role === "alumno" ? pendingEnrollments.length : summary.categories}
-          </div>
-        </div>
-        <div className="rounded-[24px] border border-border/60 bg-card p-5">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-            {actor?.role === "alumno" ? "Guardados" : "Modalidades"}
-          </div>
-          <div className="mt-3 text-3xl font-semibold tracking-[-0.03em] text-foreground">
-            {actor?.role === "alumno" ? summary.total : summary.modalities}
-          </div>
-        </div>
-      </section>
+        </section>
+      ) : null}
 
       {actor?.role === "alumno" ? (
-        <section className="mt-8 space-y-8">
+        <section className="mt-8 grid gap-8 lg:grid-cols-2">
           <div>
             <div className="mb-4 flex items-center gap-3">
               <PlayCircle className="h-4 w-4 text-primary" />
@@ -215,7 +188,10 @@ export default function DashboardMisCursosPage() {
                             <span>Pago {String(enrollment?.paymentStatus || "").replaceAll("_", " ") || "pendiente"}</span>
                           </div>
                           <div className="mt-4 h-2 max-w-md overflow-hidden rounded-full bg-muted">
-                            <div className="h-full rounded-full bg-[#1B2B50]" style={{ width: `${Math.max(0, Math.min(progress, 100))}%` }} />
+                            <div
+                              className="h-full rounded-full bg-[#1B2B50]"
+                              style={{ width: `${Math.max(0, Math.min(progress, 100))}%` }}
+                            />
                           </div>
                         </div>
 
@@ -226,8 +202,12 @@ export default function DashboardMisCursosPage() {
                               <ExternalLink className="ml-2 h-4 w-4" />
                             </Link>
                           </Button>
-                          <Button asChild variant="outline" className="rounded-2xl">
-                            <Link href={buildLocalizedPath(`/dashboard/inscripciones/${enrollment.id}`)}>Ver inscripción</Link>
+                          <Button
+                            variant="outline"
+                            className="rounded-2xl"
+                            onClick={() => openTrackingFor(enrollment)}
+                          >
+                            Ver seguimiento
                           </Button>
                         </div>
                       </div>
@@ -272,11 +252,12 @@ export default function DashboardMisCursosPage() {
                         </p>
                       </div>
 
-                      <Button asChild variant="outline" className="rounded-2xl">
-                        <Link href={buildLocalizedPath(`/dashboard/inscripciones/${enrollment.id}`)}>
-                          Ver seguimiento
-                          <ExternalLink className="ml-2 h-4 w-4" />
-                        </Link>
+                      <Button
+                        variant="outline"
+                        className="rounded-2xl"
+                        onClick={() => openTrackingFor(enrollment)}
+                      >
+                        Ver seguimiento
                       </Button>
                     </div>
                   </article>
@@ -323,31 +304,27 @@ export default function DashboardMisCursosPage() {
                       <h2 className="mt-4 text-xl font-semibold tracking-[-0.03em] text-foreground">{course?.title || "Curso"}</h2>
                       <p className="mt-2 text-sm text-muted-foreground">{course?.companyName || "ACAV Cursos"}</p>
                       <div className="mt-4 flex flex-wrap gap-2 text-xs text-muted-foreground">
-                        <span>{category}</span>
-                        <span>·</span>
-                        <span>{modality}</span>
-                        <span>·</span>
-                        <span>{level}</span>
-                        {duration ? (
-                          <>
-                            <span>·</span>
-                            <span>{duration}</span>
-                          </>
-                        ) : null}
+                        {category ? <span>{category}</span> : null}
+                        {category && (modality || level) ? <span>·</span> : null}
+                        {modality ? <span>{modality}</span> : null}
+                        {modality && level ? <span>·</span> : null}
+                        {level ? <span>{level}</span> : null}
+                        {(modality || level) && duration ? <span>·</span> : null}
+                        {duration ? <span>{duration}</span> : null}
                       </div>
                     </div>
-
-                    <div className="flex flex-wrap gap-3">
-                      {course?.slug ? (
-                        <Button asChild variant="outline" className="rounded-2xl">
-                          <Link href={buildLocalizedPath(`/cursos/${course.slug}`)}>Ver curso</Link>
-                        </Button>
-                      ) : null}
+                    <div className="flex flex-wrap items-center gap-3">
+                      <Button asChild className="rounded-2xl">
+                        <Link href={buildLocalizedPath(`/cursos/${course.slug || course.id}`)}>
+                          Ver curso
+                          <ExternalLink className="ml-2 h-4 w-4" />
+                        </Link>
+                      </Button>
                       <Button
-                        type="button"
-                        variant="ghost"
-                        className="rounded-2xl text-muted-foreground hover:text-foreground"
-                        onClick={() => removeSavedCourse(course.id)}
+                        variant="outline"
+                        size="sm"
+                        className="rounded-2xl border-slate-200 text-slate-600 hover:bg-rose-50 hover:text-rose-600"
+                        onClick={() => removeSaved(course.id)}
                       >
                         <Trash2 className="mr-2 h-4 w-4" />
                         Quitar
@@ -358,10 +335,32 @@ export default function DashboardMisCursosPage() {
               );
             })}
           </div>
+        ) : actor?.role !== "alumno" ? (
+          <EmptyState
+            buildLocalizedPath={buildLocalizedPath}
+            title="Todavía no guardaste cursos"
+            text="Marca cursos desde el catálogo y úsalos como shortlist personal. Aquí vas a tener una vista limpia para retomarlos cuando quieras."
+            cta="Explorar cursos"
+          />
         ) : (
-          <EmptyState buildLocalizedPath={buildLocalizedPath} />
+          <div className="rounded-[24px] border border-dashed border-border/70 bg-card p-6">
+            <div className="flex items-center gap-3 text-sm font-semibold text-foreground">
+              <Bookmark className="h-4 w-4 text-primary" />
+              Todavía no guardaste ningún curso.
+            </div>
+          </div>
         )}
       </section>
+
+      <EnrollmentTrackingDialog
+        open={trackingOpen}
+        onOpenChange={(next) => {
+          setTrackingOpen(next);
+          if (!next) setSelectedEnrollment(null);
+        }}
+        enrollment={selectedEnrollment}
+        course={selectedEnrollment}
+      />
     </div>
   );
 }

@@ -80,6 +80,7 @@ import {
   readinessTone,
   summarizeLessonResources,
 } from "@/lib/courses/resource-readiness";
+import { CourseEvaluationSchema } from "@/lib/courses/schemas";
 import {
   Dialog,
   DialogContent,
@@ -88,6 +89,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+
 
 const COURSE_DRAFT_STORAGE_KEY = "acav:courses:wizard-draft-v2";
 const APP_TIME_ZONE = "America/Argentina/Buenos_Aires";
@@ -188,11 +190,45 @@ const schema = z
                       id: z.string().min(1),
                       label: z.string().min(1, "El nombre del recurso es obligatorio"),
                       url: z.string().url("La URL del recurso no es válida"),
-                      kind: z.enum(["file", "link"]).optional(),
+                      kind: z.enum(["video", "document", "image", "archive", "link", "file"]).optional(),
                       mimeType: z.string().optional(),
                       fileSize: z.number().min(0).optional(),
                     })
                   ),
+                  videoAsset: z
+                    .object({
+                      url: z.string().url().optional().or(z.literal("")),
+                      storageKey: z.string().optional(),
+                      mimeType: z.string().optional(),
+                      fileSize: z.number().min(0).optional(),
+                      durationSeconds: z.number().min(0).optional(),
+                      status: z.enum(["pending", "uploading", "ready", "corrupt"]).optional(),
+                      checksum: z.string().optional(),
+                      uploadedAt: z.string().optional(),
+                      qualities: z
+                        .array(
+                          z.object({
+                            label: z.string().min(1),
+                            url: z.string().url(),
+                            width: z.number().int().min(0).optional(),
+                            height: z.number().int().min(0).optional(),
+                          })
+                        )
+                        .optional(),
+                      subtitles: z
+                        .array(
+                          z.object({
+                            src: z.string().url(),
+                            label: z.string().min(1),
+                            srclang: z.string().min(2),
+                            default: z.boolean().optional(),
+                          })
+                        )
+                        .optional(),
+                    })
+                    .optional()
+                    .nullable(),
+                  evaluation: CourseEvaluationSchema.optional(),
                 })
               )
               .min(1, "Cada sección debe tener al menos una clase"),
@@ -573,17 +609,46 @@ function createEntityId(prefix) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+function normalizeResourceKind(kind, hint = {}) {
+  const valid = ["video", "document", "image", "archive", "link"];
+  const raw = String(kind || "").trim().toLowerCase();
+  if (valid.includes(raw)) return raw;
+  if (raw === "file" || raw === "embed") {
+    const url = String(hint?.url || hint?.href || "").toLowerCase();
+    const mime = String(hint?.mimeType || hint?.type || "").toLowerCase();
+    const name = String(hint?.name || hint?.label || hint?.title || "").toLowerCase();
+    if (mime.startsWith("video/") || /\.(mp4|webm|mov|m4v)$/i.test(url) || /\.(mp4|webm|mov|m4v)$/i.test(name)) return "video";
+    if (mime.startsWith("image/") || /\.(jpe?g|png|webp|gif|svg)$/i.test(url) || /\.(jpe?g|png|webp)$/i.test(name)) return "image";
+    if (/\.(zip|rar|7z|tar|gz)$/i.test(url) || /\.(zip|rar|7z|tar|gz)$/i.test(name) || mime.includes("zip") || mime.includes("rar") || mime.includes("compressed") || mime.includes("archive")) return "archive";
+    return "document";
+  }
+  if (valid.length === 0) return undefined;
+  return undefined;
+}
+
 function sanitizeLessonResources(resources) {
   return (Array.isArray(resources) ? resources : [])
     .map((resource, index) => {
       const label = String(resource?.label || resource?.name || resource?.title || "").trim();
       const url = String(resource?.url || resource?.href || resource?.link || "").trim();
       if (!label && !url) return null;
-      const kindRaw = String(resource?.kind || "").trim();
-      const kind = kindRaw === "file" || kindRaw === "link" ? kindRaw : undefined;
+      const kind = normalizeResourceKind(resource?.kind, {
+        url,
+        mimeType: resource?.mimeType || resource?.type,
+        name: resource?.name || resource?.label || resource?.title,
+      });
       const mimeTypeRaw = String(resource?.mimeType || resource?.type || "").trim() || undefined;
       const fileSizeRaw = Number(resource?.fileSize || resource?.size);
       const fileSize = Number.isFinite(fileSizeRaw) && fileSizeRaw > 0 ? fileSizeRaw : undefined;
+      const statusRaw = String(resource?.status || "");
+      const hasExplicitStatus = ["pending", "uploading", "ready", "corrupt"].includes(statusRaw);
+      const status = hasExplicitStatus
+        ? (statusRaw === "pending" && url ? "ready" : statusRaw)
+        : url
+          ? "ready"
+          : undefined;
+      const subKindRaw = String(resource?.subKind || "").trim();
+      const subKind = subKindRaw ? subKindRaw : undefined;
       return {
         id: String(resource?.id || createEntityId(`resource-${index}`)),
         label,
@@ -591,9 +656,51 @@ function sanitizeLessonResources(resources) {
         ...(kind ? { kind } : {}),
         ...(mimeTypeRaw ? { mimeType: mimeTypeRaw } : {}),
         ...(fileSize ? { fileSize } : {}),
+        ...(status ? { status } : {}),
+        ...(subKind ? { subKind } : {}),
+        ...(resource?.checksum ? { checksum: String(resource.checksum) } : {}),
+        ...(resource?.storageKey ? { storageKey: String(resource.storageKey) } : {}),
+        ...(resource?.uploadedAt ? { uploadedAt: String(resource.uploadedAt) } : {}),
+        ...(resource?.previewUrl ? { previewUrl: String(resource.previewUrl) } : {}),
       };
     })
     .filter((resource) => resource?.label && resource?.url);
+}
+
+function sanitizeLessonEvaluationQuestions(questions) {
+  return (Array.isArray(questions) ? questions : [])
+    .map((question, index) => {
+      const type = String(question?.type || "single_choice").trim() || "single_choice";
+      const prompt = String(question?.prompt || question?.enunciado || "").trim();
+      const optionsRaw = Array.isArray(question?.options) ? question.options : [];
+      const options = optionsRaw.map((option) => String(option || "").trim());
+      if (options.length < 2) options.push("", "");
+      const nonEmptyOptions = options.filter((option) => Boolean(option));
+      const correctAnswersRaw =
+        question?.correctAnswer !== undefined && question?.correctAnswers === undefined
+          ? question.correctAnswer
+          : question?.correctAnswers;
+      const correctAnswers = sanitizeCorrectAnswers(correctAnswersRaw);
+      const hasCorrect = Array.isArray(correctAnswers) && correctAnswers.length > 0 && correctAnswers.some((c) => String(c || "").trim());
+      const points = Number(question?.points || 0);
+      const isEffectivelyConfigured =
+        Boolean(prompt) &&
+        (nonEmptyOptions.length >= 2 ||
+          type === "short_answer" ||
+          type === "true_false");
+      return {
+        id: String(question?.id || createEntityId(`q-${index}`)),
+        type,
+        prompt,
+        options,
+        correctAnswers,
+        hasCorrect: Boolean(hasCorrect),
+        isEffectivelyConfigured: Boolean(isEffectivelyConfigured),
+        explanation: question?.explanation ? String(question.explanation) : undefined,
+        points: Number.isFinite(points) && points > 0 ? points : undefined,
+      };
+    })
+    .filter((question) => question?.prompt || (Array.isArray(question?.options) && question.options.some((option) => option)));
 }
 
 function sanitizeCurriculum(curriculum) {
@@ -620,6 +727,7 @@ function sanitizeCurriculum(curriculum) {
               lessonType: "video",
               durationMinutes: undefined,
               videoUrl: undefined,
+              videoAsset: undefined,
               thumbnailUrl: undefined,
               content: undefined,
               isPreview: false,
@@ -630,11 +738,56 @@ function sanitizeCurriculum(curriculum) {
           const lessonDescription = String(lesson?.description || "").trim();
           const lessonType = String(lesson?.lessonType || lesson?.type || "video").trim() || "video";
           const durationMinutes = Number(lesson?.durationMinutes || 0);
-          const videoUrl = String(lesson?.videoUrl || lesson?.url || "").trim();
+          const videoAssetRaw = lesson?.videoAsset;
+          const hasVideoAssetShape = videoAssetRaw && typeof videoAssetRaw === "object" && (videoAssetRaw.url || videoAssetRaw.storageKey);
+          const videoAsset = hasVideoAssetShape
+            ? {
+                url: String(videoAssetRaw.url || "").trim() || undefined,
+                storageKey: videoAssetRaw.storageKey ? String(videoAssetRaw.storageKey) : undefined,
+                mimeType: videoAssetRaw.mimeType ? String(videoAssetRaw.mimeType) : undefined,
+                fileSize: Number.isFinite(Number(videoAssetRaw.fileSize)) ? Number(videoAssetRaw.fileSize) : undefined,
+                durationSeconds: Number.isFinite(Number(videoAssetRaw.durationSeconds)) ? Number(videoAssetRaw.durationSeconds) : undefined,
+                status: ["pending", "uploading", "ready", "corrupt"].includes(String(videoAssetRaw.status || "")) ? videoAssetRaw.status : undefined,
+                checksum: videoAssetRaw.checksum ? String(videoAssetRaw.checksum) : undefined,
+                uploadedAt: videoAssetRaw.uploadedAt ? String(videoAssetRaw.uploadedAt) : undefined,
+                qualities: Array.isArray(videoAssetRaw.qualities)
+                  ? videoAssetRaw.qualities.map((quality) => ({
+                      label: String(quality?.label || ""),
+                      url: String(quality?.url || ""),
+                      width: Number.isFinite(Number(quality?.width)) ? Number(quality?.width) : undefined,
+                      height: Number.isFinite(Number(quality?.height)) ? Number(quality?.height) : undefined,
+                    }))
+                  : undefined,
+                subtitles: Array.isArray(videoAssetRaw.subtitles)
+                  ? videoAssetRaw.subtitles.map((subtitle) => ({
+                      src: String(subtitle?.src || ""),
+                      label: String(subtitle?.label || ""),
+                      srclang: String(subtitle?.srclang || ""),
+                      default: typeof subtitle?.default === "boolean" ? subtitle.default : undefined,
+                    }))
+                  : undefined,
+              }
+            : undefined;
+          const videoUrlCandidate = String(lesson?.videoUrl || lesson?.url || "").trim();
+          const videoUrl = videoUrlCandidate || (videoAsset?.url ? String(videoAsset.url) : "");
           const thumbnailUrl = String(lesson?.thumbnailUrl || lesson?.thumbnail || "").trim();
           const content = String(lesson?.content || lesson?.body || "").trim();
           const resources = sanitizeLessonResources(lesson?.resources || lesson?.attachments);
-          if (!lessonTitle && !lessonDescription && !content && !videoUrl && resources.length === 0) return null;
+          const evaluationRaw = lesson?.evaluation;
+          const evaluation =
+            evaluationRaw && typeof evaluationRaw === "object" && (evaluationRaw.enabled || Array.isArray(evaluationRaw.questions))
+              ? {
+                  enabled: Boolean(evaluationRaw.enabled),
+                  title: evaluationRaw.title ? String(evaluationRaw.title) : undefined,
+                  description: evaluationRaw.description ? String(evaluationRaw.description) : undefined,
+                  passingScore: Number.isFinite(Number(evaluationRaw.passingScore)) ? Number(evaluationRaw.passingScore) : undefined,
+                  maxAttempts: Number.isFinite(Number(evaluationRaw.maxAttempts)) ? Number(evaluationRaw.maxAttempts) : undefined,
+                  durationMinutes: Number.isFinite(Number(evaluationRaw.durationMinutes)) ? Number(evaluationRaw.durationMinutes) : undefined,
+                  locked: typeof evaluationRaw.locked === "boolean" ? evaluationRaw.locked : undefined,
+                  questions: Array.isArray(evaluationRaw.questions) ? sanitizeLessonEvaluationQuestions(evaluationRaw.questions) : [],
+                }
+              : undefined;
+          if (!lessonTitle && !lessonDescription && !content && !videoUrl && resources.length === 0 && !evaluation) return null;
           return {
             id: String(lesson?.id || createEntityId(`lesson-${sectionIndex}-${lessonIndex}`)),
             title: lessonTitle,
@@ -642,10 +795,12 @@ function sanitizeCurriculum(curriculum) {
             lessonType,
             durationMinutes: Number.isFinite(durationMinutes) && durationMinutes > 0 ? durationMinutes : undefined,
             videoUrl: videoUrl || undefined,
+            videoAsset,
             thumbnailUrl: thumbnailUrl || undefined,
             content: content || undefined,
             isPreview: Boolean(lesson?.isPreview || lesson?.preview),
             resources,
+            ...(evaluation ? { evaluation } : {}),
           };
         })
         .filter((lesson) => lesson?.title);
@@ -669,6 +824,7 @@ function sanitizeQuestionOptions(options) {
 
 function sanitizeCorrectAnswers(value) {
   if (Array.isArray(value)) return sanitizeQuestionOptions(value);
+  if (!value) return [];
   return String(value || "")
     .split(",")
     .map((item) => item.trim())
@@ -801,6 +957,18 @@ function sanitizeAttachments(attachments) {
       const hasLegacy = legacyName && legacyUrl;
       const hasNewShape = ["ready", "uploading", "pending", "corrupt"].includes(String(attachment?.status || "")) || Boolean(attachment?.kind);
       if (!hasLegacy && !hasNewShape) return null;
+      const normalizedKind = normalizeResourceKind(attachment?.kind, {
+        url: attachment?.url || legacyUrl,
+        mimeType: attachment?.mimeType,
+        name: attachment?.name || attachment?.label || legacyName,
+      });
+      const normalizedStatusRaw = String(attachment?.status || "");
+      const attachmentHasUrl = Boolean(attachment?.url || legacyUrl);
+      let normalizedStatus;
+      if (["uploading", "ready", "corrupt"].includes(normalizedStatusRaw)) normalizedStatus = normalizedStatusRaw;
+      else if (normalizedStatusRaw === "pending" && attachmentHasUrl) normalizedStatus = "ready";
+      else if (!normalizedStatusRaw && attachmentHasUrl) normalizedStatus = "ready";
+      else normalizedStatus = normalizedStatusRaw || "pending";
       return {
         id,
         name: attachment?.name || legacyName || undefined,
@@ -808,9 +976,9 @@ function sanitizeAttachments(attachments) {
         url: attachment?.url || legacyUrl || "",
         fileSize: Number.isFinite(Number(attachment?.fileSize ?? attachment?.sizeBytes)) ? Number(attachment?.fileSize ?? attachment?.sizeBytes) : undefined,
         sizeBytes: Number.isFinite(Number(attachment?.sizeBytes ?? attachment?.fileSize)) ? Number(attachment?.sizeBytes ?? attachment?.fileSize) : undefined,
-        kind: attachment?.kind || "file",
+        kind: normalizedKind || "document",
         subKind: attachment?.subKind || undefined,
-        status: attachment?.status || "pending",
+        status: normalizedStatus,
         mimeType: attachment?.mimeType || undefined,
         storageKey: attachment?.storageKey || undefined,
         checksum: attachment?.checksum || undefined,
@@ -1169,6 +1337,14 @@ function LessonResourcesField({ resources, onChange }) {
     onChange(safeResources.filter((_, currentIndex) => currentIndex !== index));
   };
 
+  const updateResource = (index, patch) => {
+    onChange(
+      safeResources.map((r, currentIndex) =>
+        currentIndex === index && r ? { ...r, ...patch } : r
+      )
+    );
+  };
+
   const tone = readinessTone(summary);
   const toneMap = {
     success: "bg-emerald-50 text-emerald-700 border-emerald-100",
@@ -1189,7 +1365,7 @@ function LessonResourcesField({ resources, onChange }) {
           ) : null}
         </div>
         <p className="text-xs text-muted-foreground">
-          Subí PDFs, DOCX, imágenes o videos. Los recursos en estado «Listo» serán visibles para el alumno.
+          PDF, DOCX, imágenes, videos, links.
         </p>
       </div>
 
@@ -1197,37 +1373,76 @@ function LessonResourcesField({ resources, onChange }) {
         folderPrefix="courses/lessons/resources"
         value={safeResources}
         onChange={onChange}
+        hideExistingItems
+        helperText=""
       />
 
       {safeResources.length ? (
         <div className="grid gap-3">
           {safeResources.map((resource, index) => {
             const { icon: Icon, tone: iconTone } = resourceKindBadge(resource.kind);
-            const statusBadge = resourceStatusBadge(resource.status);
+            const resourceHasUrl = Boolean(resource.url);
+            const statusRaw = ["pending", "uploading", "ready", "corrupt"].includes(resource.status)
+              ? resource.status
+              : undefined;
+            const statusValue = statusRaw === "ready" || statusRaw === "uploading" || statusRaw === "corrupt"
+              ? statusRaw
+              : resourceHasUrl
+                ? "ready"
+                : (statusRaw || "pending");
+            const statusBadge = resourceStatusBadge(statusValue);
             const sizeLabel = resourceFormatSize(resource.fileSize);
+            const subKindOptions = ["Materiales del curso", "Material complementario", "Apunte", "Ejercicio", "Examen"];
             return (
               <div
                 key={resource.id || index}
-                className="grid items-center gap-3 rounded-2xl border border-border/60 bg-card px-4 py-3 md:grid-cols-[auto_minmax(0,1fr)_auto_auto]"
+                className="grid items-start gap-3 rounded-2xl border border-border/60 bg-card px-4 py-3 md:grid-cols-[auto_minmax(0,1fr)_auto]"
               >
                 <span className={`inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${iconTone}`}>
                   <Icon className="h-5 w-5" />
                 </span>
-                <div className="grid gap-1.5">
-                  <div className="flex items-center gap-2">
+                <div className="grid gap-2">
+                  <div className="flex flex-wrap items-center gap-1.5">
                     <span className="truncate text-sm font-medium text-foreground">
                       {resource.label || resource.name || "(Recurso sin nombre)"}
                     </span>
-                    {resource.subKind ? (
-                      <Badge variant="outline" className="h-5 px-2 text-[10px] uppercase tracking-wide">
-                        {resource.subKind}
-                      </Badge>
-                    ) : null}
-                    <Badge variant="outline" className={cn("h-5 px-2 text-[10px]", statusBadge.tone)}>
-                      {statusBadge.label}
-                    </Badge>
+                    <Select
+                      value={resource.subKind || "__none__"}
+                      onValueChange={(val) => updateResource(index, { subKind: val === "__none__" ? undefined : val })}
+                    >
+                      <SelectTrigger className="h-5 w-auto min-w-[120px] rounded-full border border-border/70 px-2 py-0 text-[10px] uppercase tracking-wide">
+                        <SelectValue placeholder="Tipo de material" />
+                      </SelectTrigger>
+                      <SelectContent align="start" className="text-[11px]">
+                        <SelectItem value="__none__">Sin tipo</SelectItem>
+                        {subKindOptions.map((opt) => (
+                          <SelectItem key={opt} value={opt}>
+                            {opt}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Select
+                      value={statusValue}
+                      onValueChange={(val) => updateResource(index, { status: val })}
+                    >
+                      <SelectTrigger
+                        className={cn(
+                          "h-5 w-auto min-w-[92px] rounded-full px-2 py-0 text-[10px] font-medium border",
+                          statusBadge.tone
+                        )}
+                      >
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent align="start" className="text-[11px]">
+                        <SelectItem value="pending">Pendiente</SelectItem>
+                        <SelectItem value="uploading">Subiendo…</SelectItem>
+                        <SelectItem value="ready">Listo</SelectItem>
+                        <SelectItem value="corrupt">Corrupto</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
-                  <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                  <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
                     {sizeLabel ? <span className="rounded-full bg-slate-100 px-2 py-0.5 font-medium">{sizeLabel}</span> : null}
                     {resource.mimeType ? <span className="truncate">{resource.mimeType}</span> : null}
                     {resource.checksum ? (
@@ -1246,36 +1461,31 @@ function LessonResourcesField({ resources, onChange }) {
                     ) : null}
                   </div>
                 </div>
-                <div className="flex items-center gap-2 justify-self-end">
+                <div className="flex items-start gap-2 justify-self-end">
                   {resource.url ? (
                     <Button
                       asChild
                       type="button"
                       variant="outline"
                       size="icon"
-                      className="shrink-0"
+                      className="shrink-0 h-8 w-8"
                       title="Abrir recurso"
                     >
                       <a href={resource.url} target="_blank" rel="noreferrer">
-                        <ExternalLink className="h-4 w-4" />
+                        <ExternalLink className="h-3.5 w-3.5" />
                       </a>
                     </Button>
                   ) : null}
-                  <FilePreview
-                    url={resource.url || ""}
-                    label={resource.label || resource.name || "Recurso"}
-                    kind={resource.kind || "file"}
-                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => removeResource(index)}
+                    className="shrink-0 self-start h-8 w-8"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
                 </div>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => removeResource(index)}
-                  className="shrink-0 self-start"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
               </div>
             );
           })}
@@ -1296,32 +1506,25 @@ function LessonEditorHeader({ selectedSection, selectedLesson, onRemove, disable
   };
 
   return (
-    <div className="grid gap-4 rounded-[22px] border border-border/60 bg-card p-4 md:grid-cols-[1fr_auto] md:items-start">
-      <div className="grid gap-1">
-        <div className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+    <div className="grid gap-4 rounded-[22px] border border-border/60 bg-card p-4 md:grid-cols-[1fr_auto] md:items-start min-w-0 overflow-hidden">
+      <div className="grid gap-0.5 min-w-0">
+        <div className="truncate text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
           {selectedSection?.title || "Sección"}
         </div>
-        <div className="text-lg font-semibold tracking-[-0.03em] text-foreground">
+        <div className="truncate text-lg font-semibold tracking-[-0.03em] text-foreground">
           {selectedLesson?.title || "Nueva clase"}
         </div>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Edita un solo elemento a la vez para mantener foco y velocidad.
-        </p>
       </div>
-      <div className="flex items-start justify-between gap-3 md:justify-end">
-        <div className="flex flex-wrap items-center gap-2">
+      <div className="flex items-start justify-between gap-3 md:justify-end min-w-0">
+        <div className="flex flex-wrap items-center gap-2 min-w-0">
           {summary.hasAny ? (
             <Badge variant="outline" className={cn(toneMap[tone])}>
               {readinessProgressText(summary)}
             </Badge>
-          ) : (
-            <Badge variant="outline" className={toneMap.secondary}>
-              Sin recursos cargados
-            </Badge>
-          )}
+          ) : null}
           {selectedLesson?.isPreview ? <Badge variant="outline">Clase abierta</Badge> : null}
         </div>
-        <Button type="button" variant="ghost" size="icon" onClick={onRemove} disabled={disabled}>
+        <Button type="button" variant="ghost" size="icon" onClick={onRemove} disabled={disabled} className="shrink-0">
           <Trash2 className="h-4 w-4" />
         </Button>
       </div>
@@ -1329,11 +1532,33 @@ function LessonEditorHeader({ selectedSection, selectedLesson, onRemove, disable
   );
 }
 
+function isEmbedUrl(url) {
+  const u = String(url || "").trim().toLowerCase();
+  if (!u) return false;
+  return u.includes("youtube.com") || u.includes("youtu.be") || u.includes("vimeo.com") || u.includes("dailymotion.com") || u.includes("loom.com") || u.includes("player.");
+}
+
+function isExternalVideoOnly(video) {
+  if (!video) return false;
+  if (typeof video === "object" && (video.storageKey || video.checksum)) return false;
+  const url = typeof video === "string" ? video : video?.url;
+  if (!url) return false;
+  if (video.mimeType && /^video\//i.test(String(video.mimeType || ""))) return false;
+  return isEmbedUrl(url);
+}
+
 function LessonVideoSection({ videoUrl, videoAsset, onVideoUrlChange, onVideoAssetChange }) {
   const hasAsset = videoAsset && typeof videoAsset === "object" && (videoAsset.url || videoAsset.storageKey);
   const hasUrl = Boolean(videoUrl);
-  const status = videoAsset?.status || (hasAsset ? "ready" : hasUrl ? "pending" : "pending");
-  const statusBadge = resourceStatusBadge(status);
+  const isExternalOnly = hasUrl && !hasAsset && isExternalVideoOnly({ url: String(videoUrl || ""), mimeType: undefined });
+  const metadataMime = hasAsset ? videoAsset.mimeType : undefined;
+  const metadataSize = hasAsset ? videoAsset.fileSize : undefined;
+  const metadataChecksum = hasAsset ? videoAsset.checksum : undefined;
+  const state = hasAsset
+    ? { tone: resourceStatusBadge(videoAsset.status || "ready").tone, label: "Asset subido" }
+    : hasUrl
+      ? { tone: resourceStatusBadge("pending").tone, label: "URL externa" }
+      : null;
 
   return (
     <div className="grid gap-4 rounded-[20px] border border-border/60 bg-background p-4">
@@ -1343,91 +1568,92 @@ function LessonVideoSection({ videoUrl, videoAsset, onVideoUrlChange, onVideoAss
             <FileVideo className="h-4 w-4 text-[#1B2B50]" />
             Video de la clase
           </Label>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Subí un MP4 / WebM / MOV para reproducirlo dentro de la plataforma, o mantené un enlace externo (YouTube/Vimeo) como alternativa.
-          </p>
+          <p className="mt-1 text-xs text-muted-foreground">MP4 / WebM / MOV / MKV · hasta 4 GB. YouTube/Vimeo permitidos como fallback.</p>
         </div>
-        <div className="flex items-center gap-2">
-          <Badge variant="outline" className={cn(statusBadge.tone)}>
-            Video: {statusBadge.label}
+        {state ? (
+          <Badge variant="outline" className={cn(state.tone)}>
+            {state.label}
           </Badge>
-        </div>
+        ) : null}
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <div className="grid gap-3">
-          <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-            Upload por input (prioridad alta)
-          </div>
-          <MediaUploader
-            mode="video"
-            multiple={false}
-            maxFiles={1}
-            folderPrefix="courses/lessons/videos"
-            value={hasAsset ? [videoAsset] : []}
-            onChange={(next) => {
-              const first = Array.isArray(next) ? next[0] : null;
-              if (!first) {
-                onVideoAssetChange(undefined);
-                return;
-              }
-              onVideoAssetChange({
-                url: first.url || videoAsset?.url || "",
-                storageKey: first.storageKey || videoAsset?.storageKey || undefined,
-                mimeType: first.mimeType || videoAsset?.mimeType || undefined,
-                fileSize: first.fileSize ?? videoAsset?.fileSize ?? undefined,
-                status: first.status || "pending",
-                checksum: first.checksum || videoAsset?.checksum || undefined,
-                uploadedAt: first.uploadedAt || videoAsset?.uploadedAt || new Date().toISOString(),
-              });
-            }}
-            compact
-          />
-          {hasAsset ? (
-            <div className="rounded-2xl border border-border/60 bg-card px-3 py-2.5">
-              <div className="flex items-center gap-2">
-                <FileVideo className="h-4 w-4 text-[#1B2B50]" />
-                <span className="text-sm font-medium text-foreground">
-                  {videoAsset?.url?.split("/").pop()?.split("?")[0] || "Video subido"}
-                </span>
-                {videoAsset?.mimeType ? (
-                  <Badge variant="outline" className="h-5 px-2 text-[10px] uppercase">
-                    {videoAsset.mimeType.includes("mp4") ? "MP4" : videoAsset.mimeType.includes("webm") ? "WebM" : videoAsset.mimeType.includes("quicktime") ? "MOV" : "Video"}
-                  </Badge>
-                ) : null}
-              </div>
-              <div className="mt-1.5 flex items-center gap-2 text-[11px] text-muted-foreground">
-                <span className="rounded-full bg-slate-100 px-2 py-0.5 font-medium">
-                  {resourceFormatSize(videoAsset?.fileSize)}
-                </span>
-                {videoAsset?.checksum ? (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5">
-                    <ShieldCheck className="h-3 w-3" /> SHA-256 {videoAsset.checksum.slice(0, 8)}…
-                  </span>
-                ) : null}
-                {videoAsset?.url ? (
-                  <Button asChild type="button" variant="ghost" size="sm" className="ml-auto h-7 px-2 text-[11px]">
-                    <a href={videoAsset.url} target="_blank" rel="noreferrer">
-                      Abrir archivo
-                    </a>
-                  </Button>
-                ) : null}
-              </div>
-            </div>
-          ) : null}
-        </div>
+      <MediaUploader
+        mode="video"
+        multiple={false}
+        maxFiles={1}
+        maxSizeBytes={COURSE_VIDEO_MAX_SIZE_BYTES}
+        acceptedFileTypes={COURSE_VIDEO_ALLOWED_TYPES}
+        folderPrefix="courses/lessons/videos"
+        value={hasAsset ? [videoAsset] : []}
+        onChange={(next) => {
+          const first = Array.isArray(next) ? next[0] : null;
+          if (!first) {
+            onVideoAssetChange(undefined);
+            return;
+          }
+          onVideoAssetChange({
+            url: first.url || videoAsset?.url || "",
+            storageKey: first.storageKey || videoAsset?.storageKey || undefined,
+            mimeType: first.mimeType || videoAsset?.mimeType || undefined,
+            fileSize: first.fileSize ?? videoAsset?.fileSize ?? undefined,
+            status: first.status || "pending",
+            checksum: first.checksum || videoAsset?.checksum || undefined,
+            uploadedAt: first.uploadedAt || videoAsset?.uploadedAt || new Date().toISOString(),
+          });
+        }}
+        compact
+      />
 
-        <div className="grid gap-3">
-          <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-            Enlace externo (fallback)
+      {hasAsset ? (
+        <div className="rounded-2xl border border-border/60 bg-card px-3 py-2.5">
+          <div className="flex flex-wrap items-center gap-2">
+            <FileVideo className="h-4 w-4 text-[#1B2B50]" />
+            <span className="text-sm font-medium text-foreground">
+              {videoAsset?.url?.split("/").pop()?.split("?")[0] || "Video subido"}
+            </span>
+            {metadataMime ? (
+              <Badge variant="outline" className="h-5 px-2 text-[10px] uppercase">
+                {metadataMime.includes("mp4")
+                  ? "MP4"
+                  : metadataMime.includes("webm")
+                    ? "WebM"
+                    : metadataMime.includes("quicktime")
+                      ? "MOV"
+                      : metadataMime.includes("matroska")
+                        ? "MKV"
+                        : "Video"}
+              </Badge>
+            ) : null}
           </div>
-          <LessonVideoUploader value={videoUrl || ""} onChange={onVideoUrlChange} />
-          {hasUrl && !hasAsset ? (
-            <div className="rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-[11px] leading-5 text-amber-800">
-              Estás usando un enlace externo. Recomendamos migrar a upload por input para garantizar compatibilidad cross-browser y control total del video.
-            </div>
-          ) : null}
+          <div className="mt-1.5 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+            {metadataSize ? (
+              <span className="rounded-full bg-slate-100 px-2 py-0.5 font-medium">
+                {resourceFormatSize(metadataSize)}
+              </span>
+            ) : null}
+            {metadataChecksum ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5">
+                <ShieldCheck className="h-3 w-3" /> SHA-256 {metadataChecksum.slice(0, 8)}…
+              </span>
+            ) : null}
+            {videoAsset?.url ? (
+              <Button asChild type="button" variant="ghost" size="sm" className="ml-auto h-7 px-2 text-[11px]">
+                <a href={videoAsset.url} target="_blank" rel="noreferrer">
+                  Abrir archivo
+                </a>
+              </Button>
+            ) : null}
+          </div>
         </div>
+      ) : null}
+
+      <div className="grid gap-3">
+        <LessonVideoUploader value={videoUrl || ""} onChange={onVideoUrlChange} compact />
+        {isExternalOnly ? (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-[11px] leading-5 text-amber-800">
+            Estás usando un enlace externo. Recomendamos subir el video aquí para garantizar compatibilidad cross-browser y control total del contenido.
+          </div>
+        ) : null}
       </div>
     </div>
   );
@@ -1485,28 +1711,81 @@ function PerClassEvaluationField({ value, onChange, resourcesSummary }) {
     questions.find((question) => String(question?.id || "") === String(selectedQuestionId || "")) || questions[0] || null;
   const selectedQuestionIndex = questions.findIndex((question) => String(question?.id || "") === String(selectedQuestion?.id || ""));
 
+  const totalQuestions = questions.length;
+  const configuredQuestions = questions.filter((q) => q?.isEffectivelyConfigured === true).length;
+  const withCorrect = questions.filter((q) => q?.hasCorrect === true).length;
+  const isFullyConfigured =
+    Boolean(evaluation.enabled) &&
+    totalQuestions > 0 &&
+    configuredQuestions === totalQuestions &&
+    withCorrect === totalQuestions;
+
+  let resourceState = null;
+  if (evaluation.enabled) {
+    if (!isFullyConfigured) {
+      const missingReasons = [];
+      if (totalQuestions === 0) missingReasons.push("sin preguntas");
+      else if (configuredQuestions < totalQuestions) missingReasons.push(`${totalQuestions - configuredQuestions} sin configurar`);
+      if (withCorrect < totalQuestions && totalQuestions > 0) missingReasons.push(`${totalQuestions - withCorrect} sin respuesta correcta`);
+      resourceState = {
+        tone: "bg-amber-50 text-amber-700 border-amber-100",
+        label: `Pendiente${missingReasons.length ? ` · ${missingReasons.join(", ")}` : ""}`,
+      };
+    } else if (!allResourcesReady) {
+      resourceState = { tone: "bg-amber-50 text-amber-700 border-amber-100", label: "Bloqueada · recursos pendientes" };
+    } else {
+      resourceState = { tone: "bg-emerald-50 text-emerald-700 border-emerald-100", label: "Habilitada" };
+    }
+  } else {
+    resourceState = { tone: "bg-slate-100 text-slate-600 border-slate-200", label: "Deshabilitada" };
+  }
+  const missingQuestionsList = totalQuestions > 0 ? questions
+    .map((q, i) => ({ q, i }))
+    .filter(({ q }) => !q?.isEffectivelyConfigured || !q?.hasCorrect)
+    .map(({ q, i }) => {
+      const label = (String(q?.prompt || "").trim().slice(0, 40)) || `Pregunta ${i + 1}`;
+      const parts = [];
+      if (!q?.isEffectivelyConfigured) parts.push("incompleta");
+      if (!q?.hasCorrect) parts.push("sin respuesta correcta");
+      return `${i + 1}. ${label} (${parts.join(" + ")})`;
+    }) : [];
+
   return (
     <div className="grid gap-4 rounded-[20px] border border-border/60 bg-background p-4">
-      <div className="grid gap-2 md:grid-cols-[1fr_auto] md:items-center">
+      <div className="grid gap-1 md:grid-cols-[1fr_auto] md:items-center">
         <div>
           <Label className="flex items-center gap-2 text-base">
             <Award className="h-4 w-4 text-purple-600" />
             Evaluación de la clase
           </Label>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Configurá preguntas específicas para esta clase. Se bloqueará automáticamente para el alumno hasta que todos los recursos estén «Listos».
-          </p>
+          <p className="mt-0.5 text-xs text-muted-foreground">Preguntas por clase. Requiere recursos listos.</p>
         </div>
         <div className="flex items-center gap-2">
-          <Badge variant="outline" className={allResourcesReady ? "bg-emerald-50 text-emerald-700 border-emerald-100" : "bg-amber-50 text-amber-700 border-amber-100"}>
-            {allResourcesReady ? "Recursos OK · evaluación habilitada" : "Recursos incompletos · evaluación bloqueada"}
-          </Badge>
+          {resourceState ? (
+            <Badge variant="outline" className={resourceState.tone}>{resourceState.label}</Badge>
+          ) : null}
           <Switch
             checked={Boolean(evaluation.enabled)}
             onCheckedChange={(checked) => updateField({ enabled: checked })}
           />
         </div>
       </div>
+
+      {evaluation.enabled && missingQuestionsList.length > 0 ? (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-[11px] leading-5 text-amber-800">
+          <div className="font-semibold uppercase tracking-wider text-amber-700">
+            Falta configurar para habilitar
+          </div>
+          <ul className="mt-1.5 list-disc space-y-0.5 pl-4 text-[11px]">
+            {missingQuestionsList.slice(0, 5).map((line, i) => (
+              <li key={i}>{line}</li>
+            ))}
+            {missingQuestionsList.length > 5 ? (
+              <li>…y {missingQuestionsList.length - 5} más</li>
+            ) : null}
+          </ul>
+        </div>
+      ) : null}
 
       <div className="grid gap-3 md:grid-cols-3">
         <div className="grid gap-2 rounded-2xl border border-border/60 bg-card px-3 py-3">
@@ -1545,52 +1824,54 @@ function PerClassEvaluationField({ value, onChange, resourcesSummary }) {
       </div>
 
       <div className="grid gap-3 md:grid-cols-2">
-        <div className="rounded-2xl border border-border/60 bg-card p-3">
-          <div className="mb-2 flex items-center justify-between gap-2">
-            <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-              Preguntas
+        <div className="sticky top-4 self-start z-20 w-full max-w-[360px] md:max-w-none">
+          <div className="rounded-2xl border border-border/60 bg-card p-3 min-w-0 overflow-hidden">
+            <div className="mb-2 flex items-center justify-between gap-2 min-w-0">
+              <div className="truncate text-xs font-medium uppercase tracking-wider text-muted-foreground min-w-0">
+                Preguntas
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={addQuestion}
+                disabled={!evaluation.enabled}
+                className="h-8 px-2.5 text-xs shrink-0"
+              >
+                <Plus className="mr-1.5 h-3.5 w-3.5" />
+                Pregunta
+              </Button>
             </div>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={addQuestion}
-              disabled={!evaluation.enabled}
-              className="h-8 px-2.5 text-xs"
-            >
-              <Plus className="mr-1.5 h-3.5 w-3.5" />
-              Pregunta
-            </Button>
+            {questions.length ? (
+              <div className="grid gap-1.5 min-w-0 max-h-[calc(100vh-230px)] overflow-auto pr-1">
+                {questions.map((question, index) => (
+                  <button
+                    key={question.id || index}
+                    type="button"
+                    onClick={() => setSelectedQuestionId(String(question.id || ""))}
+                    className={cn(
+                      "flex items-center justify-between gap-2 rounded-xl border px-3 py-2 text-left text-xs min-w-0",
+                      String(selectedQuestion?.id || "") === String(question.id || "")
+                        ? "border-purple-200 bg-purple-50 text-purple-900"
+                        : "border-border/60 bg-background hover:bg-slate-50"
+                    )}
+                    disabled={!evaluation.enabled}
+                  >
+                    <span className="truncate min-w-0">
+                      {index + 1}. {question.prompt || "(Pregunta sin redactar)"}
+                    </span>
+                    <Badge variant="outline" className="h-5 px-2 text-[10px] uppercase shrink-0">
+                      {question.type === "multiple_choice" ? "Multiple" : question.type === "boolean" ? "V/F" : "Simple"}
+                    </Badge>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-xl border border-dashed border-border/60 bg-background px-3 py-4 text-center text-xs text-muted-foreground">
+                Aún no hay preguntas para esta evaluación.
+              </div>
+            )}
           </div>
-          {questions.length ? (
-            <div className="grid gap-1.5">
-              {questions.map((question, index) => (
-                <button
-                  key={question.id || index}
-                  type="button"
-                  onClick={() => setSelectedQuestionId(String(question.id || ""))}
-                  className={cn(
-                    "flex items-center justify-between gap-2 rounded-xl border px-3 py-2 text-left text-xs",
-                    String(selectedQuestion?.id || "") === String(question.id || "")
-                      ? "border-purple-200 bg-purple-50 text-purple-900"
-                      : "border-border/60 bg-background hover:bg-slate-50"
-                  )}
-                  disabled={!evaluation.enabled}
-                >
-                  <span className="truncate">
-                    {index + 1}. {question.prompt || "(Pregunta sin redactar)"}
-                  </span>
-                  <Badge variant="outline" className="h-5 px-2 text-[10px] uppercase">
-                    {question.type === "multiple_choice" ? "Multiple" : question.type === "boolean" ? "V/F" : "Simple"}
-                  </Badge>
-                </button>
-              ))}
-            </div>
-          ) : (
-            <div className="rounded-xl border border-dashed border-border/60 bg-background px-3 py-4 text-center text-xs text-muted-foreground">
-              Aún no hay preguntas para esta evaluación.
-            </div>
-          )}
         </div>
 
         <div className="rounded-2xl border border-border/60 bg-card p-3">
@@ -1779,11 +2060,12 @@ function CoursePromoVideoSection({
 }) {
   const hasAsset = promoVideoAsset && typeof promoVideoAsset === "object" && (promoVideoAsset.url || promoVideoAsset.storageKey);
   const hasUrl = Boolean(promoVideo);
-  const legacyBadge = hasAsset
-    ? resourceStatusBadge(promoVideoAsset.status || "ready")
+  const onlyExternal = hasUrl && !hasAsset && isExternalVideoOnly({ url: String(promoVideo || ""), mimeType: undefined });
+  const state = hasAsset
+    ? { tone: resourceStatusBadge(promoVideoAsset.status || "ready").tone, label: hasAsset ? "Asset subido" : "Sin video" }
     : hasUrl
-      ? resourceStatusBadge("pending")
-      : resourceStatusBadge("pending");
+      ? { tone: resourceStatusBadge("pending").tone, label: "URL externa" }
+      : null;
 
   return (
     <div className="grid gap-4 rounded-[20px] border border-border/60 bg-background p-4">
@@ -1791,116 +2073,120 @@ function CoursePromoVideoSection({
         <div>
           <Label className="flex items-center gap-2 text-base">
             <FileVideo className="h-4 w-4 text-[#1B2B50]" />
-            Video principal / promocional
+            Video promocional
           </Label>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Subí un MP4 / WebM / MOV para reproducirlo dentro de la plataforma. El video principal se usa en la ficha pública y en el hero de la cursada.
-          </p>
+          <p className="mt-1 text-xs text-muted-foreground">MP4 / WebM / MOV / MKV · hasta 4 GB.</p>
         </div>
-        <div className="flex items-center gap-2">
-          <Badge variant="outline" className={cn(legacyBadge.tone)}>
-            {hasAsset ? "Asset subido" : hasUrl ? "URL externa" : "Sin video"}
+        {state ? (
+          <Badge variant="outline" className={cn(state.tone)}>
+            {state.label}
           </Badge>
-          <Badge variant="outline" className={cn(legacyBadge.tone)}>
-            Estado: {legacyBadge.label}
-          </Badge>
-        </div>
+        ) : null}
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <div className="grid gap-3">
-          <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-            Upload por input (prioridad alta)
-          </div>
-          <MediaUploader
-            mode="video"
-            multiple={false}
-            maxFiles={1}
-            folderPrefix="courses/promo-videos"
-            value={hasAsset ? [promoVideoAsset] : []}
-            onChange={(next) => {
-              const first = Array.isArray(next) ? next[0] : null;
-              if (!first) {
-                onVideoAssetChange(null);
-                return;
-              }
-              onVideoAssetChange({
-                url: first.url || promoVideoAsset?.url || "",
-                storageKey: first.storageKey || promoVideoAsset?.storageKey || undefined,
-                mimeType: first.mimeType || promoVideoAsset?.mimeType || undefined,
-                fileSize: first.fileSize ?? promoVideoAsset?.fileSize ?? undefined,
-                status: first.status || "pending",
-                checksum: first.checksum || promoVideoAsset?.checksum || undefined,
-                uploadedAt: first.uploadedAt || promoVideoAsset?.uploadedAt || new Date().toISOString(),
-                qualities: promoVideoAsset?.qualities || [],
-                subtitles: promoVideoAsset?.subtitles || [],
-              });
-            }}
-            compact
-          />
-          {hasAsset ? (
-            <div className="rounded-2xl border border-border/60 bg-card px-3 py-2.5">
-              <div className="flex items-center gap-2">
-                <FileVideo className="h-4 w-4 text-[#1B2B50]" />
-                <span className="text-sm font-medium text-foreground">
-                  {promoVideoAsset?.url?.split("/").pop()?.split("?")[0] || promoVideoFileName || "Video subido"}
-                </span>
-                {promoVideoAsset?.mimeType ? (
-                  <Badge variant="outline" className="h-5 px-2 text-[10px] uppercase">
-                    {promoVideoAsset.mimeType.includes("mp4") ? "MP4" : promoVideoAsset.mimeType.includes("webm") ? "WebM" : promoVideoAsset.mimeType.includes("quicktime") ? "MOV" : "Video"}
-                  </Badge>
-                ) : null}
-              </div>
-              <div className="mt-1.5 flex items-center gap-2 text-[11px] text-muted-foreground">
-                <span className="rounded-full bg-slate-100 px-2 py-0.5 font-medium">
-                  {resourceFormatSize(promoVideoAsset?.fileSize ?? promoVideoSizeBytes)}
-                </span>
-                {promoVideoAsset?.checksum ? (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5">
-                    <ShieldCheck className="h-3 w-3" /> SHA-256 {promoVideoAsset.checksum.slice(0, 8)}…
-                  </span>
-                ) : null}
-                {promoVideoAsset?.url ? (
-                  <Button asChild type="button" variant="ghost" size="sm" className="ml-auto h-7 px-2 text-[11px]">
-                    <a href={promoVideoAsset.url} target="_blank" rel="noreferrer">
-                      Abrir archivo
-                    </a>
-                  </Button>
-                ) : null}
-              </div>
-            </div>
-          ) : null}
-          <FieldError error={errors?.promoVideo} />
-        </div>
+      <MediaUploader
+        mode="video"
+        multiple={false}
+        maxFiles={1}
+        maxSizeBytes={COURSE_VIDEO_MAX_SIZE_BYTES}
+        acceptedFileTypes={COURSE_VIDEO_ALLOWED_TYPES}
+        folderPrefix="courses/promo-videos"
+        value={hasAsset ? [promoVideoAsset] : []}
+        onChange={(next) => {
+          const first = Array.isArray(next) ? next[0] : null;
+          if (!first) {
+            onVideoAssetChange(null);
+            return;
+          }
+          onVideoAssetChange({
+            url: first.url || promoVideoAsset?.url || "",
+            storageKey: first.storageKey || promoVideoAsset?.storageKey || undefined,
+            mimeType: first.mimeType || promoVideoAsset?.mimeType || undefined,
+            fileSize: first.fileSize ?? promoVideoAsset?.fileSize ?? undefined,
+            status: first.status || "pending",
+            checksum: first.checksum || promoVideoAsset?.checksum || undefined,
+            uploadedAt: first.uploadedAt || promoVideoAsset?.uploadedAt || new Date().toISOString(),
+            qualities: promoVideoAsset?.qualities || [],
+            subtitles: promoVideoAsset?.subtitles || [],
+          });
+        }}
+        compact
+      />
 
-        <div className="grid gap-3">
-          <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-            Upload legacy single-file (fallback)
+      {hasAsset ? (
+        <div className="rounded-2xl border border-border/60 bg-card px-3 py-2.5">
+          <div className="flex flex-wrap items-center gap-2">
+            <FileVideo className="h-4 w-4 text-[#1B2B50]" />
+            <span className="text-sm font-medium text-foreground">
+              {promoVideoAsset?.url?.split("/").pop()?.split("?")[0] || promoVideoFileName || "Video subido"}
+            </span>
+            {promoVideoAsset?.mimeType ? (
+              <Badge variant="outline" className="h-5 px-2 text-[10px] uppercase">
+                {promoVideoAsset.mimeType.includes("mp4")
+                  ? "MP4"
+                  : promoVideoAsset.mimeType.includes("webm")
+                    ? "WebM"
+                    : promoVideoAsset.mimeType.includes("quicktime")
+                      ? "MOV"
+                      : promoVideoAsset.mimeType.includes("matroska")
+                        ? "MKV"
+                        : "Video"}
+              </Badge>
+            ) : null}
           </div>
-          <div className="rounded-[20px] border border-border/60 bg-background p-4">
+          <div className="mt-1.5 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+            <span className="rounded-full bg-slate-100 px-2 py-0.5 font-medium">
+              {resourceFormatSize(promoVideoAsset?.fileSize ?? promoVideoSizeBytes)}
+            </span>
+            {promoVideoAsset?.checksum ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5">
+                <ShieldCheck className="h-3 w-3" /> SHA-256 {promoVideoAsset.checksum.slice(0, 8)}…
+              </span>
+            ) : null}
+            {promoVideoAsset?.url ? (
+              <Button asChild type="button" variant="ghost" size="sm" className="ml-auto h-7 px-2 text-[11px]">
+                <a href={promoVideoAsset.url} target="_blank" rel="noreferrer">
+                  Abrir archivo
+                </a>
+              </Button>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+
+      <div className="grid gap-3">
+        <div className="rounded-[20px] border border-border/60 bg-background p-4">
+          <div className="flex items-center justify-between gap-3">
+            <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              Upload legacy (solo fallback)
+            </div>
+            <div className="text-[11px] text-muted-foreground">
+              {Math.round(COURSE_VIDEO_MAX_SIZE_BYTES / (1024 * 1024 * 1024))} GB máximo
+            </div>
+          </div>
+          <div className="mt-3 grid gap-3">
             <Input
               type="file"
               accept={COURSE_VIDEO_ALLOWED_TYPES.join(",")}
               onChange={(e) => onVideoFileUpload(e.target.files?.[0])}
               disabled={busy}
             />
-            <div className="mt-3 flex items-start gap-2 text-sm text-muted-foreground">
-              <Film className="mt-0.5 h-4 w-4 shrink-0" />
-              <span>Usa MP4, WebM o MOV. Máximo {Math.round(COURSE_VIDEO_MAX_SIZE_BYTES / (1024 * 1024))}MB.</span>
-            </div>
-            {hasUrl && !hasAsset ? (
-              <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-[11px] leading-5 text-amber-800">
-                Estás usando un video por upload legacy. Recomendamos migrar al uploader izquierdo para validación SHA-256, calidad ajustable y subtítulos.
+            {onlyExternal ? (
+              <div className="rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-[11px] leading-5 text-amber-800">
+                Estás usando un enlace externo. Recomendamos subir el video aquí para compatibilidad cross-browser y control total del contenido.
               </div>
             ) : null}
             {hasUrl && !hasAsset ? (
-              <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
-                <span className="rounded-full border border-border/60 bg-card px-3 py-1">{promoVideoFileName || "Video cargado"}</span>
+              <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+                <span className="rounded-full border border-border/60 bg-card px-3 py-1">
+                  {promoVideoFileName || "Video cargado"}
+                </span>
                 <span className="rounded-full border border-border/60 bg-card px-3 py-1">{formatBytes(promoVideoSizeBytes)}</span>
               </div>
             ) : null}
           </div>
         </div>
+        <FieldError error={errors?.promoVideo} />
       </div>
     </div>
   );
@@ -1921,6 +2207,12 @@ function CourseAttachmentsField({ attachments, onChange, error }) {
     onChange(safeAttachments.filter((_, i) => i !== index));
   };
 
+  const updateAttachment = (index, patch) => {
+    onChange(
+      safeAttachments.map((a, i) => (i === index && a ? { ...a, ...patch } : a))
+    );
+  };
+
   return (
     <div className="grid gap-4 rounded-[20px] border border-border/60 bg-background p-4">
       <div className="grid gap-2 md:grid-cols-[1fr_auto] md:items-center">
@@ -1933,7 +2225,7 @@ function CourseAttachmentsField({ attachments, onChange, error }) {
           ) : null}
         </div>
         <p className="text-xs text-muted-foreground">
-          Subida masiva con drag & drop. PDF (PDF.js), DOCX (Mammoth), imágenes, ZIP, videos — todos se renderizan en la ficha del alumno sin descarga previa.
+          Drag & drop. PDF, DOCX, imágenes, ZIP, videos.
         </p>
       </div>
 
@@ -1941,38 +2233,77 @@ function CourseAttachmentsField({ attachments, onChange, error }) {
         folderPrefix="courses/attachments"
         value={safeAttachments}
         onChange={onChange}
+        hideExistingItems
+        helperText=""
       />
 
       {safeAttachments.length ? (
         <div className="grid gap-3">
           {safeAttachments.map((attachment, index) => {
             const { icon: Icon, tone: iconTone } = resourceKindBadge(attachment.kind);
-            const statusBadge = resourceStatusBadge(attachment.status);
+            const attachmentHasUrl = Boolean(attachment.url);
+            const attachStatusRaw = ["pending", "uploading", "ready", "corrupt"].includes(attachment.status)
+              ? attachment.status
+              : undefined;
+            const statusValue = attachStatusRaw === "ready" || attachStatusRaw === "uploading" || attachStatusRaw === "corrupt"
+              ? attachStatusRaw
+              : attachmentHasUrl
+                ? "ready"
+                : (attachStatusRaw || "pending");
+            const statusBadge = resourceStatusBadge(statusValue);
             const sizeLabel = resourceFormatSize(attachment.fileSize ?? attachment.sizeBytes);
             const url = attachment.url || "";
+            const subKindOptions = ["Materiales del curso", "Material complementario", "Apunte", "Ejercicio", "Examen"];
             return (
               <div
                 key={attachment.id || index}
-                className="grid items-center gap-3 rounded-2xl border border-border/60 bg-card px-4 py-3 md:grid-cols-[auto_minmax(0,1fr)_auto_auto]"
+                className="grid items-start gap-3 rounded-2xl border border-border/60 bg-card px-4 py-3 md:grid-cols-[auto_minmax(0,1fr)_auto]"
               >
                 <span className={`inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${iconTone}`}>
                   <Icon className="h-5 w-5" />
                 </span>
-                <div className="grid gap-1.5">
-                  <div className="flex items-center gap-2">
+                <div className="grid gap-2">
+                  <div className="flex flex-wrap items-center gap-1.5">
                     <span className="truncate text-sm font-medium text-foreground">
                       {attachment.label || attachment.name || "(Archivo sin nombre)"}
                     </span>
-                    {attachment.subKind ? (
-                      <Badge variant="outline" className="h-5 px-2 text-[10px] uppercase tracking-wide">
-                        {attachment.subKind}
-                      </Badge>
-                    ) : null}
-                    <Badge variant="outline" className={cn("h-5 px-2 text-[10px]", statusBadge.tone)}>
-                      {statusBadge.label}
-                    </Badge>
+                    <Select
+                      value={attachment.subKind || "__none__"}
+                      onValueChange={(val) => updateAttachment(index, { subKind: val === "__none__" ? undefined : val })}
+                    >
+                      <SelectTrigger className="h-5 w-auto min-w-[120px] rounded-full border border-border/70 px-2 py-0 text-[10px] uppercase tracking-wide">
+                        <SelectValue placeholder="Tipo de material" />
+                      </SelectTrigger>
+                      <SelectContent align="start" className="text-[11px]">
+                        <SelectItem value="__none__">Sin tipo</SelectItem>
+                        {subKindOptions.map((opt) => (
+                          <SelectItem key={opt} value={opt}>
+                            {opt}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Select
+                      value={statusValue}
+                      onValueChange={(val) => updateAttachment(index, { status: val })}
+                    >
+                      <SelectTrigger
+                        className={cn(
+                          "h-5 w-auto min-w-[92px] rounded-full px-2 py-0 text-[10px] font-medium border",
+                          statusBadge.tone
+                        )}
+                      >
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent align="start" className="text-[11px]">
+                        <SelectItem value="pending">Pendiente</SelectItem>
+                        <SelectItem value="uploading">Subiendo…</SelectItem>
+                        <SelectItem value="ready">Listo</SelectItem>
+                        <SelectItem value="corrupt">Corrupto</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
-                  <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                  <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
                     {sizeLabel ? <span className="rounded-full bg-slate-100 px-2 py-0.5 font-medium">{sizeLabel}</span> : null}
                     {attachment.mimeType ? <span className="truncate">{attachment.mimeType}</span> : null}
                     {attachment.checksum ? (
@@ -1991,18 +2322,18 @@ function CourseAttachmentsField({ attachments, onChange, error }) {
                     ) : null}
                   </div>
                 </div>
-                <div className="flex items-center gap-2 justify-self-end">
+                <div className="flex items-start gap-2 justify-self-end">
                   {url ? (
                     <Button
                       asChild
                       type="button"
                       variant="outline"
                       size="icon"
-                      className="shrink-0"
+                      className="shrink-0 h-8 w-8"
                       title="Abrir recurso"
                     >
                       <a href={url} target="_blank" rel="noreferrer">
-                        <ExternalLink className="h-4 w-4" />
+                        <ExternalLink className="h-3.5 w-3.5" />
                       </a>
                     </Button>
                   ) : null}
@@ -2011,16 +2342,16 @@ function CourseAttachmentsField({ attachments, onChange, error }) {
                     label={attachment.label || attachment.name || "Adjunto"}
                     kind={attachment.kind || "file"}
                   />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => removeAttachment(index)}
+                    className="shrink-0 self-start h-8 w-8"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
                 </div>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => removeAttachment(index)}
-                  className="shrink-0 self-start"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
               </div>
             );
           })}
@@ -2136,98 +2467,94 @@ function CurriculumField({ curriculum, onChange, error }) {
 
   return (
     <div className="grid gap-4">
-      <div>
-        <Label>Currículum del curso</Label>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Organiza el programa como un workspace: primero la estructura, después la edición de cada clase.
-        </p>
-      </div>
-      <div className="grid gap-4 xl:grid-cols-[320px_minmax(0,1fr)]">
-        <div className="rounded-[24px] border border-border/60 bg-background p-4">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <div className="text-sm font-semibold text-foreground">Estructura del curso</div>
-              <p className="mt-1 text-xs leading-5 text-muted-foreground">Selecciona una clase para editarla.</p>
+      <div className="grid gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
+        <div className="sticky top-4 self-start z-20 w-full max-w-[340px]">
+          <div className="rounded-[24px] border border-border/60 bg-background p-4 min-w-0 overflow-hidden">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="text-sm font-semibold text-foreground">Estructura del curso</div>
+                <p className="mt-1 text-xs leading-5 text-muted-foreground">Selecciona una clase para editarla.</p>
+              </div>
+              <Button type="button" variant="outline" size="sm" onClick={addSection} className="shrink-0">
+                <Plus className="mr-2 h-4 w-4" />
+                Sección
+              </Button>
             </div>
-            <Button type="button" variant="outline" size="sm" onClick={addSection}>
-              <Plus className="mr-2 h-4 w-4" />
-              Sección
-            </Button>
-          </div>
 
-          <div className="mt-4 grid gap-3">
-            {safeCurriculum.map((section, sectionIndex) => {
-              const lessonCount = Array.isArray(section.lessons) ? section.lessons.length : 0;
-              const durationCount = Array.isArray(section.lessons)
-                ? section.lessons.reduce((sum, lesson) => sum + Number(lesson?.durationMinutes || 0), 0)
-                : 0;
-              const isSelectedSection = String(section?.id || "") === String(selectedSection?.id || "");
+            <div className="mt-4 grid gap-3 max-h-[calc(100vh-170px)] overflow-auto pr-1 min-w-0">
+              {safeCurriculum.map((section, sectionIndex) => {
+                const lessonCount = Array.isArray(section.lessons) ? section.lessons.length : 0;
+                const durationCount = Array.isArray(section.lessons)
+                  ? section.lessons.reduce((sum, lesson) => sum + Number(lesson?.durationMinutes || 0), 0)
+                  : 0;
+                const isSelectedSection = String(section?.id || "") === String(selectedSection?.id || "");
 
-              return (
-                <div key={section.id || sectionIndex} className="rounded-[22px] border border-border/60 bg-card p-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSelectedSectionId(String(section.id || ""));
-                        setSelectedLessonId(String((section.lessons?.[0] || {}).id || ""));
-                      }}
-                      className={`min-w-0 flex-1 rounded-2xl px-3 py-2 text-left transition ${
-                        isSelectedSection ? "bg-[#1B2B50] text-white" : "hover:bg-[#F6F8FC]"
-                      }`}
-                    >
-                      <div className="truncate text-sm font-semibold">{section.title || `Sección ${sectionIndex + 1}`}</div>
-                      <div className={`mt-1 text-xs ${isSelectedSection ? "text-white/70" : "text-muted-foreground"}`}>
-                        {lessonCount} clases · {durationCount || 0} min
-                      </div>
-                    </button>
-                    <Button type="button" variant="ghost" size="icon" onClick={() => removeSection(sectionIndex)}>
-                      <Trash2 className="h-4 w-4" />
+                return (
+                  <div key={section.id || sectionIndex} className="rounded-[22px] border border-border/60 bg-card p-3 min-w-0 overflow-hidden">
+                    <div className="flex items-start justify-between gap-3 min-w-0">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedSectionId(String(section.id || ""));
+                          setSelectedLessonId(String((section.lessons?.[0] || {}).id || ""));
+                        }}
+                        className={`min-w-0 flex-1 rounded-2xl px-3 py-2 text-left transition overflow-hidden ${
+                          isSelectedSection ? "bg-[#1B2B50] text-white" : "hover:bg-[#F6F8FC]"
+                        }`}
+                      >
+                        <div className="truncate text-sm font-semibold">{section.title || `Sección ${sectionIndex + 1}`}</div>
+                        <div className={`mt-1 text-xs ${isSelectedSection ? "text-white/70" : "text-muted-foreground"}`}>
+                          {lessonCount} clases · {durationCount || 0} min
+                        </div>
+                      </button>
+                      <Button type="button" variant="ghost" size="icon" onClick={() => removeSection(sectionIndex)} className="shrink-0">
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+
+                    <div className="mt-3 grid gap-2 min-w-0">
+                      {(Array.isArray(section.lessons) ? section.lessons : []).map((lesson, lessonIndex) => {
+                        const isSelectedLesson = String(lesson?.id || "") === String(selectedLesson?.id || "");
+                        return (
+                          <button
+                            key={lesson.id || lessonIndex}
+                            type="button"
+                            onClick={() => {
+                              setSelectedSectionId(String(section.id || ""));
+                              setSelectedLessonId(String(lesson.id || ""));
+                            }}
+                            className={`flex items-center justify-between gap-2 rounded-2xl border px-3 py-2 text-left transition min-w-0 overflow-hidden ${
+                              isSelectedLesson
+                                ? "border-[#1B2B50]/15 bg-[#EEF4FF]"
+                                : "border-border/60 bg-background hover:bg-[#FAFAFC]"
+                            }`}
+                          >
+                            <span className="min-w-0 overflow-hidden">
+                              <span className="block truncate text-sm font-medium text-foreground">{lesson.title || `Clase ${lessonIndex + 1}`}</span>
+                              <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+                                {lesson.lessonType || "video"} · {lesson.durationMinutes || 0} min
+                              </span>
+                            </span>
+                            <GripVertical className="h-4 w-4 shrink-0 text-muted-foreground" />
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    <Button type="button" variant="ghost" size="sm" onClick={() => addLesson(sectionIndex)} className="mt-3 w-full justify-start">
+                      <Plus className="mr-2 h-4 w-4" />
+                      Agregar clase
                     </Button>
                   </div>
-
-                  <div className="mt-3 grid gap-2">
-                    {(Array.isArray(section.lessons) ? section.lessons : []).map((lesson, lessonIndex) => {
-                      const isSelectedLesson = String(lesson?.id || "") === String(selectedLesson?.id || "");
-                      return (
-                        <button
-                          key={lesson.id || lessonIndex}
-                          type="button"
-                          onClick={() => {
-                            setSelectedSectionId(String(section.id || ""));
-                            setSelectedLessonId(String(lesson.id || ""));
-                          }}
-                          className={`flex items-center justify-between rounded-2xl border px-3 py-2 text-left transition ${
-                            isSelectedLesson
-                              ? "border-[#1B2B50]/15 bg-[#EEF4FF]"
-                              : "border-border/60 bg-background hover:bg-[#FAFAFC]"
-                          }`}
-                        >
-                          <span className="min-w-0">
-                            <span className="block truncate text-sm font-medium text-foreground">{lesson.title || `Clase ${lessonIndex + 1}`}</span>
-                            <span className="mt-0.5 block text-xs text-muted-foreground">
-                              {lesson.lessonType || "video"} · {lesson.durationMinutes || 0} min
-                            </span>
-                          </span>
-                          <GripVertical className="h-4 w-4 text-muted-foreground" />
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  <Button type="button" variant="ghost" size="sm" onClick={() => addLesson(sectionIndex)} className="mt-3 w-full justify-start">
-                    <Plus className="mr-2 h-4 w-4" />
-                    Agregar clase
-                  </Button>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
         </div>
 
-        <div className="rounded-[24px] border border-border/60 bg-background p-4 md:p-5">
+        <div className="rounded-[24px] border border-border/60 bg-background p-4 md:p-5 min-w-0 overflow-hidden">
           {selectedSection && selectedLesson ? (
-            <div className="grid gap-5">
+            <div className="grid gap-5 min-w-0">
               <LessonEditorHeader
                 selectedSection={selectedSection}
                 selectedLesson={selectedLesson}
@@ -2235,8 +2562,8 @@ function CurriculumField({ curriculum, onChange, error }) {
                 disabled={selectedSectionIndex < 0 || selectedLessonIndex < 0}
               />
 
-              <div className="grid gap-4 md:grid-cols-2">
-                  <div className="grid gap-2">
+              <div className="grid gap-4 md:grid-cols-2 min-w-0">
+                  <div className="grid gap-2 min-w-0">
                     <Label>Título de la sección</Label>
                     <Input
                       value={selectedSection.title || ""}
@@ -2244,7 +2571,7 @@ function CurriculumField({ curriculum, onChange, error }) {
                       placeholder="Ej: Módulo 1 · Fundamentos"
                     />
                   </div>
-                  <div className="grid gap-2">
+                  <div className="grid gap-2 min-w-0">
                     <Label>Descripción de la sección</Label>
                     <Input
                       value={selectedSection.description || ""}
@@ -2254,9 +2581,9 @@ function CurriculumField({ curriculum, onChange, error }) {
                   </div>
                 </div>
 
-              <div className="grid gap-4 rounded-[22px] border border-border/60 bg-card p-4">
-                <div className="grid gap-4 md:grid-cols-[1.2fr_0.8fr_0.5fr]">
-                  <div className="grid gap-2">
+              <div className="grid gap-4 rounded-[22px] border border-border/60 bg-card p-4 min-w-0 overflow-hidden">
+                <div className="grid gap-4 md:grid-cols-[1.2fr_0.8fr_0.5fr] min-w-0">
+                  <div className="grid gap-2 min-w-0">
                     <Label>Título de la clase</Label>
                     <Input
                       value={selectedLesson.title || ""}
@@ -2264,13 +2591,13 @@ function CurriculumField({ curriculum, onChange, error }) {
                       placeholder="Ej: Primer proyecto"
                     />
                   </div>
-                  <div className="grid gap-2">
+                  <div className="grid gap-2 min-w-0">
                     <Label>Tipo</Label>
                     <Select
                       value={selectedLesson.lessonType || "video"}
                       onValueChange={(value) => updateLesson(selectedSectionIndex, selectedLessonIndex, { lessonType: value })}
                     >
-                      <SelectTrigger>
+                      <SelectTrigger className="w-full">
                         <SelectValue placeholder="Tipo de clase" />
                       </SelectTrigger>
                       <SelectContent>
@@ -2283,7 +2610,7 @@ function CurriculumField({ curriculum, onChange, error }) {
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="grid gap-2">
+                  <div className="grid gap-2 min-w-0">
                     <Label>Minutos</Label>
                     <Input
                       type="number"
@@ -2299,7 +2626,7 @@ function CurriculumField({ curriculum, onChange, error }) {
                   </div>
                 </div>
 
-                <div className="grid gap-2">
+                <div className="grid gap-2 min-w-0">
                   <Label>Descripción</Label>
                   <Textarea
                     rows={3}
@@ -2309,7 +2636,7 @@ function CurriculumField({ curriculum, onChange, error }) {
                   />
                 </div>
 
-                <div className="grid gap-2">
+                <div className="grid gap-2 min-w-0">
                   <Label>Contenido o guía</Label>
                   <Textarea
                     rows={5}
@@ -2332,12 +2659,7 @@ function CurriculumField({ curriculum, onChange, error }) {
 
                 <div className="rounded-[18px] border border-border/60 bg-background p-4">
                   <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <div className="text-sm font-semibold text-foreground">Clase abierta</div>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        Permite ver un preview del contenido antes de la inscripción.
-                      </p>
-                    </div>
+                    <div className="text-sm font-semibold text-foreground">Clase abierta</div>
                     <Switch
                       checked={Boolean(selectedLesson.isPreview)}
                       onCheckedChange={(checked) => updateLesson(selectedSectionIndex, selectedLessonIndex, { isPreview: checked })}
@@ -2406,6 +2728,7 @@ function FinalEvaluationField({ value, onChange, error }) {
           options: ["", ""],
           correctAnswers: [],
           explanation: "",
+          points: undefined,
         },
       ],
     });
@@ -2422,6 +2745,16 @@ function FinalEvaluationField({ value, onChange, error }) {
   const selectedQuestion =
     questions.find((question) => String(question?.id || "") === String(selectedQuestionId || "")) || questions[0] || null;
   const selectedQuestionIndex = questions.findIndex((question) => String(question?.id || "") === String(selectedQuestion?.id || ""));
+
+  const mapQuestionTypeForPerClassUi = (type) => {
+    if (type === "true_false") return "boolean";
+    return type || "single_choice";
+  };
+
+  const mapQuestionTypeForSchema = (perClassType) => {
+    if (perClassType === "boolean") return "true_false";
+    return perClassType || "single_choice";
+  };
 
   return (
     <div className="grid gap-4">
@@ -2442,74 +2775,42 @@ function FinalEvaluationField({ value, onChange, error }) {
               </TooltipContent>
             </Tooltip>
           </Label>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Actívala si el curso cierra con examen, cuestionario o validación final.
-          </p>
         </div>
         <Switch checked={Boolean(evaluation.enabled)} onCheckedChange={(checked) => updateField({ enabled: checked })} />
       </div>
 
       {evaluation.enabled ? (
         <div className="grid gap-4 rounded-[24px] border border-border/60 bg-background p-4 md:p-5">
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="grid gap-2">
-              <Label>Título de la evaluación</Label>
+          <div className="grid gap-4 md:grid-cols-3">
+            <div className="grid gap-2 rounded-2xl border border-border/60 bg-card px-3 py-3">
+              <Label className="text-xs">Título</Label>
               <Input
                 value={evaluation.title || ""}
                 onChange={(event) => updateField({ title: event.target.value })}
-                placeholder="Evaluación final del curso"
+                placeholder="Examen final"
+                className="h-9 text-sm"
               />
             </div>
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="grid gap-2">
-                <Label className="flex items-center gap-1.5">
-                  Nota mínima (%)
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <button type="button" className="inline-flex h-4 w-4 items-center justify-center text-slate-400 hover:text-slate-700">
-                        <HelpCircle className="h-3.5 w-3.5" />
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent side="right">
-                      <div className="max-w-xs text-[11px] leading-5">
-                        Porcentaje mínimo de respuestas correctas para aprobar.
-                      </div>
-                    </TooltipContent>
-                  </Tooltip>
-                </Label>
-                <Input
-                  type="number"
-                  min="0"
-                  max="100"
-                  value={evaluation.passingScore ?? ""}
-                  onChange={(event) => updateField({ passingScore: Number(event.target.value || 0) || undefined })}
-                  placeholder="70"
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label className="flex items-center gap-1.5">
-                  Intentos máximos
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <button type="button" className="inline-flex h-4 w-4 items-center justify-center text-slate-400 hover:text-slate-700">
-                        <HelpCircle className="h-3.5 w-3.5" />
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent side="right">
-                      <div className="max-w-xs text-[11px] leading-5">
-                        Cantidad de veces que un alumno puede rendir la evaluación.
-                      </div>
-                    </TooltipContent>
-                  </Tooltip>
-                </Label>
-                <Input
-                  type="number"
-                  min="1"
-                  value={evaluation.maxAttempts ?? ""}
-                  onChange={(event) => updateField({ maxAttempts: Number(event.target.value || 0) || undefined })}
-                  placeholder="3"
-                />
-              </div>
+            <div className="grid gap-2 rounded-2xl border border-border/60 bg-card px-3 py-3">
+              <Label className="text-xs">Nota de aprobación (%)</Label>
+              <Input
+                type="number"
+                min="0"
+                max="100"
+                value={evaluation.passingScore ?? 60}
+                onChange={(event) => updateField({ passingScore: Number(event.target.value || 0) || undefined })}
+                className="h-9 text-sm"
+              />
+            </div>
+            <div className="grid gap-2 rounded-2xl border border-border/60 bg-card px-3 py-3">
+              <Label className="text-xs">Intentos máximos</Label>
+              <Input
+                type="number"
+                min="1"
+                value={evaluation.maxAttempts ?? 3}
+                onChange={(event) => updateField({ maxAttempts: Number(event.target.value || 0) || undefined })}
+                className="h-9 text-sm"
+              />
             </div>
           </div>
 
@@ -2523,141 +2824,204 @@ function FinalEvaluationField({ value, onChange, error }) {
             />
           </div>
 
-          <div className="grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)]">
-            <div className="rounded-[22px] border border-border/60 bg-card p-4">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <div className="text-sm font-semibold text-foreground">Preguntas</div>
-                  <p className="mt-1 text-xs text-muted-foreground">Selecciona una para editarla.</p>
+          <div className="grid gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
+            <div className="sticky top-4 self-start z-20 w-full max-w-[340px]">
+              <div className="rounded-[22px] border border-border/60 bg-card p-4 min-w-0 overflow-hidden">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-semibold text-foreground">Preguntas</div>
+                    <p className="mt-1 truncate text-xs text-muted-foreground">Selecciona una para editarla.</p>
+                  </div>
+                  <Button type="button" variant="outline" size="sm" onClick={addQuestion} className="shrink-0">
+                    <Plus className="mr-2 h-4 w-4" />
+                    Pregunta
+                  </Button>
                 </div>
-                <Button type="button" variant="outline" size="sm" onClick={addQuestion}>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Pregunta
-                </Button>
-              </div>
 
-              <div className="mt-4 grid gap-2">
-                {questions.map((question, index) => {
-                  const isSelected = String(question?.id || "") === String(selectedQuestion?.id || "");
-                  return (
-                    <button
-                      key={question.id || index}
-                      type="button"
-                      onClick={() => setSelectedQuestionId(String(question.id || ""))}
-                      className={`rounded-2xl border px-3 py-3 text-left transition ${
-                        isSelected ? "border-[#1B2B50]/15 bg-[#EEF4FF]" : "border-border/60 bg-background hover:bg-[#FAFAFC]"
-                      }`}
-                    >
-                      <div className="text-sm font-medium text-foreground">Pregunta {index + 1}</div>
-                      <div className="mt-1 truncate text-xs text-muted-foreground">{question.prompt || "Sin enunciado"}</div>
-                    </button>
-                  );
-                })}
+                <div className="mt-4 grid gap-2 max-h-[calc(100vh-210px)] overflow-auto pr-1">
+                  {questions.map((question, index) => {
+                    const isSelected = String(question?.id || "") === String(selectedQuestion?.id || "");
+                    return (
+                      <button
+                        key={question.id || index}
+                        type="button"
+                        onClick={() => setSelectedQuestionId(String(question.id || ""))}
+                        className={`rounded-2xl border px-3 py-3 text-left transition min-w-0 ${
+                          isSelected ? "border-[#1B2B50]/15 bg-[#EEF4FF]" : "border-border/60 bg-background hover:bg-[#FAFAFC]"
+                        }`}
+                      >
+                        <div className="truncate text-sm font-medium text-foreground">Pregunta {index + 1}</div>
+                        <div className="mt-1 truncate text-xs text-muted-foreground">{question.prompt || "Sin enunciado"}</div>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             </div>
 
-            <div className="rounded-[22px] border border-border/60 bg-card p-4">
+            <div className="rounded-2xl border border-border/60 bg-card p-3 min-w-0 overflow-hidden">
               {selectedQuestion ? (
-                <div className="grid gap-4">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="text-sm font-semibold text-foreground">Editor de pregunta</div>
-                    <Button type="button" variant="ghost" size="icon" onClick={() => removeQuestion(selectedQuestionIndex)}>
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-
-                  <div className="grid gap-4 md:grid-cols-[1fr_220px]">
-                    <div className="grid gap-2">
-                      <Label>Enunciado</Label>
-                      <Textarea
-                        rows={3}
-                        value={selectedQuestion.prompt || ""}
-                        onChange={(event) => updateQuestion(selectedQuestionIndex, { prompt: event.target.value })}
-                        placeholder="Escribe la pregunta"
-                      />
-                    </div>
-                    <div className="grid gap-2">
-                      <Label>Formato</Label>
-                      <Select
-                        value={selectedQuestion.type || "single_choice"}
-                        onValueChange={(value) =>
-                          updateQuestion(selectedQuestionIndex, {
-                            type: value,
-                            options:
-                              value === "true_false"
-                                ? ["Verdadero", "Falso"]
-                                : value === "short_answer"
-                                  ? []
-                                  : (selectedQuestion.options && selectedQuestion.options.length ? selectedQuestion.options : ["", ""]),
-                            correctAnswers: value === "true_false" ? ["Verdadero"] : [],
-                          })
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Seleccionar formato" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="single_choice">Opción única</SelectItem>
-                          <SelectItem value="multiple_choice">Selección múltiple</SelectItem>
-                          <SelectItem value="true_false">Verdadero / Falso</SelectItem>
-                          <SelectItem value="short_answer">Respuesta corta</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                  {selectedQuestion.type === "single_choice" || selectedQuestion.type === "multiple_choice" ? (
-                    <DynamicListField
-                      label="Opciones"
-                      items={selectedQuestion.options || []}
-                      onChange={(next) => updateQuestionOptions(selectedQuestionIndex, next)}
-                      placeholder="Ej: Reservas online"
+                <div className="grid gap-2.5">
+                  <div className="grid gap-1.5">
+                    <Label className="text-xs">Pregunta</Label>
+                    <Input
+                      value={selectedQuestion.prompt || ""}
+                      onChange={(event) => updateQuestion(selectedQuestionIndex, { prompt: event.target.value })}
+                      placeholder="¿Qué objetivo cierra esta evaluación?"
+                      className="h-9 text-sm"
                     />
-                  ) : null}
-
-                  <div className="grid gap-2">
-                    <Label>
-                      {selectedQuestion.type === "multiple_choice"
-                        ? "Respuestas correctas (separa con comas)"
-                        : selectedQuestion.type === "short_answer"
-                          ? "Respuesta esperada"
-                          : "Respuesta correcta"}
-                    </Label>
-                    {selectedQuestion.type === "true_false" ? (
-                      <Select
-                        value={Array.isArray(selectedQuestion.correctAnswers) ? selectedQuestion.correctAnswers[0] || "" : ""}
-                        onValueChange={(value) => updateQuestion(selectedQuestionIndex, { correctAnswers: [value] })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Seleccionar respuesta correcta" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Verdadero">Verdadero</SelectItem>
-                          <SelectItem value="Falso">Falso</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    ) : (
-                      <Input
-                        value={Array.isArray(selectedQuestion.correctAnswers) ? selectedQuestion.correctAnswers.join(", ") : ""}
-                        onChange={(event) => updateQuestion(selectedQuestionIndex, { correctAnswers: sanitizeCorrectAnswers(event.target.value) })}
-                        placeholder="Ej: Opción A, Opción C"
-                      />
-                    )}
                   </div>
-
-                  <div className="grid gap-2">
-                    <Label>Feedback o explicación</Label>
+                  <div className="grid gap-1.5">
+                    <Label className="text-xs">Tipo</Label>
+                    <Select
+                      value={mapQuestionTypeForPerClassUi(selectedQuestion.type)}
+                      onValueChange={(value) => {
+                        const schemaType = mapQuestionTypeForSchema(value);
+                        if (value === "boolean") {
+                          updateQuestion(selectedQuestionIndex, {
+                            type: schemaType,
+                            options: ["Verdadero", "Falso"],
+                            correctAnswers: Array.isArray(selectedQuestion.correctAnswers) ? selectedQuestion.correctAnswers.slice(0, 1) : [],
+                          });
+                          return;
+                        }
+                        updateQuestion(selectedQuestionIndex, {
+                          type: schemaType,
+                          options: selectedQuestion.options && selectedQuestion.options.length ? selectedQuestion.options : ["", ""],
+                        });
+                      }}
+                    >
+                      <SelectTrigger className="h-9 text-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="single_choice">Opción simple</SelectItem>
+                        <SelectItem value="multiple_choice">Múltiple opción</SelectItem>
+                        <SelectItem value="boolean">Verdadero / Falso</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid gap-1.5">
+                    <Label className="text-xs">Opciones</Label>
+                    <div className="grid gap-1.5">
+                      {Array.isArray(selectedQuestion.options) && selectedQuestion.options.length
+                        ? selectedQuestion.options.map((opt, optIndex) => {
+                            const selectedAnswers = Array.isArray(selectedQuestion.correctAnswers)
+                              ? selectedQuestion.correctAnswers
+                              : [];
+                            const perClassUiType = mapQuestionTypeForPerClassUi(selectedQuestion.type);
+                            const isCorrect =
+                              perClassUiType === "boolean" || perClassUiType === "single_choice"
+                                ? String(selectedAnswers[0] ?? "") === String(optIndex)
+                                : selectedAnswers.includes(String(optIndex));
+                            return (
+                              <div
+                                key={`${selectedQuestion.id || "q"}-opt-${optIndex}`}
+                                className="flex items-center gap-2 rounded-xl border border-border/60 bg-background px-2.5 py-1.5"
+                              >
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => {
+                                    const nextOptions = [...(selectedQuestion.options || [])];
+                                    nextOptions.splice(optIndex, 1);
+                                    updateQuestionOptions(selectedQuestionIndex, nextOptions);
+                                    const filtered = (selectedAnswers || []).filter((a) => String(a) !== String(optIndex));
+                                    updateQuestion(selectedQuestionIndex, { correctAnswers: filtered });
+                                  }}
+                                  disabled={perClassUiType === "boolean"}
+                                  className="h-6 w-6 shrink-0 text-muted-foreground"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                                <Input
+                                  value={opt}
+                                  onChange={(event) => {
+                                    const nextOptions = [...(selectedQuestion.options || [])];
+                                    nextOptions[optIndex] = event.target.value;
+                                    updateQuestionOptions(selectedQuestionIndex, nextOptions);
+                                  }}
+                                  className="h-8 border-0 bg-transparent px-0 text-sm focus-visible:ring-0"
+                                />
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        if (perClassUiType === "multiple_choice") {
+                                          const set = new Set(selectedAnswers.map((a) => String(a)));
+                                          if (set.has(String(optIndex))) set.delete(String(optIndex));
+                                          else set.add(String(optIndex));
+                                          updateQuestion(selectedQuestionIndex, { correctAnswers: [...set.values()] });
+                                        } else {
+                                          updateQuestion(selectedQuestionIndex, { correctAnswers: [String(optIndex)] });
+                                        }
+                                      }}
+                                      className={cn(
+                                        "inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border transition-colors",
+                                        isCorrect
+                                          ? "border-emerald-400 bg-emerald-500 text-white"
+                                          : "border-slate-200 bg-white text-slate-400 hover:border-emerald-300 hover:text-emerald-600"
+                                      )}
+                                    >
+                                      <CheckCircle2 className="h-3.5 w-3.5" />
+                                    </button>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="bottom">
+                                    <div className="max-w-xs text-[11px] leading-5">
+                                      {perClassUiType === "multiple_choice"
+                                        ? "Marcar como respuesta correcta (pueden ser varias)."
+                                        : "Marcar como respuesta correcta."}
+                                    </div>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </div>
+                            );
+                          })
+                        : null}
+                      {mapQuestionTypeForPerClassUi(selectedQuestion.type) !== "boolean" ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() =>
+                            updateQuestionOptions(selectedQuestionIndex, [...(selectedQuestion.options || []), ""])
+                          }
+                          className="mt-1 h-8 justify-start px-2.5 text-xs"
+                        >
+                          <Plus className="mr-1.5 h-3.5 w-3.5" />
+                          Agregar opción
+                        </Button>
+                      ) : null}
+                    </div>
+                  </div>
+                  <div className="grid gap-1.5">
+                    <Label className="text-xs">Explicación (opcional)</Label>
                     <Textarea
-                      rows={3}
+                      rows={2}
                       value={selectedQuestion.explanation || ""}
                       onChange={(event) => updateQuestion(selectedQuestionIndex, { explanation: event.target.value })}
-                      placeholder="Explica por qué esa respuesta es correcta o qué se espera del alumno."
+                      placeholder="Mostrar al alumno al finalizar el intento."
+                      className="text-xs"
                     />
+                  </div>
+                  <div className="flex justify-end">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => removeQuestion(selectedQuestionIndex)}
+                      className="h-8 px-2.5 text-xs text-destructive"
+                    >
+                      <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+                      Eliminar pregunta
+                    </Button>
                   </div>
                 </div>
               ) : (
-                <div className="rounded-[22px] border border-dashed border-border/60 bg-background px-4 py-8 text-sm text-muted-foreground">
-                  Crea una pregunta para abrir su editor.
+                <div className="flex h-full min-h-[160px] items-center justify-center rounded-xl border border-dashed border-border/60 bg-background px-3 py-4 text-center text-xs text-muted-foreground">
+                  Creá una pregunta primero para editarla acá.
                 </div>
               )}
             </div>
@@ -3071,7 +3435,21 @@ export default function CourseWizard({ jobId }) {
     const learningObjectives = sanitizeList(formValues.learningObjectives);
     const requirementsList = sanitizeList(formValues.requirements);
     const targetAudience = sanitizeList(formValues.targetAudience);
-    const curriculum = sanitizeCurriculum(formValues.curriculum);
+    const curriculumRaw = sanitizeCurriculum(formValues.curriculum);
+    const curriculum = curriculumRaw.map((section) => ({
+      ...section,
+      lessons: (Array.isArray(section?.lessons) ? section.lessons : []).map((lesson) => {
+        const lessonVideoAsset = lesson?.videoAsset;
+        const hasAsset = Boolean(lessonVideoAsset && typeof lessonVideoAsset === "object" && (lessonVideoAsset.url || lessonVideoAsset.storageKey));
+        const baseVideoUrl = String(lesson?.videoUrl || "").trim();
+        const videoUrl = hasAsset ? String(lessonVideoAsset.url || baseVideoUrl) : baseVideoUrl;
+        return {
+          ...lesson,
+          videoUrl: videoUrl || undefined,
+          videoAsset: hasAsset ? lessonVideoAsset : undefined,
+        };
+      }),
+    }));
     const modules = buildLegacyModulesFromCurriculum(curriculum);
     const finalEvaluation = sanitizeFinalEvaluation(formValues.finalEvaluation);
     const classesCount = countCurriculumLessons(curriculum) || Number(formValues.classesCount || 0);
@@ -3272,134 +3650,94 @@ export default function CourseWizard({ jobId }) {
   }
 
   return (
-    <div className="grid gap-6">
-      <form onSubmit={handleSubmit(onSubmit, onInvalidSubmit)} className="grid gap-6">
+    <div className="grid gap-6 text-[0.625em] leading-tight [&_*]:!leading-tight [&_*]:!tracking-normal">
+      <form onSubmit={handleSubmit(onSubmit, onInvalidSubmit)} className="grid gap-6 [line-height:1.35]">
         <div className="rounded-[30px] border border-border/60 bg-card/95 p-4 shadow-sm backdrop-blur">
-          <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-            <div className="flex items-start gap-3">
-              <Button type="button" variant="outline" size="icon" asChild>
-                <Link href={buildLocalizedPath("/dashboard/cursos")} aria-label="Volver al listado de cursos">
-                  <ChevronRight className="h-4 w-4 rotate-180" />
+        <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+          <div className="flex items-center gap-3 min-w-0">
+            <Button type="button" variant="ghost" size="icon" asChild className="shrink-0 h-8 w-8 rounded-xl text-muted-foreground hover:text-foreground">
+              <Link href={buildLocalizedPath("/dashboard/cursos")} aria-label="Volver al listado de cursos">
+                <ChevronRight className="h-3.5 w-3.5 rotate-180" />
+              </Link>
+            </Button>
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
+                <Link href={buildLocalizedPath("/dashboard/cursos")} className="hover:text-foreground transition-colors">
+                  Cursos
                 </Link>
-              </Button>
-              <div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <h1 className="text-[20px] font-semibold tracking-[-0.04em] text-foreground">
-                    {jobId ? "Editar curso" : "Crear curso"}
-                  </h1>
-                  {(() => {
-                    const statusMeta = PUBLICATION_STATUS_OPTIONS.find((item) => item.value === (values.status || "borrador"));
-                    const tone = statusMeta?.tone || "secondary";
-                    return (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <span>
-                            <Badge variant="soft" color={tone} className="rounded-full cursor-help">
-                              {statusMeta?.label || values.status || "Borrador"}
-                            </Badge>
-                          </span>
-                        </TooltipTrigger>
-                        <TooltipContent side="right">
-                          <div className="max-w-xs leading-5">
-                            <div className="font-semibold">{statusMeta?.label || "Estado"}</div>
-                            <div className="mt-1 text-[11px] text-slate-100/90">
-                              {statusMeta?.description || "Define la visibilidad del curso dentro del catálogo."}
-                            </div>
-                          </div>
-                        </TooltipContent>
-                      </Tooltip>
-                    );
-                  })()}
-                </div>
-                <div className="mt-1 text-xs text-muted-foreground">
-                  <span className="inline-flex items-center gap-1">
-                    <Clock3 className="h-3 w-3" />
-                    {[`${values.classesCount || 0} clases`, `${Array.isArray(values.curriculum) ? values.curriculum.length : 0} secciones`].join(" · ")}
-                  </span>
-                </div>
+                <span className="text-slate-300">/</span>
+                <span className="font-medium text-foreground truncate">{jobId ? "Editar curso" : "Crear curso"}</span>
               </div>
-            </div>
-
-            <div className="flex flex-col gap-2 xl:items-end">
-              <div className="min-h-4 text-xs text-muted-foreground">
-                {draftSavedAt ? `Guardado ${new Date(draftSavedAt).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })}` : ""}
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {publicCourseHref ? (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <span>
-                        <Button type="button" variant="outline" asChild>
-                          <Link href={publicCourseHref}>
-                            <Eye className="mr-2 h-4 w-4" />
-                            Vista previa
-                          </Link>
-                        </Button>
-                      </span>
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom">
-                      <div className="text-[11px]">Abre el curso en la vista pública para validar cómo lo verán los alumnos.</div>
-                    </TooltipContent>
-                  </Tooltip>
-                ) : null}
+              <div className="mt-1 flex flex-wrap items-center gap-1.5 min-w-0">
+                <h1 className="text-[15px] font-semibold tracking-[-0.03em] text-foreground truncate">
+                  {values.title || (jobId ? "Curso" : "Nuevo curso")}
+                </h1>
+                {(() => {
+                  const statusMeta = PUBLICATION_STATUS_OPTIONS.find((item) => item.value === (values.status || "borrador"));
+                  const tone = statusMeta?.tone || "secondary";
+                  return statusMeta ? (
+                    <Badge variant="soft" color={tone} className="h-5 px-2 text-[10px] rounded-full shrink-0">
+                      {statusMeta.label}
+                    </Badge>
+                  ) : null;
+                })()}
+                <span className="inline-flex h-5 items-center gap-1 rounded-full border border-border/60 bg-background px-2 text-[10px] font-medium text-muted-foreground shrink-0">
+                  {values.classesCount || 0} clases · {Array.isArray(values.curriculum) ? values.curriculum.length : 0} secciones
+                </span>
                 {draftSavedAt ? (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <span>
-                        <Button type="button" variant="ghost" onClick={() => clearLocalDraft()} disabled={busy} className="text-muted-foreground">
-                          Limpiar borrador
-                        </Button>
-                      </span>
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom">
-                      <div className="max-w-xs text-[11px] leading-5">Borra el borrador local guardado en este navegador. No afecta el curso publicado.</div>
-                    </TooltipContent>
-                  </Tooltip>
+                  <span className="inline-flex h-5 items-center gap-1 rounded-full border border-emerald-100 bg-emerald-50 px-2 text-[10px] font-medium text-emerald-700 shrink-0">
+                    <Clock3 className="h-3 w-3" />
+                    Guardado {new Date(draftSavedAt).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })}
+                  </span>
                 ) : null}
-                {!isLastTab ? (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <span>
-                        <Button type="button" onClick={goToNextTab} disabled={busy}>
-                          Siguiente
-                          <ChevronRight className="ml-2 h-4 w-4" />
-                        </Button>
-                      </span>
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom">
-                      <div className="text-[11px]">Valida los campos actuales y pasa a la siguiente sección.</div>
-                    </TooltipContent>
-                  </Tooltip>
-                ) : (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <span>
-                        <Button type="submit" disabled={busy} className="min-w-[190px]">
-                          {submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                          {submitting ? savingSubmitLabel : primarySubmitLabel}
-                        </Button>
-                      </span>
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom">
-                      <div className="max-w-xs text-[11px] leading-5">
-                        {actor?.role === "empresa"
-                          ? "Envía el curso para que el equipo admin lo revise y publique."
-                          : "Guarda y publica el curso con la configuración actual."}
-                      </div>
-                    </TooltipContent>
-                  </Tooltip>
-                )}
               </div>
             </div>
           </div>
+
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            {publicCourseHref ? (
+              <Button type="button" variant="ghost" size="sm" asChild className="h-8 text-[11px]">
+                <Link href={publicCourseHref} className="gap-1.5">
+                  <Eye className="h-3.5 w-3.5" />
+                  Vista previa
+                </Link>
+              </Button>
+            ) : null}
+            {draftSavedAt ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => clearLocalDraft()}
+                disabled={busy}
+                className="h-8 text-[11px] text-muted-foreground hover:text-foreground"
+              >
+                Limpiar borrador
+              </Button>
+            ) : null}
+            {!isLastTab ? (
+              <Button type="button" size="sm" onClick={goToNextTab} disabled={busy} className="h-8 text-[11px]">
+                Siguiente
+                <ChevronRight className="ml-1 h-3.5 w-3.5" />
+              </Button>
+            ) : (
+              <Button type="submit" size="sm" disabled={busy} className="h-8 text-[11px] min-w-[160px]">
+                {submitting ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Save className="mr-1.5 h-3.5 w-3.5" />}
+                {submitting ? savingSubmitLabel : primarySubmitLabel}
+              </Button>
+            )}
+          </div>
         </div>
+      </div>
 
         <div className="grid gap-6 xl:grid-cols-[280px_minmax(0,1fr)]">
-          <WorkspaceSidebar activeTab={activeTab} onSelect={handleTabChange} values={values} errors={errors} draftSavedAt={draftSavedAt} />
+          <div className="sticky top-4 self-start z-20 w-full max-w-[320px]">
+            <WorkspaceSidebar activeTab={activeTab} onSelect={handleTabChange} values={values} errors={errors} draftSavedAt={draftSavedAt} />
+          </div>
 
           <div className="grid gap-6">
             {activeTab === "general" ? (
-              <SectionCard title="Información base" description="Solo quedan los datos imprescindibles para vender el curso.">
+              <SectionCard title="Información base">
                 <div className="grid gap-6 md:grid-cols-2">
                   <div className="grid gap-2">
                     <Label className="flex items-center gap-1.5">
@@ -3582,7 +3920,7 @@ export default function CourseWizard({ jobId }) {
 
             {activeTab === "content" ? (
               <>
-                <SectionCard title="Narrativa del curso" description="Primero define qué resuelve el curso y a quién está dirigido.">
+                <SectionCard title="Narrativa del curso">
                   <div className="grid gap-4">
                     <div className="grid gap-2">
                       <Label>Descripción corta</Label>
@@ -3606,11 +3944,11 @@ export default function CourseWizard({ jobId }) {
                   </div>
                 </SectionCard>
 
-                <SectionCard title="Editor curricular" description="Construye secciones y clases como un árbol navegable con edición enfocada.">
+                <SectionCard>
                   <CurriculumField curriculum={values.curriculum || []} onChange={updateCurriculum} error={errors.curriculum} />
                 </SectionCard>
 
-                <SectionCard title="Cierre pedagógico" description="Configura la evaluación final y las métricas básicas del recorrido.">
+                <SectionCard title="Cierre pedagógico">
                   <FinalEvaluationField value={values.finalEvaluation || { enabled: false, questions: [] }} onChange={updateFinalEvaluation} error={errors.finalEvaluation} />
                   <div className="mt-5 grid gap-4 md:grid-cols-3">
                     <div className="grid gap-2">
@@ -3633,16 +3971,12 @@ export default function CourseWizard({ jobId }) {
             ) : null}
 
             {activeTab === "resources" ? (
-              <SectionCard title="Multimedia y recursos" description="Sube solo lo necesario para mostrar y vender mejor el curso.">
+              <SectionCard title="Multimedia y recursos">
                 <div className="grid gap-6 lg:grid-cols-2">
                   <div className="grid gap-3">
                     <Label>Portada del curso</Label>
                     <div className="rounded-[24px] border border-border/60 bg-background p-4">
                       <Input type="file" accept="image/*" onChange={(e) => handleUpload("coverImage", e.target.files?.[0], "courses/covers", "Portada cargada")} disabled={busy} />
-                      <div className="mt-3 flex items-center gap-2 text-sm text-muted-foreground">
-                        <UploadCloud className="h-4 w-4" />
-                        Optimizada para catálogo y detalle.
-                      </div>
                     </div>
                     {values.coverImage ? <FilePreview url={values.coverImage} title="Portada del curso" variant="compact" /> : null}
                   </div>
@@ -3651,10 +3985,6 @@ export default function CourseWizard({ jobId }) {
                     <Label>Miniatura</Label>
                     <div className="rounded-[24px] border border-border/60 bg-background p-4">
                       <Input type="file" accept="image/*" onChange={(e) => handleUpload("thumbnail", e.target.files?.[0], "courses/thumbnails", "Miniatura cargada")} disabled={busy} />
-                      <div className="mt-3 flex items-center gap-2 text-sm text-muted-foreground">
-                        <UploadCloud className="h-4 w-4" />
-                        Ideal para cards pequeñas y carruseles.
-                      </div>
                     </div>
                     {values.thumbnail ? <FilePreview url={values.thumbnail} title="Miniatura del curso" variant="compact" /> : null}
                   </div>
@@ -3687,7 +4017,7 @@ export default function CourseWizard({ jobId }) {
             ) : null}
 
             {activeTab === "pricing" ? (
-              <SectionCard title="Comercialización" description="Configura el posicionamiento comercial del curso con la menor fricción posible.">
+              <SectionCard title="Comercialización">
                 <div className="grid gap-6 md:grid-cols-3">
                   <div className="grid gap-2">
                     <Label className="flex items-center gap-1.5">
@@ -3744,23 +4074,13 @@ export default function CourseWizard({ jobId }) {
                       </Tooltip>
                     </Label>
                     <div className="rounded-2xl border border-border/60 bg-background px-4 py-3">
-                      <div className="flex items-center justify-between gap-4">
-                        <div className="text-sm text-muted-foreground">Actívalo para publicar sin precio visible.</div>
+                      <div className="flex items-center justify-end gap-4">
                         <Switch checked={Boolean(values.freeCourse)} onCheckedChange={(checked) => setValue("freeCourse", checked, { shouldValidate: true, shouldDirty: true })} />
                       </div>
                     </div>
                   </div>
                 </div>
 
-                <div className="mt-2 flex flex-wrap items-center gap-2">
-                  <Badge variant="soft" color="info" className="rounded-full">
-                    <Sparkles className="mr-1 h-3 w-3" />
-                    Beneficios destacados
-                  </Badge>
-                  <span className="text-xs text-muted-foreground">
-                    Activá los beneficios que se mostrarán en la ficha pública del curso.
-                  </span>
-                </div>
                 <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
                   {[
                     ["certificate", "Incluye certificado", <Award key="cert-icon" className="h-4 w-4" />, "El alumno recibe un certificado oficial de ACAV al finalizar la cursada."],
@@ -3799,16 +4119,7 @@ export default function CourseWizard({ jobId }) {
 
             {activeTab === "publish" ? (
               <>
-                <SectionCard title="Publicación" description="Define cómo se publica el curso y qué tan visible será dentro del ecosistema ACAV.">
-                  <div className="mt-2 mb-4 flex flex-wrap items-center gap-2">
-                    <Badge variant="soft" color="info" className="rounded-full">
-                      <Eye className="mr-1 h-3 w-3" />
-                      Opciones de visibilidad
-                    </Badge>
-                    <span className="text-xs text-muted-foreground">
-                      Controla dónde y cómo aparece el curso para los alumnos.
-                    </span>
-                  </div>
+                <SectionCard title="Publicación">
                   <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                     {[
                       ["featured", "Destacar en la portada", "Curso top. Se muestra primero en la home con badge Destacado."],
@@ -3891,7 +4202,7 @@ export default function CourseWizard({ jobId }) {
                   </div>
                 </SectionCard>
 
-                <SectionCard title="Vista previa ejecutiva" description="Resumen rápido para validar la propuesta antes de guardar.">
+                <SectionCard title="Vista previa ejecutiva">
                   <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
                     <div className="rounded-[24px] border border-border/60 bg-background p-5">
                       <div className="inline-flex rounded-full border border-[#DD4913]/20 bg-[#DD4913]/10 px-3 py-1 text-[11px] font-extrabold uppercase tracking-[0.14em] text-[#DD4913]">
@@ -3911,7 +4222,7 @@ export default function CourseWizard({ jobId }) {
                         <div>Precio: {values.freeCourse ? "Gratuito" : values.price ? `$ ${values.price}` : "Sin definir"}</div>
                         <div>Inscripciones: {values.allowEnrollment ? "Abiertas" : "Cerradas"}</div>
                         <div>Certificado: {values.certificate ? "Incluido" : "No incluido"}</div>
-                        <div>Video: {values.promoVideo ? "Cargado" : "Pendiente"}</div>
+                        {values.promoVideoAsset?.url || values.promoVideo ? <div>Video: Cargado</div> : null}
                         <div>Secciones: {Array.isArray(values.curriculum) ? values.curriculum.length : 0}</div>
                         <div>Clases: {values.classesCount || 0}</div>
                         <div>Evaluación final: {values.finalEvaluation?.enabled ? `${values.finalEvaluation?.questions?.length || 0} preguntas` : "No incluida"}</div>
@@ -3922,62 +4233,34 @@ export default function CourseWizard({ jobId }) {
               </>
             ) : null}
 
-            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-              {uploading ? (
-                <div className="inline-flex items-center gap-2 rounded-full border border-primary/15 bg-primary/5 px-4 py-2 text-sm font-medium text-primary">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Subiendo archivos...
+            <div className="sticky bottom-2 z-30 rounded-[20px] border border-border/60 bg-card/95 px-3 py-2.5 shadow-sm backdrop-blur">
+              <div className="flex flex-wrap items-center gap-2 justify-between">
+                <div className="min-w-0 shrink-0">
+                  {uploading ? (
+                    <span className="inline-flex h-8 items-center gap-1.5 rounded-full border border-primary/15 bg-primary/5 px-3 text-[11px] font-medium text-primary">
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      Subiendo
+                    </span>
+                  ) : null}
                 </div>
-              ) : (
-                <div />
-              )}
-              <div className="flex flex-col gap-2 sm:flex-row">
-                {!isFirstTab ? (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <span>
-                        <Button type="button" variant="outline" onClick={goToPreviousTab} disabled={busy}>
-                          Anterior
-                        </Button>
-                      </span>
-                    </TooltipTrigger>
-                    <TooltipContent side="top">
-                      <div className="text-[11px]">Vuelve a la sección anterior sin perder el progreso.</div>
-                    </TooltipContent>
-                  </Tooltip>
-                ) : null}
-                {!isLastTab ? (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <span>
-                        <Button type="button" variant="outline" onClick={goToNextTab} disabled={busy}>
-                          Siguiente
-                        </Button>
-                      </span>
-                    </TooltipTrigger>
-                    <TooltipContent side="top">
-                      <div className="text-[11px]">Valida los campos actuales y avanza a la siguiente sección.</div>
-                    </TooltipContent>
-                  </Tooltip>
-                ) : (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <span>
-                        <Button type="submit" disabled={busy} className="min-w-[190px]">
-                          {submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                          {submitting ? savingSubmitLabel : primarySubmitLabel}
-                        </Button>
-                      </span>
-                    </TooltipTrigger>
-                    <TooltipContent side="top">
-                      <div className="max-w-xs text-[11px] leading-5">
-                        {actor?.role === "empresa"
-                          ? "Envía el curso para aprobación administrativa y queda en revisión."
-                          : "Guarda definitivamente el curso con toda la configuración actual."}
-                      </div>
-                    </TooltipContent>
-                  </Tooltip>
-                )}
+                <div className="flex flex-wrap items-center gap-2 ml-auto">
+                  {!isFirstTab ? (
+                    <Button type="button" variant="ghost" size="sm" onClick={goToPreviousTab} disabled={busy} className="h-8 text-[11px]">
+                      Anterior
+                    </Button>
+                  ) : null}
+                  {!isLastTab ? (
+                    <Button type="button" size="sm" onClick={goToNextTab} disabled={busy} className="h-8 text-[11px]">
+                      Siguiente
+                      <ChevronRight className="ml-1 h-3.5 w-3.5" />
+                    </Button>
+                  ) : (
+                    <Button type="submit" size="sm" disabled={busy} className="h-8 text-[11px] min-w-[160px]">
+                      {submitting ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Save className="mr-1.5 h-3.5 w-3.5" />}
+                      {submitting ? savingSubmitLabel : primarySubmitLabel}
+                    </Button>
+                  )}
+                </div>
               </div>
             </div>
           </div>

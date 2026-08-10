@@ -1,4 +1,4 @@
-import { BarChart3, Bookmark, Briefcase, CreditCard, FileText, Trophy, Users2 } from "lucide-react";
+import { BarChart3, Bookmark, Briefcase, Users2 } from "lucide-react";
 
 function withRoles(item) {
   return item;
@@ -24,7 +24,22 @@ function resolveMenuByActor(item, actor) {
   return item;
 }
 
-export function filterMenusByRole(items = [], actorOrRole) {
+function stripEmptyIsHeaderGroups(items = []) {
+  if (!Array.isArray(items) || !items.length) return items;
+  const result = [];
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i];
+    if (item?.isHeader) {
+      const next = items[i + 1];
+      const isFollowedByRealItem = Boolean(next) && !next?.isHeader;
+      if (!isFollowedByRealItem) continue;
+    }
+    result.push(item);
+  }
+  return result;
+}
+
+function filterMenusByRoleInternal(items = [], actorOrRole) {
   const actor = normalizeActor(actorOrRole);
   const normalizedRole = String(actor?.role || "").trim().toLowerCase();
 
@@ -79,6 +94,11 @@ export function filterMenusByRole(items = [], actorOrRole) {
     });
 }
 
+export function filterMenusByRole(items = [], actorOrRole) {
+  const filtered = filterMenusByRoleInternal(items, actorOrRole);
+  return stripEmptyIsHeaderGroups(filtered);
+}
+
 export const menusConfig = {
   mainNav: [
     withRoles({
@@ -100,24 +120,6 @@ export const menusConfig = {
       roles: ["admin"],
     }),
     withRoles({
-      title: "Pagos",
-      icon: CreditCard,
-      href: "/dashboard/pagos",
-      roles: ["admin"],
-    }),
-    withRoles({
-      title: "Certificados",
-      icon: Trophy,
-      href: "/dashboard/certificados",
-      roles: ["admin"],
-    }),
-    withRoles({
-      title: "Contenido",
-      icon: FileText,
-      href: "/dashboard/contenido",
-      roles: ["admin"],
-    }),
-    withRoles({
       title: "Mi panel",
       icon: BarChart3,
       href: "/dashboard",
@@ -127,24 +129,6 @@ export const menusConfig = {
       title: "Mis cursos",
       icon: Bookmark,
       href: "/dashboard/mis-cursos",
-      roles: ["alumno"],
-    }),
-    withRoles({
-      title: "Inscripciones",
-      icon: Briefcase,
-      href: "/dashboard/inscripciones",
-      roles: ["alumno"],
-    }),
-    withRoles({
-      title: "Pagos",
-      icon: CreditCard,
-      href: "/dashboard/pagos",
-      roles: ["alumno"],
-    }),
-    withRoles({
-      title: "Certificados",
-      icon: Trophy,
-      href: "/dashboard/certificados",
       roles: ["alumno"],
     }),
   ],
@@ -174,29 +158,6 @@ export const menusConfig = {
         roles: ["admin"],
       }),
       withRoles({
-        title: "Pagos",
-        icon: CreditCard,
-        href: "/dashboard/pagos",
-        roles: ["admin"],
-      }),
-      withRoles({
-        isHeader: true,
-        title: "Herramientas",
-        roles: ["admin"],
-      }),
-      withRoles({
-        title: "Certificados",
-        icon: Trophy,
-        href: "/dashboard/certificados",
-        roles: ["admin"],
-      }),
-      withRoles({
-        title: "Contenido",
-        icon: FileText,
-        href: "/dashboard/contenido",
-        roles: ["admin"],
-      }),
-      withRoles({
         title: "Mi panel",
         icon: BarChart3,
         href: "/dashboard",
@@ -206,24 +167,6 @@ export const menusConfig = {
         title: "Mis cursos",
         icon: Bookmark,
         href: "/dashboard/mis-cursos",
-        roles: ["alumno"],
-      }),
-      withRoles({
-        title: "Inscripciones",
-        icon: Briefcase,
-        href: "/dashboard/inscripciones",
-        roles: ["alumno"],
-      }),
-      withRoles({
-        title: "Pagos",
-        icon: CreditCard,
-        href: "/dashboard/pagos",
-        roles: ["alumno"],
-      }),
-      withRoles({
-        title: "Certificados",
-        icon: Trophy,
-        href: "/dashboard/certificados",
         roles: ["alumno"],
       }),
     ],
@@ -256,29 +199,6 @@ export const menusConfig = {
         roles: ["admin"],
       }),
       withRoles({
-        title: "Pagos",
-        icon: CreditCard,
-        href: "/dashboard/pagos",
-        roles: ["admin"],
-      }),
-      withRoles({
-        isHeader: true,
-        title: "Herramientas",
-        roles: ["admin"],
-      }),
-      withRoles({
-        title: "Certificados",
-        icon: Trophy,
-        href: "/dashboard/certificados",
-        roles: ["admin"],
-      }),
-      withRoles({
-        title: "Contenido",
-        icon: FileText,
-        href: "/dashboard/contenido",
-        roles: ["admin"],
-      }),
-      withRoles({
         title: "Mi panel",
         icon: BarChart3,
         href: "/dashboard",
@@ -288,24 +208,6 @@ export const menusConfig = {
         title: "Mis cursos",
         icon: Bookmark,
         href: "/dashboard/mis-cursos",
-        roles: ["alumno"],
-      }),
-      withRoles({
-        title: "Inscripciones",
-        icon: Briefcase,
-        href: "/dashboard/inscripciones",
-        roles: ["alumno"],
-      }),
-      withRoles({
-        title: "Pagos",
-        icon: CreditCard,
-        href: "/dashboard/pagos",
-        roles: ["alumno"],
-      }),
-      withRoles({
-        title: "Certificados",
-        icon: Trophy,
-        href: "/dashboard/certificados",
         roles: ["alumno"],
       }),
     ],

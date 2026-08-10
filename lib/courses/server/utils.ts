@@ -36,11 +36,30 @@ export function slugify(input: unknown) {
 }
 
 export function removeUndefined<T extends Record<string, any>>(value: T): T {
-  const next = { ...value };
-  Object.keys(next).forEach((key) => {
-    if (next[key] === undefined) delete next[key];
+  if (Array.isArray(value)) {
+    return value.map((item) => (item && typeof item === "object" ? removeUndefined(item as any) : item)) as unknown as T;
+  }
+  if (!value || typeof value !== "object") {
+    return value;
+  }
+  const next: Record<string, any> = {};
+  Object.entries(value).forEach(([key, val]) => {
+    if (val === undefined) return;
+    if (val === null) {
+      next[key] = null;
+      return;
+    }
+    if (Array.isArray(val)) {
+      next[key] = val.map((item) => (item && typeof item === "object" ? removeUndefined(item as any) : item));
+      return;
+    }
+    if (typeof val === "object") {
+      next[key] = removeUndefined(val as any);
+      return;
+    }
+    next[key] = val;
   });
-  return next;
+  return next as T;
 }
 
 export function ensureDateIsTodayOrFuture(isoDate: string) {

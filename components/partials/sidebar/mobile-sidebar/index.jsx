@@ -12,6 +12,7 @@ import SingleMenuItem from "./single-menu-item";
 import SubMenuHandler from "./sub-menu-handler";
 import NestedSubMenu from "../common/nested-menus";
 import { useCourseActor } from "@/components/courses/dashboard/use-course-actor";
+import SidebarProfileFooter from "../common/profile-footer";
 const MobileSidebar = ({ collapsed, className }) => {
   const { sidebarBg, mobileMenu, setMobileMenu } = useSidebar();
   const [activeSubmenu, setActiveSubmenu] = useState(null);
@@ -82,7 +83,7 @@ const MobileSidebar = ({ collapsed, className }) => {
         )}
         <SidebarLogo collapsed={collapsed} />
         <ScrollArea
-          className={cn("sidebar-menu  h-[calc(100%-80px)] ", {
+          className={cn("sidebar-menu  h-[calc(100%-80px-180px)] ", {
             "px-4": !collapsed,
           })}
         >
@@ -131,6 +132,7 @@ const MobileSidebar = ({ collapsed, className }) => {
             ))}
           </ul>
         </ScrollArea>
+        <SidebarProfileFooter compact={collapsed} />
       </div>
       {mobileMenu && (
         <div

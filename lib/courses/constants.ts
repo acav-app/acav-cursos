@@ -136,9 +136,13 @@ export const COURSE_VIDEO_ALLOWED_TYPES = [
   "video/webm",
   "video/ogg",
   "video/quicktime",
+  "video/x-matroska",
+  "video/x-m4v",
+  "video/avi",
+  "video/x-msvideo",
 ] as const;
 
-export const COURSE_VIDEO_MAX_SIZE_BYTES = 250 * 1024 * 1024;
+export const COURSE_VIDEO_MAX_SIZE_BYTES = 4 * 1024 * 1024 * 1024;
 
 export const COURSE_CLOSE_REASONS = [
   "Cupos completos",

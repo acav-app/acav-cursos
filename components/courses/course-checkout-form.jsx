@@ -505,10 +505,10 @@ export default function CourseCheckoutForm({ lang, job, variant = "modal", onClo
               </Button>
             ) : null}
             <Link
-              href={createdEnrollmentId ? `/${lang}/dashboard/inscripciones/${createdEnrollmentId}` : `/${lang}/dashboard`}
+              href={createdEnrollmentId ? `/${lang}/dashboard/mis-cursos/${createdEnrollmentId}` : `/${lang}/dashboard/mis-cursos`}
               className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#1B2B50] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#133778]"
             >
-              {createdEnrollmentId ? "Ver inscripción" : "Ir a mi panel"}
+              {createdEnrollmentId ? "Ir al curso" : "Ir a mis cursos"}
               <ChevronRight className="h-4 w-4" />
             </Link>
           </div>

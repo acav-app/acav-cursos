@@ -2,15 +2,25 @@ export const READY_STATUSES = new Set(["ready"]);
 const UPLOADING_STATUSES = new Set(["pending", "uploading"]);
 const BAD_STATUSES = new Set(["corrupt", "missing"]);
 
+function resolveEffectiveStatus(res) {
+  if (!res) return "pending";
+  const raw = String(res?.status || "").trim();
+  if (BAD_STATUSES.has(raw)) return raw;
+  if (raw === "uploading") return raw;
+  if (READY_STATUSES.has(raw)) return "ready";
+  if (res.url || res.storageKey || res.checksum || res.uploadedAt) return "ready";
+  return raw || "pending";
+}
+
 export function resourceIsReady(res) {
   if (!res) return false;
   if (!res.url) return false;
-  const status = res.status || (res.url ? "ready" : "pending");
+  const status = resolveEffectiveStatus(res);
   return READY_STATUSES.has(status);
 }
 
 export function videoAssetIsReady(videoAsset, videoUrlFallback) {
-  if (videoAsset?.url && READY_STATUSES.has(videoAsset.status || "ready")) {
+  if (videoAsset?.url && READY_STATUSES.has(resolveEffectiveStatus(videoAsset))) {
     return true;
   }
   if (videoUrlFallback) {
@@ -29,7 +39,7 @@ export function summarizeLessonResources(lesson) {
   let uploading = 0;
   let corrupt = 0;
   resources.forEach((r) => {
-    const status = r.status || (r.url ? "ready" : "pending");
+    const status = resolveEffectiveStatus(r);
     if (READY_STATUSES.has(status)) ready += 1;
     else if (UPLOADING_STATUSES.has(status)) uploading += 1;
     else if (BAD_STATUSES.has(status)) corrupt += 1;
@@ -302,9 +312,9 @@ export function finalEvaluationUnlockedReason(course, perClassStates) {
 
 export function readinessProgressText(summary) {
   if (!summary?.hasAny) return "Sin recursos requeridos";
-  if (summary.allReady) return `Todos los recursos listos (${summary.ready}/${summary.total})`;
+  if (summary.allReady) return `(${summary.ready}/${summary.total})`;
   if (summary.corrupt > 0) return `${summary.corrupt} archivo(s) corrupto(s) · ${summary.ready}/${summary.total}`;
-  return `Subiendo recursos… ${summary.ready}/${summary.total}`;
+  return `${summary.ready}/${summary.total}`;
 }
 
 export function readinessTone(summary) {

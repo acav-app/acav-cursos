@@ -1,3 +1,4 @@
+// @ts-nocheck
 "use client";
 
 import Link from "next/link";
@@ -5,6 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import {
   ArrowLeft,
+  Award,
   BookOpen,
   CalendarDays,
   CheckCircle2,
@@ -40,6 +42,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Progress, CircularProgress } from "@/components/ui/progress";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
@@ -60,16 +70,63 @@ import PaymentReceiptUploader from "@/components/courses/dashboard/payment-recei
 import { resolveEducationalStatusMeta, resolvePaymentStatusMeta } from "@/lib/courses/status-meta";
 import VideoPlayer from "@/components/courses/video-player";
 import DocumentPreviewCard from "@/components/courses/document-preview";
+import EvaluationRenderer from "@/components/courses/evaluation-renderer";
+import CourseCertificate from "@/components/courses/course-certificate";
+import type { CourseCertificateData } from "@/components/courses/course-certificate";
+import { DashboardDetailSkeleton } from "@/components/courses/dashboard/page-skeletons";
 import {
   isFinalEvaluationUnlocked,
   isLessonEvaluationUnlocked,
   readinessProgressText,
   readinessTone,
   summarizeLessonResources,
+  summarizeCurriculumResources,
   buildLessonEvaluationStatesFromEnrollment,
   perClassEvaluationProgress,
   finalEvaluationUnlockedReason,
 } from "@/lib/courses/resource-readiness";
+import type { GradedEvaluation } from "@/lib/courses/evaluation-engine";
+import type { Course, Enrollment } from "@/lib/courses/schemas";
+
+type LessonProgressEntry = {
+  lessonId?: string | number | null;
+  completedAt?: string | null;
+  kind?: string | null;
+  [key: string]: unknown;
+};
+
+type GradebookEntry = {
+  sourceType?: string | null;
+  sourceId?: string | number | null;
+  title?: string | null;
+  score?: number | null;
+  maxScore?: number | null;
+  weight?: number | null;
+  status?: string | null;
+  reviewedAt?: string | null;
+  submittedAt?: string | null;
+  feedback?: string | null;
+  attempts?: number | null;
+  passed?: boolean | null;
+  percentage?: number | null;
+  submitted?: boolean | null;
+  [key: string]: unknown;
+};
+
+type FeaturedVideoSource = {
+  id?: string | null;
+  url: string;
+  mimeType?: string | null;
+  title?: string | null;
+  topic?: string | null;
+  durationLabel?: string | null;
+  posterUrl?: string | null;
+  progress?: number | null;
+  summary?: string | null;
+  publishedAt?: string | null;
+  qualities?: ReadonlyArray<Record<string, unknown>> | null;
+  subtitles?: ReadonlyArray<Record<string, unknown>> | null;
+};
 
 function titleCase(value, fallback = "-") {
   const normalized = String(value || "").replaceAll("_", " ").trim();
@@ -431,6 +488,7 @@ function MetricCard({ label, value, hint, accentClass, sparkColor }) {
 }
 
 function InfoRow({ icon: Icon, label, value, hint }) {
+  type RadixSide = "top" | "right" | "bottom" | "left";
   const inner = (
     <div className="flex items-center justify-between gap-4 border-b border-slate-100 py-3 last:border-b-0">
       <div className="flex items-center gap-3 text-sm text-slate-500">
@@ -449,7 +507,7 @@ function InfoRow({ icon: Icon, label, value, hint }) {
       <TooltipTrigger asChild>
         <div className="cursor-help">{inner}</div>
       </TooltipTrigger>
-      <TooltipContent side="left">
+      <TooltipContent side={"left" as RadixSide}>
         <div className="max-w-[240px] leading-5 text-[11px]">{hint}</div>
       </TooltipContent>
     </Tooltip>
@@ -474,19 +532,23 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
   const buildLocalizedPath = useLocalizedPath();
   const { user } = useAuth();
   const { loading: actorLoading } = useCourseActor();
-  const [loading, setLoading] = useState(true);
-  const [savingLesson, setSavingLesson] = useState("");
-  const [savingActivity, setSavingActivity] = useState("");
-  const [course, setCourse] = useState(null);
-  const [enrollment, setEnrollment] = useState(null);
-  const [lessonProgress, setLessonProgress] = useState([]);
-  const [activitySubmissions, setActivitySubmissions] = useState([]);
-  const [submissionDrafts, setSubmissionDrafts] = useState({});
-  const [locked, setLocked] = useState(false);
-  const [openSections, setOpenSections] = useState([]);
-  const [contentTypeFilter, setContentTypeFilter] = useState("all");
-  const [contentStatusFilter, setContentStatusFilter] = useState("all");
-  const [contentSort, setContentSort] = useState("default");
+  const [loading, setLoading] = useState<boolean>(true);
+  const [savingLesson, setSavingLesson] = useState<string>("");
+  const [savingActivity, setSavingActivity] = useState<string>("");
+  const [course, setCourse] = useState<Course | null>(null);
+  const [enrollment, setEnrollment] = useState<Enrollment | null>(null);
+  const [lessonProgress, setLessonProgress] = useState<LessonProgressEntry[]>([]);
+  const [activitySubmissions, setActivitySubmissions] = useState<Record<string, unknown>[]>([]);
+  const [submissionDrafts, setSubmissionDrafts] = useState<Record<string, Record<string, string>>>({});
+  const [locked, setLocked] = useState<boolean>(false);
+  const [openSections, setOpenSections] = useState<string[]>([]);
+  const [contentTypeFilter, setContentTypeFilter] = useState<string>("all");
+  const [contentStatusFilter, setContentStatusFilter] = useState<string>("all");
+  const [contentSort, setContentSort] = useState<string>("default");
+  const [activeVideoSource, setActiveVideoSource] = useState<FeaturedVideoSource | null>(null);
+  const [openEvaluationId, setOpenEvaluationId] = useState<string | null>(null);
+  const [showCertificate, setShowCertificate] = useState<boolean>(false);
+  const [showTracking, setShowTracking] = useState<boolean>(false);
 
   useEffect(() => {
     let alive = true;
@@ -533,9 +595,65 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
       }
     }
 
+    let intervalId: ReturnType<typeof setInterval> | null = null;
+
+    function startPolling() {
+      stopPolling();
+      intervalId = setInterval(() => {
+        if (!user) return;
+        void authedFetch(user, `/api/student-courses/${id}`, { method: "GET", silent: true })
+          .then((data) => {
+            const nextEnrollment = data?.enrollment || null;
+            const nextCourse = data?.course || null;
+            if (!nextCourse && !nextEnrollment) return;
+            setCourse(nextCourse);
+            setEnrollment(nextEnrollment);
+            setLessonProgress(Array.isArray(nextEnrollment?.lessonProgress) ? nextEnrollment.lessonProgress : []);
+            const nextSubmissions = Array.isArray(nextEnrollment?.activitySubmissions) ? nextEnrollment.activitySubmissions : [];
+            setActivitySubmissions(nextSubmissions);
+            setSubmissionDrafts((prevDrafts) => {
+              const base = typeof prevDrafts === "object" && prevDrafts !== null ? { ...prevDrafts } : {};
+              nextSubmissions.forEach((item) => {
+                const key = String(item?.lessonId || "");
+                if (!key) return;
+                base[key] = {
+                  note: String(item?.note || ""),
+                  linkUrl: String(item?.linkUrl || ""),
+                };
+              });
+              return base;
+            });
+          })
+          .catch(() => {});
+      }, 15000);
+    }
+
+    function stopPolling() {
+      if (intervalId) {
+        clearInterval(intervalId);
+        intervalId = null;
+      }
+    }
+
+    function handleVisibility() {
+      if (document?.hidden) {
+        stopPolling();
+        return;
+      }
+      load();
+      startPolling();
+    }
+
     load();
+    startPolling();
+    window?.addEventListener?.("focus", load);
+    window?.document?.addEventListener?.("visibilitychange", handleVisibility);
+
     return () => {
       alive = false;
+      stopPolling();
+      window?.removeEventListener?.("focus", load);
+      window?.document?.removeEventListener?.("visibilitychange", handleVisibility);
     };
   }, [id, user]);
 
@@ -563,7 +681,6 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
       ),
     [curriculum]
   );
-  const completion = progressValue(enrollment, lessonProgress, totalLessons);
   const activityLessons = useMemo(() => getActivityLessons(curriculum), [curriculum]);
   const gradebook = useMemo(
     () => (Array.isArray(enrollment?.gradebook) ? enrollment.gradebook : []),
@@ -958,6 +1075,481 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
     [allContentItems]
   );
 
+  const effectiveVideo = useMemo(() => {
+    if (activeVideoSource) return activeVideoSource;
+    return featuredVideo;
+  }, [activeVideoSource, featuredVideo]);
+
+  const effectiveVideoKind = effectiveVideo
+    ? detectVideoKind(effectiveVideo.url, effectiveVideo.mimeType)
+    : "empty";
+  const effectiveVideoEmbed = effectiveVideo
+    ? normalizeEmbedUrl(effectiveVideo.url, effectiveVideoKind)
+    : "";
+  const effectiveInlineVideo =
+    effectiveVideo &&
+    (effectiveVideoKind === "file" ||
+      effectiveVideoKind === "youtube" ||
+      effectiveVideoKind === "vimeo");
+  const effectivePlayerSrc = effectiveVideo
+    ? effectiveVideoKind === "file"
+      ? effectiveVideo.url
+      : effectiveVideoEmbed || effectiveVideo.url
+    : "";
+  const effectivePlayerKey = useMemo(() => {
+    const rawId = String(effectiveVideo?.id || "").trim() || "main";
+    const srcHash = String(effectivePlayerSrc || "")
+      .trim()
+      .toLowerCase()
+      .normalize("NFKD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/\s+/g, " ")
+      .replace(/[^a-z0-9]+/g, "-")
+      .slice(0, 40);
+    return `vp-${rawId}-${effectiveVideoKind || "x"}-${srcHash}`;
+  }, [effectiveVideo?.id, effectivePlayerSrc, effectiveVideoKind]);
+
+  function playSourceFromLesson(lessonOrSource, fallbackSectionTitle) {
+    if (!lessonOrSource) return;
+    if (typeof lessonOrSource === "string") {
+      const raw = String(lessonOrSource || "").trim();
+      if (!raw) return;
+      const kind = detectVideoKind(raw, "");
+      const source = {
+        id: `inline-${Date.now()}`,
+        url: raw,
+        mimeType: "",
+        title: "Clase",
+        topic: fallbackSectionTitle || "Contenido del curso",
+        durationLabel: "Ver ahora",
+        posterUrl:
+          (course?.thumbnailUrl && String(course.thumbnailUrl).trim()) ||
+          course?.imageUrl ||
+          "",
+        progress: 0,
+        summary: "",
+        publishedAt: course?.publishedAt || course?.createdAt || new Date().toISOString(),
+      };
+      if (kind === "youtube" || kind === "vimeo") {
+        source.url = normalizeEmbedUrl(raw, kind) || raw;
+      }
+      setActiveVideoSource(source);
+      const target = document?.querySelector?.("#video-destacado");
+      if (target) {
+        try {
+          target.scrollIntoView({ behavior: "smooth", block: "center" });
+        } catch {
+          /* noop */
+        }
+      }
+      return;
+    }
+    const lesson = lessonOrSource;
+    const lessonId = String(lesson?.id || "").trim();
+    const url = String(lesson?.videoUrl || "").trim();
+    if (!url) return;
+    const sectionTitle =
+      (curriculum.find((section) =>
+        (Array.isArray(section?.lessons) ? section.lessons : []).some(
+          (l) => String(l?.id || "") === lessonId
+        )
+      )?.title as string) ||
+      fallbackSectionTitle ||
+      "Clase del programa";
+    const completed = lessonProgress.some(
+      (item) => String(item?.lessonId || "") === lessonId
+    );
+    const kind = detectVideoKind(url, lesson?.videoAsset?.mimeType || "");
+    const finalUrl =
+      kind === "youtube" || kind === "vimeo"
+        ? normalizeEmbedUrl(url, kind) || url
+        : url;
+    setActiveVideoSource({
+      id: lessonId || `inline-${Date.now()}`,
+      url: finalUrl,
+      mimeType: lesson?.videoAsset?.mimeType || "",
+      title: lesson?.title || "Clase del curso",
+      topic: sectionTitle,
+      durationLabel:
+        formatMinutes(lesson?.durationMinutes) || course?.duration || "Reproducción disponible",
+      posterUrl:
+        (lesson?.thumbnailUrl && String(lesson.thumbnailUrl).trim()) ||
+        (course?.thumbnailUrl && String(course.thumbnailUrl).trim()) ||
+        course?.imageUrl ||
+        "",
+      progress: completed ? 100 : 0,
+      summary: lesson?.description || course?.shortDescription || "",
+      publishedAt:
+        lesson?.videoAsset?.uploadedAt ||
+        course?.publishedAt ||
+        course?.createdAt ||
+        new Date().toISOString(),
+      qualities: lesson?.videoAsset?.qualities || [],
+      subtitles: lesson?.videoAsset?.subtitles || [],
+    });
+    const target = document?.querySelector?.("#video-destacado");
+    if (target) {
+      try {
+        target.scrollIntoView({ behavior: "smooth", block: "center" });
+      } catch {
+        /* noop */
+      }
+    }
+  }
+
+  async function persistEvaluationGradebook({
+    sourceId,
+    sourceType,
+    title,
+    result,
+    successMessage,
+  }) {
+    if (!user || !result) return null;
+    const reviewedAt = new Date().toISOString();
+    const currentGradebook = Array.isArray(enrollment?.gradebook)
+      ? [...enrollment.gradebook]
+      : [];
+    const prevAttempts = currentGradebook.filter(
+      (entry) =>
+        String(entry?.sourceId || "") === String(sourceId) &&
+        String(entry?.sourceType || "") === String(sourceType)
+    ).length;
+    const attemptsUsed = Number.isFinite(Number(prevAttempts)) ? Number(prevAttempts) : 0;
+    const attempts = attemptsUsed + 1;
+    const submittedAt = reviewedAt;
+    const nextEntry = {
+      sourceType,
+      sourceId,
+      title,
+      score: result.totalScore,
+      maxScore: result.totalMaxScore || undefined,
+      percentage: Number.isFinite(Number(result.percentage)) ? Number(result.percentage) : undefined,
+      status: result.passed ? "passed" : "failed",
+      passed: Boolean(result.passed),
+      reviewedAt,
+      submittedAt,
+      attempts,
+      attemptsUsed: attempts,
+      correctCount: Number.isFinite(Number(result.correctCount)) ? Number(result.correctCount) : undefined,
+      totalCount: Number.isFinite(Number(result.totalCount)) ? Number(result.totalCount) : undefined,
+      feedback:
+        result.passed
+          ? `Aprobaste con ${result.percentage}% (${result.correctCount ?? "—"}/${result.totalCount ?? "—"} correctas). ¡Buen trabajo!`
+          : `Obtuviste ${result.percentage}% (${result.correctCount ?? "—"}/${result.totalCount ?? "—"} correctas). Podés volver a intentarlo si tenés intentos disponibles.`,
+    };
+    const filtered = currentGradebook.filter(
+      (entry) =>
+        !(
+          String(entry?.sourceId || "") === String(sourceId) &&
+          String(entry?.sourceType || "") === String(sourceType)
+        )
+    );
+    const nextGradebook = [...filtered, nextEntry];
+    const data = await authedFetch(user, `/api/enrollments/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ gradebook: nextGradebook }),
+    });
+    const nextEnrollment = data?.enrollment || {
+      ...(enrollment || {}),
+      gradebook: nextGradebook,
+    };
+    setEnrollment(nextEnrollment);
+    if (successMessage) {
+      toast.success(successMessage, { position: "top-right" });
+    }
+    return nextEnrollment;
+  }
+
+  async function submitLessonEvaluation(lesson, result: GradedEvaluation) {
+    const title =
+      lesson?.evaluation?.title ||
+      lesson?.title ||
+      "Evaluación de la clase";
+    const lessonId = String(lesson?.id || "");
+    const passAndUpdateProgress =
+      result.passed &&
+      lessonId &&
+      !lessonProgress.some((p) => String(p?.lessonId || "") === lessonId);
+    const gradebookResp = await persistEvaluationGradebook({
+      sourceId: lessonId,
+      sourceType: "lesson",
+      title,
+      result,
+      successMessage: result.passed
+        ? "¡Evaluación aprobada! Tu nota fue guardada correctamente."
+        : "Evaluación enviada — podés volver a intentarlo si tenés más intentos.",
+    });
+    let mergedEnrollment = gradebookResp || enrollment;
+    if (passAndUpdateProgress && user) {
+      try {
+        const nextLessonProgress = [
+          ...lessonProgress,
+          { lessonId, completedAt: new Date().toISOString(), kind: "lesson" },
+        ];
+        const patchResp = await authedFetch(user, `/api/enrollments/${id}`, {
+          method: "PATCH",
+          body: JSON.stringify({ lessonProgress: nextLessonProgress }),
+        });
+        const patchedEnrollment = patchResp?.enrollment || {
+          ...(mergedEnrollment || {}),
+          lessonProgress: nextLessonProgress,
+        };
+        mergedEnrollment = patchedEnrollment;
+        setEnrollment(patchedEnrollment);
+        setLessonProgress(nextLessonProgress);
+      } catch {
+        /* non-blocking */
+      }
+    }
+    return mergedEnrollment;
+  }
+
+  async function submitFinalEvaluation(result: GradedEvaluation) {
+    const title =
+      course?.finalEvaluation?.title || "Evaluación final";
+    const resp = await persistEvaluationGradebook({
+      sourceId: "final_evaluation",
+      sourceType: "final_evaluation",
+      title,
+      result,
+      successMessage: result.passed
+        ? "¡Aprobaste la evaluación final! Revisá tu certificado."
+        : "Evaluación final enviada. Si no la aprobaste, podés reintentarlo.",
+    });
+    let mergedEnrollment = resp || enrollment;
+
+    if (result.passed && user) {
+      const allLessonIds = new Set<string>();
+      curriculum.forEach((section) => {
+        (Array.isArray(section?.lessons) ? section.lessons : []).forEach((lesson) => {
+          const lessonId = String(lesson?.id || "").trim();
+          if (lessonId) allLessonIds.add(lessonId);
+        });
+      });
+      if (allLessonIds.size > 0) {
+        const existing = new Set(
+          lessonProgress
+            .map((p) => String(p?.lessonId || "").trim())
+            .filter(Boolean)
+        );
+        const newEntries = Array.from(allLessonIds.values())
+          .filter((lessonId) => !existing.has(lessonId))
+          .map((lessonId) => ({
+            lessonId,
+            completedAt: new Date().toISOString(),
+            kind: "lesson" as const,
+          }));
+        if (newEntries.length > 0) {
+          try {
+            const mergedProgress = [...lessonProgress, ...newEntries];
+            const patchResp = await authedFetch(user, `/api/enrollments/${id}`, {
+              method: "PATCH",
+              body: JSON.stringify({
+                lessonProgress: mergedProgress,
+                progress: 100,
+              }),
+            });
+            const patched = patchResp?.enrollment || {
+              ...(mergedEnrollment || {}),
+              lessonProgress: mergedProgress,
+              progress: 100,
+            };
+            mergedEnrollment = patched;
+            setEnrollment(patched);
+            setLessonProgress(mergedProgress);
+          } catch {
+            /* non-blocking */
+          }
+        } else if (typeof (mergedEnrollment as any)?.progress !== "number" || (mergedEnrollment as any).progress < 100) {
+          try {
+            const patchResp = await authedFetch(user, `/api/enrollments/${id}`, {
+              method: "PATCH",
+              body: JSON.stringify({ progress: 100 }),
+            });
+            const patched = patchResp?.enrollment || {
+              ...(mergedEnrollment || {}),
+              progress: 100,
+            };
+            mergedEnrollment = patched;
+            setEnrollment(patched);
+          } catch {
+            /* non-blocking */
+          }
+        }
+      }
+    }
+
+    if (mergedEnrollment && result.passed) {
+      setTimeout(() => {
+        if (!course?.includesCertificate) return;
+        const finalProgress = Array.isArray((mergedEnrollment as any)?.lessonProgress)
+          ? (mergedEnrollment as any).lessonProgress.length
+          : lessonProgress.length;
+        const allLessonsFinished =
+          totalLessons === 0 || finalProgress >= totalLessons;
+        const tempPerClass = perClassEvaluationProgress(
+          curriculum,
+          buildLessonEvaluationStatesFromEnrollment(
+            curriculum,
+            Array.isArray((mergedEnrollment as any)?.gradebook)
+              ? (mergedEnrollment as any).gradebook
+              : gradebook
+          )
+        );
+        if (allLessonsFinished && tempPerClass.allPassed) {
+          setShowCertificate(true);
+          return;
+        }
+        if (courseEligibleForCertificate) {
+          setShowCertificate(true);
+        }
+      }, 500);
+    }
+    return mergedEnrollment;
+  }
+
+  function lessonEvaluationUsedAttempts(lessonId: unknown): number {
+    const lid = String(lessonId || "").trim();
+    if (!lid) return 0;
+    const entries = Array.isArray(gradebook) ? gradebook : [];
+    return entries.filter(
+      (entry) =>
+        String(entry?.sourceId || "") === lid &&
+        (String(entry?.sourceType || "") === "lesson" ||
+          String(entry?.sourceType || "").toLowerCase().includes("lesson"))
+    ).length;
+  }
+
+  function finalEvaluationUsedAttempts(): number {
+    const entries = Array.isArray(gradebook) ? gradebook : [];
+    return entries.filter(
+      (entry) =>
+        String(entry?.sourceId || "") === "final_evaluation" ||
+        String(entry?.sourceType || "") === "final_evaluation"
+    ).length;
+  }
+
+  const finalEvalEntry = useMemo(() => {
+    const list = Array.isArray(enrollment?.gradebook) ? enrollment.gradebook : [];
+    const matches = list.filter(
+      (entry) =>
+        String(entry?.sourceType || "") === "final_evaluation" ||
+        String(entry?.sourceId || "") === "final_evaluation"
+    );
+    if (!matches.length) return null;
+    return matches.reduce((carry, entry) => {
+      if (!carry) return entry;
+      const pctA = Number.isFinite(Number((carry as any).percentage)) ? Number((carry as any).percentage) : -Infinity;
+      const pctB = Number.isFinite(Number((entry as any).percentage)) ? Number((entry as any).percentage) : -Infinity;
+      if (pctB > pctA) return entry;
+      return carry;
+    }, null);
+  }, [enrollment?.gradebook]);
+
+  const completion = useMemo(() => {
+    const lessonsScore =
+      totalLessons === 0 ? 100 : Math.round((lessonProgress.length / totalLessons) * 100);
+    const lessonEvalCount =
+      perClassProgress.totalEvaluations === 0 ? 100 : Math.round(
+        ((perClassProgress.passed + (course?.finalEvaluation?.enabled ? 0 : perClassProgress.failed)) /
+          perClassProgress.totalEvaluations) *
+          100
+      );
+    const finalEvalScore = (() => {
+      if (!course?.finalEvaluation?.enabled) return 100;
+      const status = String(finalEvalEntry?.status || "").trim().toLowerCase();
+      if (status === "passed") return 100;
+      const pct = Number.isFinite(Number(finalEvalEntry?.percentage)) ? Number(finalEvalEntry.percentage) : 0;
+      return pct;
+    })();
+    const activityScore =
+      activityLessons.length === 0 ? 100 : Math.round((activitySubmissions.length / activityLessons.length) * 100);
+    const weights = { lessons: 0.5, activities: 0.1, lessonEvaluations: 0.2, final: 0.2 };
+    const weighted =
+      lessonsScore * weights.lessons +
+      activityScore * weights.activities +
+      lessonEvalCount * weights.lessonEvaluations +
+      finalEvalScore * weights.final;
+    return Math.max(0, Math.min(100, Math.round(weighted)));
+  }, [
+    totalLessons,
+    lessonProgress.length,
+    perClassProgress,
+    course?.finalEvaluation?.enabled,
+    finalEvalEntry,
+    activityLessons.length,
+    activitySubmissions.length,
+  ]);
+
+  const courseEligibleForCertificate = useMemo(() => {
+    if (!course?.includesCertificate) return false;
+    if (totalLessons === 0) return false;
+    if (!lessonProgress.length || lessonProgress.length < totalLessons) return false;
+    if (!perClassProgress.allPassed) return false;
+    const fe = course?.finalEvaluation;
+    if (!fe?.enabled) return true;
+    const raw = finalEvalEntry?.status;
+    return String(raw || "").trim().toLowerCase() === "passed";
+  }, [
+    course?.includesCertificate,
+    course?.finalEvaluation,
+    totalLessons,
+    lessonProgress.length,
+    perClassProgress.allPassed,
+    finalEvalEntry,
+  ]);
+
+  const certificateData: CourseCertificateData | null = useMemo(() => {
+    if (!courseEligibleForCertificate) return null;
+    const displayName =
+      String(enrollment?.studentName || "").trim() ||
+      [
+        String(enrollment?.firstName || user?.displayName || user?.firstName || "").trim(),
+        String(enrollment?.lastName || user?.lastName || "").trim(),
+      ]
+        .filter(Boolean)
+        .join(" ") ||
+      user?.email ||
+      "Alumno / Alumna";
+    const score = Number.isFinite(Number(averageScore)) ? Number(averageScore) : undefined;
+    return {
+      studentName: displayName,
+      studentEmail: String(enrollment?.email || user?.email || "").trim() || undefined,
+      courseTitle: String(course?.title || "Curso").trim(),
+      institutionName:
+        String(course?.institutionName || course?.companyName || "ACAV Cursos").trim(),
+      courseDuration:
+        String(course?.duration || "").trim() ||
+        (totalMinutes ? formatMinutes(totalMinutes) : undefined) ||
+        undefined,
+      completionDate:
+        String(
+          finalEvalEntry?.reviewedAt ||
+            enrollment?.approvedAt ||
+            enrollment?.updatedAt ||
+            new Date().toISOString()
+        ),
+      certificateId: `ACAV-CERT-${String(id || "").toUpperCase().slice(0, 8)}-${String(
+        enrollment?.id || user?.uid || ""
+      )
+        .toUpperCase()
+        .slice(0, 8)}`,
+      averageScore: score,
+      logoUrl:
+        String(course?.institutionLogoUrl || course?.companyLogoUrl || "").trim() ||
+        undefined,
+    };
+  }, [
+    courseEligibleForCertificate,
+    course,
+    enrollment,
+    user,
+    id,
+    averageScore,
+    totalMinutes,
+    finalEvalEntry,
+  ]);
+
   const courseInfo = [
     { icon: CalendarDays, label: "Inscripción", value: formatDate(enrollment?.approvedAt || enrollment?.createdAt) || "-", hint: "Fecha en la que tu inscripción quedó formalizada o fue presentada." },
     { icon: BookOpen, label: "Institución", value: course?.institutionName || course?.companyName || "ACAV Cursos", hint: "Organismo que dicta y valida este curso." },
@@ -979,13 +1571,8 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
 
   if (loading || actorLoading) {
     return (
-      <div className="mx-auto max-w-7xl px-3 py-8 md:px-4">
-        <div className="rounded-[30px] border border-slate-200 bg-white p-8 shadow-[0_20px_55px_rgba(15,23,42,0.06)]">
-          <div className="flex items-center gap-3 text-sm text-slate-500">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            Cargando cursada...
-          </div>
-        </div>
+      <div className="bg-[#F6F7FB]">
+        <DashboardDetailSkeleton />
       </div>
     );
   }
@@ -1066,21 +1653,153 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
             />
           </div>
 
-          <div className="mt-6 flex flex-wrap gap-3">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span>
-                  <Button asChild className="rounded-2xl bg-[#6D4CFF] hover:bg-[#5E3EF0]">
-                    <Link href={buildLocalizedPath(`/dashboard/inscripciones/${id}`)}>Ver seguimiento de la inscripción</Link>
-                  </Button>
-                </span>
-              </TooltipTrigger>
-              <TooltipContent side="bottom">
-                <div className="max-w-xs text-[11px] leading-5">
-                  Abre la ficha completa con el historial de pagos, mensajes y novedades de tu inscripción.
-                </div>
-              </TooltipContent>
-            </Tooltip>
+          {/* <div className="mt-6 flex flex-wrap gap-3">
+            <Dialog open={showTracking} onOpenChange={setShowTracking}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <DialogTrigger asChild>
+                    <Button className="rounded-2xl bg-[#6D4CFF] hover:bg-[#5E3EF0]">
+                      Ver seguimiento de la inscripción
+                    </Button>
+                  </DialogTrigger>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  <div className="max-w-xs text-[11px] leading-5">
+                    Historial de pagos, estado académico y novedades de tu inscripción.
+                  </div>
+                </TooltipContent>
+              </Tooltip>
+              <DialogContent size="4xl" className="max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2 text-slate-950">
+                    <FolderKanban className="h-5 w-5 shrink-0 text-[#6D4CFF]" />
+                    Seguimiento de tu inscripción
+                  </DialogTitle>
+                  <DialogDescription className="text-left">
+                    Resumen en tiempo real del estado del pago, tu progreso y las evaluaciones del curso.
+                  </DialogDescription>
+                </DialogHeader>
+                {enrollment ? (() => {
+                  const eduMeta = resolveEducationalStatusMeta(enrollment?.status);
+                  const payMeta = resolvePaymentStatusMeta(enrollment?.paymentStatus || enrollment?.payment?.status);
+                  const EduIcon = eduMeta.Icon || Circle;
+                  const PayIcon = payMeta.Icon || Circle;
+                  const createdAtRaw = (enrollment as any)?.createdAt || (enrollment as any)?.created_at || (enrollment as any)?.submittedAt;
+                  const approvedAtRaw = (enrollment as any)?.approvedAt || (enrollment as any)?.activatedAt;
+                  const paymentNotes = (enrollment as any)?.paymentNotes || (enrollment as any)?.payment?.notes;
+                  const adminMessage = (enrollment as any)?.adminMessage || (enrollment as any)?.notes;
+                  return (
+                    <div className="mt-2 grid w-full gap-4 sm:grid-cols-2">
+                      <div className="w-full rounded-2xl border border-slate-200 bg-[#FCFCFF] p-4">
+                        <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">Estado académico</div>
+                        <div className="mt-2 flex items-center gap-2">
+                          <span className={cn("inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold", eduMeta.badgeClass)}>
+                            <EduIcon className="h-3.5 w-3.5 shrink-0" />
+                            {eduMeta.label}
+                          </span>
+                        </div>
+                        <div className="mt-4 grid grid-cols-2 gap-3 text-[11px]">
+                          <div>
+                            <div className="font-semibold uppercase tracking-[0.16em] text-slate-400">Progreso cursada</div>
+                            <div className="mt-1 flex items-center gap-2">
+                              <CircularProgress size="sm" value={completion} className="shrink-0" />
+                              <span className="text-sm font-semibold text-slate-900">{completion}%</span>
+                            </div>
+                          </div>
+                          <div>
+                            <div className="font-semibold uppercase tracking-[0.16em] text-slate-400">Clases completadas</div>
+                            <div className="mt-1 text-sm font-semibold text-slate-900">{lessonProgress.length} / {totalLessons}</div>
+                          </div>
+                          <div>
+                            <div className="font-semibold uppercase tracking-[0.16em] text-slate-400">Evaluaciones clase</div>
+                            <div className="mt-1 text-sm font-semibold text-slate-900">{perClassProgress.passed} / {perClassProgress.totalEvaluations} aprobadas</div>
+                          </div>
+                          <div>
+                            <div className="font-semibold uppercase tracking-[0.16em] text-slate-400">Evaluación final</div>
+                            <div className="mt-1 text-sm font-semibold text-slate-900">
+                              {!course?.finalEvaluation?.enabled
+                                ? "No requiere"
+                                : finalEvalEntry
+                                ? (String(finalEvalEntry.status || "").trim().toLowerCase() === "passed" ? `Aprobada · ${finalEvalEntry.percentage ?? 0}%` : `En curso · ${finalEvalEntry.percentage ?? 0}%`)
+                                : "Pendiente"}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="w-full rounded-2xl border border-slate-200 bg-[#FCFCFF] p-4">
+                        <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">Estado del pago</div>
+                        <div className="mt-2 flex items-center gap-2 flex-wrap">
+                          <span className={cn("inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold", payMeta.badgeClass)}>
+                            <PayIcon className="h-3.5 w-3.5 shrink-0" />
+                            {payMeta.label}
+                          </span>
+                          {(enrollment as any)?.paymentReference ? (
+                            <Badge variant="soft" color="default" className="rounded-full shrink-0">
+                              <FileText className="mr-1 h-3 w-3" />
+                              Ref. {(enrollment as any).paymentReference}
+                            </Badge>
+                          ) : null}
+                        </div>
+                        <p className="mt-3 text-[11px] leading-5 text-slate-500">{payMeta.description}</p>
+                        <div className="mt-4 grid grid-cols-2 gap-3 text-[11px]">
+                          <div>
+                            <div className="font-semibold uppercase tracking-[0.16em] text-slate-400">Inscripción</div>
+                            <div className="mt-1 text-sm font-semibold text-slate-900 break-all">#{String(id || "").slice(0, 12)}</div>
+                          </div>
+                          <div>
+                            <div className="font-semibold uppercase tracking-[0.16em] text-slate-400">Fecha inicio</div>
+                            <div className="mt-1 text-sm font-semibold text-slate-900">{createdAtRaw ? new Date(String(createdAtRaw)).toLocaleDateString() : "—"}</div>
+                          </div>
+                          <div>
+                            <div className="font-semibold uppercase tracking-[0.16em] text-slate-400">Aprobada en</div>
+                            <div className="mt-1 text-sm font-semibold text-slate-900">{approvedAtRaw ? new Date(String(approvedAtRaw)).toLocaleDateString() : "—"}</div>
+                          </div>
+                          <div>
+                            <div className="font-semibold uppercase tracking-[0.16em] text-slate-400">Intentos final</div>
+                            <div className="mt-1 text-sm font-semibold text-slate-900">
+                              {course?.finalEvaluation?.enabled ? `${finalEvaluationUsedAttempts()}${typeof course.finalEvaluation.maxAttempts === "number" ? ` / ${course.finalEvaluation.maxAttempts}` : ""}` : "—"}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      {(adminMessage || paymentNotes || (enrollment as any)?.paymentReceiptUrl) ? (
+                        <div className="w-full sm:col-span-2 rounded-2xl border border-slate-200 bg-white p-4">
+                          <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">Novedades y comprobantes</div>
+                          <div className="mt-3 space-y-3 text-sm leading-6 text-slate-600">
+                            {adminMessage ? (
+                              <div className="rounded-2xl border border-violet-100 bg-violet-50/60 p-3">
+                                <div className="text-[11px] font-semibold uppercase tracking-wider text-violet-600">Mensaje de coordinación</div>
+                                <div className="mt-1 break-words">{String(adminMessage)}</div>
+                              </div>
+                            ) : null}
+                            {paymentNotes ? (
+                              <div className="rounded-2xl border border-amber-100 bg-amber-50/60 p-3">
+                                <div className="text-[11px] font-semibold uppercase tracking-wider text-amber-700">Notas de pago</div>
+                                <div className="mt-1 break-words">{String(paymentNotes)}</div>
+                              </div>
+                            ) : null}
+                            {(enrollment as any)?.paymentReceiptUrl ? (
+                              <div>
+                                <a
+                                  href={String((enrollment as any).paymentReceiptUrl)}
+                                  target="_blank"
+                                  rel="noreferrer noopener"
+                                  className="inline-flex items-center gap-2 text-[11px] font-semibold text-[#5B5BD6] hover:underline"
+                                >
+                                  <Download className="h-3.5 w-3.5" />
+                                  Descargar comprobante de pago
+                                  <ExternalLink className="h-3.5 w-3.5" />
+                                </a>
+                              </div>
+                            ) : null}
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
+                  );
+                })() : null}
+              </DialogContent>
+            </Dialog>
             <Tooltip>
               <TooltipTrigger asChild>
                 <span>
@@ -1093,7 +1812,7 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
                 <div className="text-[11px]">Panel consolidado de todas tus inscripciones y pagos.</div>
               </TooltipContent>
             </Tooltip>
-          </div>
+          </div> */}
         </div>
       </div>
     );
@@ -1114,7 +1833,7 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
 
   return (
     <div className="bg-[#F6F7FB]">
-      <div className="mx-auto max-w-[1380px] px-3 py-6 md:px-4 md:py-8">
+      <div className="mx-auto px-3 py-6 md:px-4 md:py-8">
         <div className="mb-5">
           <Link
             href={buildLocalizedPath("/dashboard/mis-cursos")}
@@ -1125,148 +1844,127 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
           </Link>
         </div>
 
-        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_330px]">
-          <div className="space-y-6">
-            <section className="rounded-[32px] border border-slate-200 bg-white p-4 shadow-[0_22px_70px_rgba(15,23,42,0.06)] md:p-5 lg:p-6">
-              <div className="grid gap-5 xl:grid-cols-[360px_minmax(0,1fr)]">
+        <div className="grid gap-5 md:gap-6 xl:grid-cols-[minmax(0,1fr)_330px] 2xl:grid-cols-[minmax(0,1fr)_360px]">
+          <div className="space-y-5 md:space-y-6">
+            <section id="video-destacado" className="rounded-[28px] md:rounded-[32px] border border-slate-200 bg-white p-4 shadow-[0_22px_70px_rgba(15,23,42,0.06)] md:p-5 lg:p-6">
+              <div className="grid gap-4 md:gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] xl:grid-cols-[420px_minmax(0,1fr)] 2xl:grid-cols-[480px_minmax(0,1fr)]">
                 <div
                   className={cn(
-                    "group relative min-h-[320px] overflow-hidden rounded-[28px] border border-[#D9D5FF] bg-[radial-gradient(circle_at_top,#9B8BFF_0%,#5F43FF_42%,#24104D_100%)] shadow-[0_30px_80px_rgba(76,29,149,0.28)] transition duration-500 hover:-translate-y-1 hover:scale-[1.01] hover:shadow-[0_34px_90px_rgba(76,29,149,0.34)] focus-within:ring-2 focus-within:ring-[#8B5CF6] focus-within:ring-offset-2",
-                    featuredVideo ? "border-[#C9BFFF]" : "border-slate-200"
+                    "flex flex-col gap-4 overflow-hidden rounded-[24px] md:rounded-[28px] border border-[#D9D5FF] bg-[radial-gradient(circle_at_top,#9B8BFF_0%,#5F43FF_42%,#24104D_100%)] shadow-[0_30px_80px_rgba(76,29,149,0.28)] transition duration-500",
+                    effectiveVideo ? "border-[#C9BFFF]" : "border-slate-200"
                   )}
                 >
-                  {featuredVideo ? (
-                    <>
-                      {inlineFeaturedVideo ? (
-                        <VideoPlayer
-                          src={featuredVideoKind === "file" ? featuredVideo.url : featuredVideoEmbed || featuredVideo.url}
-                          kind={featuredVideoKind === "file" ? "file" : "embed"}
-                          title={featuredVideo.title}
-                          poster={featuredVideo.posterUrl || undefined}
-                          qualities={featuredVideo.qualities || undefined}
-                          subtitles={featuredVideo.subtitles || undefined}
-                          className="absolute inset-0 h-full w-full !rounded-none border-0 shadow-none"
-                          fallbackLabel="Contenido no disponible temporalmente"
-                        />
-                      ) : featuredVideo.posterUrl ? (
-                        <div
-                          className="absolute inset-0 transition duration-500 group-hover:scale-[1.04] group-hover:opacity-90"
-                          style={{
-                            backgroundImage: `url(${featuredVideo.posterUrl})`,
-                            backgroundPosition: "center",
-                            backgroundRepeat: "no-repeat",
-                            backgroundSize: "cover",
-                          }}
-                          aria-label={featuredVideo.title}
-                          role="img"
-                        />
-                      ) : null}
+                  <div className="relative aspect-video w-full overflow-hidden bg-black/90">
+                    {effectiveVideo ? (
+                      <>
+                        {effectiveInlineVideo ? (
+                          <VideoPlayer
+                            key={effectivePlayerKey}
+                            src={effectivePlayerSrc}
+                            kind={effectiveVideoKind === "file" ? "file" : "embed"}
+                            title={effectiveVideo.title}
+                            poster={effectiveVideo.posterUrl || undefined}
+                            qualities={effectiveVideo.qualities || undefined}
+                            subtitles={effectiveVideo.subtitles || undefined}
+                            className="absolute inset-0 h-full w-full !rounded-none border-0 shadow-none"
+                            fallbackLabel="Contenido no disponible temporalmente"
+                            autoPlay={Boolean(activeVideoSource)}
+                          />
+                        ) : effectiveVideo.posterUrl ? (
+                          <div
+                            className="absolute inset-0 transition duration-500"
+                            style={{
+                              backgroundImage: `url(${effectiveVideo.posterUrl})`,
+                              backgroundPosition: "center",
+                              backgroundRepeat: "no-repeat",
+                              backgroundSize: "cover",
+                            }}
+                            aria-label={effectiveVideo.title}
+                            role="img"
+                          />
+                        ) : null}
 
-                      <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(15,23,42,0.05)_0%,rgba(15,23,42,0.24)_40%,rgba(15,23,42,0.82)_100%)]" />
-                      <div className="absolute inset-x-0 top-0 h-24 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.42),transparent_66%)] opacity-80" />
+                        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(15,23,42,0)_0%,rgba(15,23,42,0.08)_35%,rgba(15,23,42,0.35)_100%)]" />
 
-                      <div className="absolute inset-x-4 top-4 flex flex-wrap gap-2">
-                        <TonePill
-                          icon={Video}
-                          label={featuredVideo.durationLabel || "Video"}
-                          className="border-white/30 bg-white/16 text-white backdrop-blur-sm"
-                        />
-                        <TonePill
-                          icon={CalendarDays}
-                          label={formatDate(featuredVideo.publishedAt) || "Disponible ahora"}
-                          className="border-white/30 bg-white/16 text-white backdrop-blur-sm"
-                        />
-                      </div>
-
-                      <div className="absolute inset-x-4 bottom-4 space-y-4">
-                        <div>
-                          <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-white/70">
-                            {featuredVideo.topic}
+                        <div className="absolute inset-x-3 top-3 flex flex-wrap items-center justify-between gap-2">
+                          <div className="flex flex-wrap gap-2">
+                            <TonePill
+                              icon={Video}
+                              label={effectiveVideo.durationLabel || "Video"}
+                              className="border-white/30 bg-black/45 text-white backdrop-blur-sm"
+                            />
+                            <TonePill
+                              icon={CalendarDays}
+                              label={formatDate(effectiveVideo.publishedAt) || "Disponible ahora"}
+                              className="border-white/30 bg-black/45 text-white backdrop-blur-sm"
+                            />
                           </div>
-                          <h2 className="mt-2 text-[24px] font-semibold tracking-[-0.03em] text-white">
-                            {featuredVideo.title}
-                          </h2>
-                          {featuredVideo.summary ? (
-                            <p className="mt-2 line-clamp-2 max-w-[26rem] text-sm leading-6 text-white/78">
-                              {featuredVideo.summary}
-                            </p>
+                          {activeVideoSource ? (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="rounded-full border-white/20 bg-black/50 text-white hover:bg-black/60 h-8 backdrop-blur-sm"
+                              onClick={() => setActiveVideoSource(null)}
+                            >
+                              Volver al video principal
+                            </Button>
                           ) : null}
                         </div>
-
-                        <div className="flex flex-wrap items-center gap-3">
-                          <Button
-                            asChild
-                            className="rounded-2xl bg-white text-slate-950 shadow-[0_10px_30px_rgba(255,255,255,0.18)] hover:bg-white/95"
-                          >
-                            <a
-                              href={featuredVideo.url}
-                              target="_blank"
-                              rel="noreferrer"
-                              aria-label={`Reproducir ${featuredVideo.title}`}
-                            >
-                              <PlayCircle className="mr-2 h-4 w-4" />
-                              Reproducir
-                            </a>
-                          </Button>
-                          <Button
-                            asChild
-                            variant="outline"
-                            className="rounded-2xl border-white/20 bg-white/10 text-white hover:bg-white/16 hover:text-white"
-                          >
-                            <a
-                              href={featuredVideo.url}
-                              target="_blank"
-                              rel="noreferrer"
-                              aria-label={`Abrir ${featuredVideo.title} en una pestaña nueva`}
-                            >
-                              <ExternalLink className="mr-2 h-4 w-4" />
-                              Abrir recurso
-                            </a>
-                          </Button>
-                        </div>
-
-                        <div className="rounded-[18px] border border-white/15 bg-white/10 p-3 backdrop-blur-md">
-                          <div className="flex items-center justify-between gap-3">
-                            <div>
-                              <div className="text-xs font-semibold text-white">Progreso de visualización estimado</div>
-                              <div className="mt-1 text-[11px] text-white/72">
-                                {featuredVideo.progress > 0 ? "Contenido retomable" : "Aún no comenzado"}
-                              </div>
-                            </div>
-                            <div className="text-lg font-semibold tracking-[-0.03em] text-white">
-                              {featuredVideo.progress}%
-                            </div>
-                          </div>
-                          <Progress
-                            value={featuredVideo.progress}
-                            size="sm"
-                            className="mt-3 bg-white/15 [&>div]:bg-[linear-gradient(90deg,#7C3AED_0%,#A78BFA_100%)]"
-                            aria-label="Progreso de visualización"
-                          />
-                        </div>
+                      </>
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center">
+                        <TonePill
+                          icon={PlayCircle}
+                          label="Sin video principal"
+                          className="border-white/20 bg-white/10 text-white backdrop-blur"
+                        />
                       </div>
-                    </>
-                  ) : (
-                    <div className="flex h-full min-h-[320px] flex-col justify-between p-6 text-white">
+                    )}
+                  </div>
+
+                  <div className="space-y-4 px-4 pb-4 sm:px-5 sm:pb-5 text-white">
+                    <div>
                       <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-white/70">
-                        Vista principal
+                        {effectiveVideo ? effectiveVideo.topic : "Vista principal"}
                       </div>
-                      <div>
-                        <div className="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-[20px] bg-white/12 text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.12)]">
-                          <BookOpen className="h-8 w-8" />
-                        </div>
-                        <h2 className="text-[24px] font-semibold tracking-[-0.03em]">
-                          {course.title}
-                        </h2>
+                      <h2 className="mt-2 text-[18px] sm:text-[20px] md:text-[22px] font-semibold tracking-[-0.03em]">
+                        {effectiveVideo ? effectiveVideo.title : course.title}
+                      </h2>
+                      {effectiveVideo?.summary ? (
+                        <p className="mt-2 line-clamp-3 max-w-none text-sm leading-6 text-white/82">
+                          {effectiveVideo.summary}
+                        </p>
+                      ) : !effectiveVideo ? (
                         <p className="mt-3 text-sm leading-6 text-white/78">
                           Esta cursada no tiene un video principal cargado, pero el temario y los recursos ya están organizados para continuar.
                         </p>
-                      </div>
+                      ) : null}
                     </div>
-                  )}
+
+                    <div className="rounded-[18px] border border-white/15 bg-white/10 p-3 backdrop-blur-md">
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <div className="text-xs font-semibold text-white">Progreso de visualización estimado</div>
+                            <div className="mt-1 text-[11px] text-white/72">
+                              {(effectiveVideo?.progress ?? 0) > 0 ? "Contenido retomable" : "Aún no comenzado"}
+                            </div>
+                          </div>
+                          <div className="text-lg font-semibold tracking-[-0.03em] text-white">
+                            {effectiveVideo?.progress ?? 0}%
+                          </div>
+                        </div>
+                      <Progress
+                        value={effectiveVideo?.progress ?? 0}
+                        size="sm"
+                        className="mt-3 bg-white/15 [&>div]:bg-[linear-gradient(90deg,#7C3AED_0%,#A78BFA_100%)]"
+                        aria-label="Progreso de visualización"
+                      />
+                    </div>
+                  </div>
                 </div>
 
-                <div className="flex flex-col justify-between rounded-[28px] border border-slate-100 bg-[linear-gradient(180deg,#FFFFFF_0%,#FBFAFF_100%)] p-5 md:p-6">
+                <div className="flex flex-col justify-between rounded-[24px] md:rounded-[28px] border border-slate-100 bg-[linear-gradient(180deg,#FFFFFF_0%,#FBFAFF_100%)] p-4 sm:p-5 md:p-6">
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
                       <TonePill
@@ -1290,22 +1988,22 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
                       ) : null}
                     </div>
 
-                    <h1 className="mt-4 text-[32px] font-semibold tracking-[-0.04em] text-slate-950 md:text-[36px]">
+                    <h1 className="mt-4 text-[24px] sm:text-[28px] md:text-[32px] font-semibold tracking-[-0.04em] text-slate-950 lg:text-[36px]">
                       {course.title}
                     </h1>
                     <p className="mt-2 text-sm text-slate-500">
                       {course.institutionName || course.companyName || "ACAV Cursos"}
                     </p>
 
-                    <div className="mt-7">
-                      <div className="flex items-end justify-between gap-4">
+                    <div className="mt-5 sm:mt-7">
+                      <div className="flex items-end justify-between gap-3 md:gap-4">
                         <div>
                           <div className="text-sm font-semibold text-slate-900">Tu progreso general</div>
                           <p className="mt-1 text-xs text-slate-500">
                             {lessonProgress.length} de {totalLessons} clases completadas
                           </p>
                         </div>
-                        <div className="text-[24px] font-semibold tracking-[-0.03em] text-[#6D4CFF]">
+                        <div className="text-[20px] sm:text-[24px] font-semibold tracking-[-0.03em] text-[#6D4CFF]">
                           {completion}%
                         </div>
                       </div>
@@ -1317,11 +2015,11 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
                       />
                     </div>
 
-                    <div className="mt-6 rounded-[24px] border border-slate-200 bg-white p-4 shadow-[0_14px_36px_rgba(15,23,42,0.04)]">
+                    <div className="mt-5 sm:mt-6 rounded-[20px] md:rounded-[24px] border border-slate-200 bg-white p-3 sm:p-4 shadow-[0_14px_36px_rgba(15,23,42,0.04)]">
                       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                        <div className="flex items-center gap-4">
-                          <div className="flex h-16 w-16 items-center justify-center rounded-[20px] bg-[linear-gradient(145deg,#7C3AED_0%,#5B5BD6_100%)] text-white shadow-[0_12px_28px_rgba(109,76,255,0.28)]">
-                            <PlayCircle className="h-8 w-8" />
+                        <div className="flex items-center gap-3 sm:gap-4">
+                          <div className="flex h-14 w-14 sm:h-16 sm:w-16 shrink-0 items-center justify-center rounded-[18px] md:rounded-[20px] bg-[linear-gradient(145deg,#7C3AED_0%,#5B5BD6_100%)] text-white shadow-[0_12px_28px_rgba(109,76,255,0.28)]">
+                            <PlayCircle className="h-7 w-7 sm:h-8 sm:w-8" />
                           </div>
                           <div className="min-w-0">
                             <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
@@ -1365,7 +2063,7 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
               </div>
             </section>
 
-            <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <section className="grid gap-3 md:gap-4 grid-cols-2 md:grid-cols-2 xl:grid-cols-4">
               <MetricCard
                 label="Completado"
                 value={`${completion}%`}
@@ -1396,7 +2094,7 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
               />
             </section>
 
-            <section id="ruta-del-curso" className="rounded-[30px] border border-slate-200 bg-white p-5 shadow-[0_20px_60px_rgba(15,23,42,0.05)] md:p-6">
+            <section id="ruta-del-curso" className="rounded-[24px] md:rounded-[30px] border border-slate-200 bg-white p-4 shadow-[0_20px_60px_rgba(15,23,42,0.05)] md:p-6">
               <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div>
                   <h2 className="text-[22px] font-semibold tracking-[-0.03em] text-slate-950">Ruta del curso</h2>
@@ -1578,21 +2276,22 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
                                         <Tooltip>
                                           <TooltipTrigger asChild>
                                             <span>
-                                              <Button asChild variant="outline" className="rounded-2xl border-slate-200">
-                                                <a
-                                                  href={lesson.videoUrl}
-                                                  target="_blank"
-                                                  rel="noreferrer"
-                                                  aria-label={`Abrir ${lesson.title || "clase"}`}
-                                                >
-                                                  <PlayCircle className="mr-2 h-4 w-4" />
-                                                  Abrir
-                                                </a>
+                                              <Button
+                                                type="button"
+                                                variant="outline"
+                                                className="rounded-2xl border-slate-200"
+                                                onClick={() => playSourceFromLesson(lesson, section?.title)}
+                                                aria-label={`Reproducir ${lesson.title || "clase"}`}
+                                              >
+                                                <PlayCircle className="mr-2 h-4 w-4" />
+                                                Reproducir
                                               </Button>
                                             </span>
                                           </TooltipTrigger>
                                           <TooltipContent side="top">
-                                            <div className="text-[11px]">Abre el video o enlace de la clase en una pestaña nueva.</div>
+                                            <div className="text-[11px]">
+                                              Reproduce el video de la clase directamente en el panel superior.
+                                            </div>
                                           </TooltipContent>
                                         </Tooltip>
                                       ) : null}
@@ -1767,57 +2466,131 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
                                           ) : null}
 
                                           {hasEval ? (
-                                            <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                                              <div>
-                                                <div className="text-sm font-semibold text-slate-950">
-                                                  {lesson.evaluation.title || `Evaluación · ${lesson.title}`}
+                                            <div
+                                              id={`clase-${lesson.id || "eval"}`}
+                                              className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4"
+                                            >
+                                              <div className="flex flex-wrap items-start justify-between gap-3">
+                                                <div className="min-w-0 flex-1">
+                                                  <div className="text-sm font-semibold text-slate-950">
+                                                    {lesson.evaluation.title || `Evaluación · ${lesson.title}`}
+                                                  </div>
+                                                  {lesson.evaluation.description ? (
+                                                    <p className="mt-1 text-xs text-slate-500">
+                                                      {lesson.evaluation.description}
+                                                    </p>
+                                                  ) : null}
+                                                  <div className="mt-2 flex flex-wrap gap-2">
+                                                    <Badge variant="soft" color="secondary" className="rounded-full">
+                                                      {(lesson.evaluation.questions || []).length} preguntas
+                                                    </Badge>
+                                                    {lesson.evaluation.passingScore ? (
+                                                      <Badge variant="soft" color="success" className="rounded-full">
+                                                        Mínimo {lesson.evaluation.passingScore}%
+                                                      </Badge>
+                                                    ) : null}
+                                                    {lesson.evaluation.maxAttempts ? (
+                                                      <Badge variant="soft" color="warning" className="rounded-full">
+                                                        {lesson.evaluation.maxAttempts} intentos
+                                                      </Badge>
+                                                    ) : null}
+                                                    {evalState?.attempts ? (
+                                                      <Badge variant="soft" color="default" className="rounded-full">
+                                                        {evalState.attempts}/{lesson.evaluation.maxAttempts || "∞"} realizados
+                                                      </Badge>
+                                                    ) : null}
+                                                  </div>
                                                 </div>
-                                                {lesson.evaluation.description ? (
-                                                  <p className="mt-1 text-xs text-slate-500">
-                                                    {lesson.evaluation.description}
-                                                  </p>
-                                                ) : null}
-                                                <div className="mt-2 flex flex-wrap gap-2">
-                                                  <Badge variant="soft" color="secondary" className="rounded-full">
-                                                    {(lesson.evaluation.questions || []).length} preguntas
-                                                  </Badge>
-                                                  {lesson.evaluation.passingScore ? (
-                                                    <Badge variant="soft" color="success" className="rounded-full">
-                                                      Mínimo {lesson.evaluation.passingScore}%
-                                                    </Badge>
-                                                  ) : null}
-                                                  {lesson.evaluation.maxAttempts ? (
-                                                    <Badge variant="soft" color="warning" className="rounded-full">
-                                                      {lesson.evaluation.maxAttempts} intentos
-                                                    </Badge>
-                                                  ) : null}
-                                                  {evalState?.attempts ? (
-                                                    <Badge variant="soft" color="default" className="rounded-full">
-                                                      {evalState.attempts}/{lesson.evaluation.maxAttempts || "∞"} realizados
-                                                    </Badge>
-                                                  ) : null}
-                                                </div>
+                                                {openEvaluationId !== String(lesson?.id || "") ? (
+                                                  <Button
+                                                    type="button"
+                                                    disabled={
+                                                      !evalUnlocked ||
+                                                      evalState?.passed === true ||
+                                                      (lesson.evaluation.maxAttempts &&
+                                                        evalState?.attempts &&
+                                                        evalState.attempts >= lesson.evaluation.maxAttempts)
+                                                    }
+                                                    className="rounded-2xl bg-[#1B2B50] hover:bg-[#233A6A]"
+                                                    onClick={() => setOpenEvaluationId(String(lesson?.id || ""))}
+                                                  >
+                                                    <FileQuestion className="mr-2 h-4 w-4" />
+                                                    {evalState?.passed === true
+                                                      ? "Ya aprobada"
+                                                      : lesson.evaluation.maxAttempts &&
+                                                          evalState?.attempts &&
+                                                          evalState.attempts >= lesson.evaluation.maxAttempts
+                                                      ? "Sin intentos disponibles"
+                                                      : evalUnlocked
+                                                      ? "Rendir evaluación"
+                                                      : "Esperando recursos"}
+                                                  </Button>
+                                                ) : (
+                                                  <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    className="rounded-2xl"
+                                                    onClick={() => setOpenEvaluationId(null)}
+                                                  >
+                                                    Ocultar evaluación
+                                                  </Button>
+                                                )}
                                               </div>
-                                              <Button
-                                                asChild
-                                                disabled={!evalUnlocked || evalState?.passed === true || (lesson.evaluation.maxAttempts && evalState?.attempts && evalState.attempts >= lesson.evaluation.maxAttempts)}
-                                                className="rounded-2xl bg-[#1B2B50] hover:bg-[#233A6A]"
-                                              >
-                                                <a
-                                                  href={evalUnlocked ? `#clase-${lesson.id || "eval"}` : undefined}
-                                                  onClick={(e) => (!evalUnlocked || evalState?.passed === true || (lesson.evaluation.maxAttempts && evalState?.attempts && evalState.attempts >= lesson.evaluation.maxAttempts)) && e.preventDefault()}
-                                                  aria-disabled={!evalUnlocked || evalState?.passed === true || (lesson.evaluation.maxAttempts && evalState?.attempts && evalState.attempts >= lesson.evaluation.maxAttempts)}
-                                                >
-                                                  <FileQuestion className="mr-2 h-4 w-4" />
-                                                  {evalState?.passed === true
-                                                    ? "Ya aprobada"
-                                                    : lesson.evaluation.maxAttempts && evalState?.attempts && evalState.attempts >= lesson.evaluation.maxAttempts
-                                                    ? "Sin intentos disponibles"
-                                                    : evalUnlocked
-                                                    ? "Rendir evaluación"
-                                                    : "Esperando recursos"}
-                                                </a>
-                                              </Button>
+
+                                              {openEvaluationId === String(lesson?.id || "") &&
+                                              evalUnlocked &&
+                                              Array.isArray(lesson.evaluation.questions) &&
+                                              lesson.evaluation.questions.length ? (
+                                                <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
+                                                  <EvaluationRenderer
+                                                    key={lesson.id}
+                                                    questions={lesson.evaluation.questions}
+                                                    title={lesson.evaluation.title}
+                                                    description={lesson.evaluation.description}
+                                                    passingScore={lesson.evaluation.passingScore}
+                                                    maxAttempts={lesson.evaluation.maxAttempts}
+                                                    attemptsUsed={evalState?.attempts ?? 0}
+                                                    defaultPoints={lesson.evaluation.defaultPoints}
+                                                    previousResult={
+                                                      evalState?.submitted
+                                                        ? {
+                                                            questions: [],
+                                                            totalScore: Number(evalState.score ?? 0),
+                                                            totalMaxScore: Number(evalState.maxScore ?? 0),
+                                                            percentage: Number.isFinite(Number(evalState.percentage))
+                                                              ? Number(evalState.percentage)
+                                                              : Number(evalState.maxScore) > 0
+                                                              ? Math.round(
+                                                                  (Number(evalState.score ?? 0) / Number(evalState.maxScore)) *
+                                                                    100
+                                                                )
+                                                              : 0,
+                                                            passingPercentage: Number(lesson.evaluation.passingScore ?? 60),
+                                                            passed: Boolean(evalState.passed),
+                                                            correctCount:
+                                                              Number.isFinite(Number((evalState.bestEntry as any)?.correctCount))
+                                                                ? Number((evalState.bestEntry as any).correctCount)
+                                                                : typeof evalState.percentage === "number" &&
+                                                                  Number.isFinite(evalState.percentage)
+                                                                ? Math.round(
+                                                                    ((lesson.evaluation.questions || []).length *
+                                                                      evalState.percentage) /
+                                                                      100
+                                                                  )
+                                                                : undefined,
+                                                            totalCount:
+                                                              Number.isFinite(Number((evalState.bestEntry as any)?.totalCount))
+                                                                ? Number((evalState.bestEntry as any).totalCount)
+                                                                : (lesson.evaluation.questions || []).length,
+                                                          }
+                                                        : undefined
+                                                    }
+                                                    onSubmit={async (result) =>
+                                                      submitLessonEvaluation(lesson, result)
+                                                    }
+                                                  />
+                                                </div>
+                                              ) : null}
                                             </div>
                                           ) : null}
                                         </div>
@@ -1838,7 +2611,7 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
               </div>
             </section>
 
-            <section id="contenidos-academicos" className="rounded-[30px] border border-slate-200 bg-white p-5 shadow-[0_20px_60px_rgba(15,23,42,0.05)] md:p-6">
+            <section id="contenidos-academicos" className="rounded-[24px] md:rounded-[30px] border border-slate-200 bg-white p-4 shadow-[0_20px_60px_rgba(15,23,42,0.05)] md:p-6">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
                 <div>
                   <h2 className="text-[22px] font-semibold tracking-[-0.03em] text-slate-950">
@@ -1849,7 +2622,7 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
                   </p>
                 </div>
 
-                <div className="grid gap-3 sm:grid-cols-3">
+                <div className="w-full grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 md:gap-3">
                   <div className="grid gap-2">
                     <label className="sr-only" htmlFor="tipo-contenido">
                       Filtrar por tipo
@@ -2084,14 +2857,6 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
                           </div>
 
                           <div className="flex flex-wrap gap-2">
-                            {item.ctaHref ? (
-                              <Button asChild variant="outline" className="rounded-2xl border-slate-200">
-                                <a href={item.ctaHref} target="_blank" rel="noreferrer">
-                                  <ExternalLink className="mr-2 h-4 w-4" />
-                                  {item.ctaLabel || "Abrir"}
-                                </a>
-                              </Button>
-                            ) : null}
                             {["video", "text", "live", "download"].includes(item.type) && item.id ? (
                               <Button
                                 type="button"
@@ -2135,7 +2900,7 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
               </div>
             </section>
 
-            <section className="rounded-[30px] border border-slate-200 bg-white p-5 shadow-[0_20px_60px_rgba(15,23,42,0.05)] md:p-6">
+            <section className="rounded-[24px] md:rounded-[30px] border border-slate-200 bg-white p-4 shadow-[0_20px_60px_rgba(15,23,42,0.05)] md:p-6">
               <div className="flex items-center gap-3">
                 <ClipboardCheck className="h-5 w-5 text-[#6D4CFF]" />
                 <div>
@@ -2239,8 +3004,8 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
               </div>
             </section>
 
-            <section className="rounded-[30px] border border-slate-200 bg-white p-5 shadow-[0_20px_60px_rgba(15,23,42,0.05)] md:p-6">
-              <div className="flex items-center justify-between gap-4">
+            <section className="rounded-[24px] md:rounded-[30px] border border-slate-200 bg-white p-4 shadow-[0_20px_60px_rgba(15,23,42,0.05)] md:p-6">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <h2 className="text-[22px] font-semibold tracking-[-0.03em] text-slate-950">
                     Materiales y recursos del curso
@@ -2305,8 +3070,8 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
             </section>
           </div>
 
-          <aside className="space-y-6">
-            <section className="rounded-[30px] border border-slate-200 bg-white p-5 shadow-[0_20px_60px_rgba(15,23,42,0.05)]">
+          <aside className="space-y-5 md:space-y-6">
+            <section className="rounded-[24px] md:rounded-[30px] border border-slate-200 bg-white p-4 md:p-5 shadow-[0_20px_60px_rgba(15,23,42,0.05)]">
               <div className="flex items-center justify-between gap-3">
                 <div className="text-lg font-semibold text-slate-950">Información del curso</div>
                 <Tooltip>
@@ -2329,7 +3094,7 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
               </div>
             </section>
 
-            <section className="rounded-[30px] border border-slate-200 bg-white p-5 shadow-[0_20px_60px_rgba(15,23,42,0.05)]">
+            <section className="rounded-[24px] md:rounded-[30px] border border-slate-200 bg-white p-4 md:p-5 shadow-[0_20px_60px_rgba(15,23,42,0.05)]">
               <div className="flex items-center justify-between gap-3">
                 <div className="text-lg font-semibold text-slate-950">Tu progreso</div>
                 <Tooltip>
@@ -2356,7 +3121,7 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
                         aria-label="Progreso circular del curso"
                       />
                       <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-                        <div className="text-[34px] font-semibold tracking-[-0.04em] text-slate-950">{completion}%</div>
+                        <div className="text-[19px] font-semibold tracking-[-0.04em] text-slate-950">{completion}%</div>
                         <div className="text-xs font-medium text-slate-500">Completado</div>
                       </div>
                     </div>
@@ -2372,12 +3137,6 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
               <div className="mt-6 space-y-4">
                 <InfoRow icon={BookOpen} label="Clases" value={`${lessonProgress.length} / ${totalLessons || 0}`} hint="Cantidad de clases marcadas como completadas sobre el total disponible." />
                 <InfoRow icon={ClipboardCheck} label="Actividades" value={`${activitySubmissions.length} / ${activityLessons.length || 0}`} hint="Tareas, prácticos o quizzes que ya fueron presentados." />
-                <InfoRow
-                  icon={GraduationCap}
-                  label="Examen final"
-                  value={course?.finalEvaluation?.enabled ? "Pendiente" : "No aplica"}
-                  hint={course?.finalEvaluation?.enabled ? "Evaluación obligatoria para certificar la cursada." : "Este curso no requiere examen final de certificación."}
-                />
               </div>
 
               <Tooltip>
@@ -2394,7 +3153,7 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
               </Tooltip>
             </section>
 
-            <section className="rounded-[30px] border border-slate-200 bg-white p-5 shadow-[0_20px_60px_rgba(15,23,42,0.05)]">
+            <section className="rounded-[24px] md:rounded-[30px] border border-slate-200 bg-white p-4 md:p-5 shadow-[0_20px_60px_rgba(15,23,42,0.05)]">
               <div className="flex items-center justify-between gap-3">
                 <div className="text-lg font-semibold text-slate-950">Próximas actividades</div>
                 <Tooltip>
@@ -2476,7 +3235,7 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
               </div>
             </section>
 
-            <section className="rounded-[30px] border border-slate-200 bg-white p-5 shadow-[0_20px_60px_rgba(15,23,42,0.05)]">
+            <section className="rounded-[24px] md:rounded-[30px] border border-slate-200 bg-white p-4 md:p-5 shadow-[0_20px_60px_rgba(15,23,42,0.05)]">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
                   <GraduationCap className="h-5 w-5 text-[#6D4CFF]" />
@@ -2550,11 +3309,18 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
               </div>
             </section>
 
-            <section className="rounded-[30px] border border-slate-200 bg-white p-5 shadow-[0_20px_60px_rgba(15,23,42,0.05)]">
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  <BookOpen className="h-5 w-5 text-[#6D4CFF]" />
-                  <div className="text-lg font-semibold text-slate-950">Evaluación final</div>
+            <section className="w-full min-w-0 rounded-[24px] md:rounded-[30px] border border-slate-200 bg-white p-4 md:p-5 shadow-[0_20px_60px_rgba(15,23,42,0.05)]">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex min-w-0 items-start gap-3">
+                  <div className="mt-0.5 shrink-0 rounded-2xl bg-violet-100 p-2 text-violet-700">
+                    <BookOpen className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-base font-semibold leading-snug tracking-tight text-slate-950">Evaluación final</div>
+                    {course?.finalEvaluation?.enabled && course.finalEvaluation.title ? (
+                      <div className="mt-0.5 truncate text-xs font-medium text-slate-500">{course.finalEvaluation.title}</div>
+                    ) : null}
+                  </div>
                 </div>
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -2569,7 +3335,7 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
                   </TooltipContent>
                 </Tooltip>
               </div>
-              <div className="mt-4">
+              <div className="mt-4 w-full min-w-0">
                 {course?.finalEvaluation?.enabled ? (
                   (() => {
                     const unlocked = isFinalEvaluationUnlocked(course, perClassStates);
@@ -2582,188 +3348,270 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
                     const requireResources = course.finalEvaluation.requireAllResourcesReady !== false;
                     const requireEvaluations = course.finalEvaluation.requireAllLessonsEvaluationsCompleted !== false;
                     const reason = finalEvaluationUnlockedReason(course, perClassStates);
+                    const totalQuestions = Array.isArray(course.finalEvaluation.questions) ? course.finalEvaluation.questions.length : 0;
                     return (
-                      <div
-                        className={cn(
-                          "rounded-[22px] border p-4",
-                          unlocked ? "border-slate-200 bg-[#FCFCFF]" : "border-amber-200 bg-amber-50/60"
-                        )}
-                      >
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                          <div className="text-sm font-semibold text-slate-950">
-                            {course.finalEvaluation.title || "Evaluación de cierre"}
-                          </div>
-                          {unlocked ? (
-                            <Badge variant="soft" color="success" className="rounded-full">
-                              <CheckCircle2 className="mr-1 h-3 w-3" /> Habilitada
-                            </Badge>
-                          ) : (
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Badge variant="soft" color="warning" className="rounded-full cursor-help">
-                                  <Clock3 className="mr-1 h-3 w-3" /> Bloqueada
-                                </Badge>
-                              </TooltipTrigger>
-                              <TooltipContent side="bottom">
-                                <div className="max-w-[240px] leading-5 text-[11px]">
-                                  {reason || "Completá todas las clases y evaluaciones para habilitar el examen final."}
-                                </div>
-                              </TooltipContent>
-                            </Tooltip>
+                      <div className="w-full min-w-0">
+                        <div
+                          className={cn(
+                            "w-full min-w-0 rounded-[22px] border p-4",
+                            unlocked ? "border-slate-200 bg-[#FCFCFF]" : "border-amber-200 bg-amber-50/60"
                           )}
-                        </div>
-                        {course.finalEvaluation.description ? (
-                          <p className="mt-2 text-sm leading-6 text-slate-500">
-                            {course.finalEvaluation.description}
-                          </p>
-                        ) : null}
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <span>
-                                <Badge
-                                  variant="soft"
-                                  color="default"
-                                  className="bg-violet-100 text-violet-700 hover:text-violet-700 cursor-help"
-                                >
-                                  {Array.isArray(course.finalEvaluation.questions)
-                                    ? course.finalEvaluation.questions.length
-                                    : 0}{" "}
-                                  preguntas
-                                </Badge>
-                              </span>
-                            </TooltipTrigger>
-                            <TooltipContent side="bottom">
-                              <div className="text-[11px]">
-                                Cantidad de preguntas que incluye el examen final.
-                              </div>
-                            </TooltipContent>
-                          </Tooltip>
-                          {course.finalEvaluation.passingScore ? (
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <span>
-                                  <Badge
-                                    variant="soft"
-                                    color="success"
-                                    className="bg-emerald-100 text-emerald-700 hover:text-emerald-700 cursor-help"
-                                  >
-                                    Mínimo {course.finalEvaluation.passingScore}%
+                        >
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div className="min-w-0 flex-1 text-sm font-semibold leading-snug text-slate-950 break-words">
+                              {course.finalEvaluation.title || "Evaluación de cierre"}
+                            </div>
+                            {unlocked ? (
+                              <Badge variant="soft" color="success" className="rounded-full shrink-0">
+                                <CheckCircle2 className="mr-1 h-3 w-3" /> Habilitada
+                              </Badge>
+                            ) : (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Badge variant="soft" color="warning" className="rounded-full cursor-help shrink-0">
+                                    <Clock3 className="mr-1 h-3 w-3" /> Bloqueada
                                   </Badge>
-                                </span>
-                              </TooltipTrigger>
-                              <TooltipContent side="bottom">
-                                <div className="text-[11px]">Porcentaje mínimo necesario para aprobar el examen.</div>
-                              </TooltipContent>
-                            </Tooltip>
-                          ) : null}
-                          {course.finalEvaluation.maxAttempts ? (
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <span>
-                                  <Badge
-                                    variant="soft"
-                                    color="warning"
-                                    className="bg-amber-100 text-amber-700 hover:text-amber-700 cursor-help"
-                                  >
-                                    {course.finalEvaluation.maxAttempts} intentos
-                                  </Badge>
-                                </span>
-                              </TooltipTrigger>
-                              <TooltipContent side="bottom">
-                                <div className="text-[11px]">Cantidad de oportunidades para rendir el examen.</div>
-                              </TooltipContent>
-                            </Tooltip>
-                          ) : null}
-                        </div>
-                        {(requireEvaluations || requireResources) && evaluatedLessons.length + summary.total > 0 ? (
-                          <div className="mt-4 grid gap-2 md:grid-cols-2">
-                            {requireEvaluations && evaluatedLessons.length > 0 ? (
-                              <div className="rounded-2xl border border-slate-200 bg-white p-3">
-                                <div className="flex items-center justify-between gap-2">
-                                  <div className="flex items-center gap-2 text-xs font-semibold text-slate-700">
-                                    <GraduationCap className="h-3.5 w-3.5 text-violet-600" />
-                                    Evaluaciones por clase
+                                </TooltipTrigger>
+                                <TooltipContent side="bottom">
+                                  <div className="max-w-[240px] leading-5 text-[11px]">
+                                    {reason || "Completá todas las clases y evaluaciones para habilitar el examen final."}
                                   </div>
+                                </TooltipContent>
+                              </Tooltip>
+                            )}
+                          </div>
+                          {course.finalEvaluation.description ? (
+                            <p className="mt-2 text-sm leading-6 text-slate-500 break-words line-clamp-4">
+                              {course.finalEvaluation.description}
+                            </p>
+                          ) : null}
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span>
                                   <Badge
                                     variant="soft"
-                                    color={progress.allPassed ? "success" : progress.passed > 0 ? "warning" : "default"}
-                                    className="rounded-full text-[10px]"
+                                    color="default"
+                                    className="bg-violet-100 text-violet-700 hover:text-violet-700 cursor-help break-words"
                                   >
-                                    {progress.allPassed
-                                      ? `${progress.passed}/${progress.totalEvaluations} · Todas aprobadas`
-                                      : `${progress.passed}/${progress.totalEvaluations} · ${progress.pending > 0 ? `${progress.pending} sin rendir` : ""}${progress.failed > 0 ? (progress.pending > 0 ? " · " : "") + `${progress.failed} desaprobadas` : ""}`}
+                                    {totalQuestions} preguntas
                                   </Badge>
-                                </div>
-                                <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
-                                  <div
-                                    className={cn(
-                                      "h-full rounded-full transition-all",
-                                      progress.allPassed
-                                        ? "bg-emerald-500"
-                                        : progress.passed > 0
-                                        ? "bg-amber-500"
-                                        : "bg-slate-300"
-                                    )}
-                                    style={{
-                                      width: `${progress.totalEvaluations > 0 ? Math.round((progress.passed / progress.totalEvaluations) * 100) : 0}%`,
-                                    }}
-                                  />
-                                </div>
-                              </div>
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent side="bottom">
+                                <div className="text-[11px]">Cantidad de preguntas que incluye el examen final.</div>
+                              </TooltipContent>
+                            </Tooltip>
+                            {course.finalEvaluation.passingScore ? (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span>
+                                    <Badge
+                                      variant="soft"
+                                      color="success"
+                                      className="bg-emerald-100 text-emerald-700 hover:text-emerald-700 cursor-help break-words"
+                                    >
+                                      Mínimo {course.finalEvaluation.passingScore}%
+                                    </Badge>
+                                  </span>
+                                </TooltipTrigger>
+                                <TooltipContent side="bottom">
+                                  <div className="text-[11px]">Porcentaje mínimo necesario para aprobar el examen.</div>
+                                </TooltipContent>
+                              </Tooltip>
                             ) : null}
-                            {requireResources ? (
-                              <div className="rounded-2xl border border-slate-200 bg-white p-3">
-                                <div className="flex items-center justify-between gap-2">
-                                  <div className="flex items-center gap-2 text-xs font-semibold text-slate-700">
-                                    <FolderOpen className="h-3.5 w-3.5 text-sky-600" />
-                                    Recursos de cursada
-                                  </div>
-                                  <Badge
-                                    variant="soft"
-                                    color={readinessTone(summary)}
-                                    className="rounded-full text-[10px]"
-                                  >
-                                    {readinessProgressText(summary)}
-                                  </Badge>
-                                </div>
-                                <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
-                                  <div
-                                    className={cn(
-                                      "h-full rounded-full transition-all",
-                                      summary.allReady
-                                        ? "bg-emerald-500"
-                                        : summary.corrupt > 0
-                                        ? "bg-rose-500"
-                                        : summary.ready > 0
-                                        ? "bg-amber-500"
-                                        : "bg-slate-300"
-                                    )}
-                                    style={{
-                                      width: `${summary.total > 0 ? Math.round((summary.ready / summary.total) * 100) : 100}%`,
-                                    }}
-                                  />
-                                </div>
-                              </div>
+                            {course.finalEvaluation.maxAttempts ? (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span>
+                                    <Badge
+                                      variant="soft"
+                                      color="warning"
+                                      className="bg-amber-100 text-amber-700 hover:text-amber-700 cursor-help break-words"
+                                    >
+                                      {course.finalEvaluation.maxAttempts} intentos
+                                    </Badge>
+                                  </span>
+                                </TooltipTrigger>
+                                <TooltipContent side="bottom">
+                                  <div className="text-[11px]">Cantidad de oportunidades para rendir el examen.</div>
+                                </TooltipContent>
+                              </Tooltip>
                             ) : null}
                           </div>
-                        ) : null}
-                        <div className="mt-4">
-                          <Button
-                            asChild
-                            disabled={!unlocked}
-                            className="w-full rounded-2xl bg-[#1B2B50] hover:bg-[#233A6A]"
-                          >
-                            <a
-                              href={unlocked ? "#" : undefined}
-                              onClick={(e) => !unlocked && e.preventDefault()}
-                              aria-disabled={!unlocked}
-                            >
-                              <ClipboardCheck className="mr-2 h-4 w-4" />
-                              {unlocked ? "Rendir evaluación final" : "Rendimiento disponible próximamente"}
-                            </a>
-                          </Button>
+                          {(requireEvaluations || requireResources) && (evaluatedLessons.length + summary.total) > 0 ? (
+                            <div className="mt-4 grid w-full gap-2 grid-cols-1">
+                              {requireEvaluations && evaluatedLessons.length > 0 ? (
+                                <div className="w-full min-w-0 rounded-2xl border border-slate-200 bg-white p-3">
+                                  <div className="flex flex-wrap items-start justify-between gap-2">
+                                    <div className="flex min-w-0 items-center gap-2 text-xs font-semibold text-slate-700">
+                                      <GraduationCap className="h-3.5 w-3.5 shrink-0 text-violet-600" />
+                                      <span className="break-words">Evaluaciones por clase</span>
+                                    </div>
+                                    <Badge
+                                      variant="soft"
+                                      color={progress.allPassed ? "success" : progress.passed > 0 ? "warning" : "default"}
+                                      className="rounded-full text-[10px] shrink-0"
+                                    >
+                                      {progress.allPassed
+                                        ? `${progress.passed}/${progress.totalEvaluations} · Todas aprobadas`
+                                        : `${progress.passed}/${progress.totalEvaluations}${progress.pending > 0 ? ` · ${progress.pending} sin rendir` : ""}${progress.failed > 0 ? `${progress.pending > 0 || progress.passed > 0 ? " · " : ""}${progress.failed} desaprobadas` : ""}`}
+                                    </Badge>
+                                  </div>
+                                  <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+                                    <div
+                                      className={cn(
+                                        "h-full rounded-full transition-all",
+                                        progress.allPassed
+                                          ? "bg-emerald-500"
+                                          : progress.passed > 0
+                                          ? "bg-amber-500"
+                                          : "bg-slate-300"
+                                      )}
+                                      style={{
+                                        width: `${progress.totalEvaluations > 0 ? Math.round((progress.passed / progress.totalEvaluations) * 100) : 0}%`,
+                                      }}
+                                    />
+                                  </div>
+                                </div>
+                              ) : null}
+                              {requireResources ? (
+                                <div className="w-full min-w-0 rounded-2xl border border-slate-200 bg-white p-3">
+                                  <div className="flex flex-wrap items-start justify-between gap-2">
+                                    <div className="flex min-w-0 items-center gap-2 text-xs font-semibold text-slate-700">
+                                      <FolderOpen className="h-3.5 w-3.5 shrink-0 text-sky-600" />
+                                      <span className="break-words">Recursos de cursada</span>
+                                    </div>
+                                    <Badge
+                                      variant="soft"
+                                      color={readinessTone(summary)}
+                                      className="rounded-full text-[10px] shrink-0"
+                                    >
+                                      {readinessProgressText(summary)}
+                                    </Badge>
+                                  </div>
+                                </div>
+                              ) : null}
+                            </div>
+                          ) : null}
+                          <div className="mt-4 flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-start">
+                            {openEvaluationId !== "final_evaluation" ? (
+                              <Button
+                                type="button"
+                                disabled={
+                                  !unlocked ||
+                                  finalEvalEntry?.status === "passed" ||
+                                  (course.finalEvaluation.maxAttempts &&
+                                    finalEvalEntry &&
+                                    Number.isFinite(Number(finalEvalEntry.reviewedAt)) &&
+                                    false)
+                                }
+                                className="w-full rounded-2xl bg-[#1B2B50] hover:bg-[#233A6A] sm:w-auto"
+                                onClick={() => setOpenEvaluationId("final_evaluation")}
+                              >
+                                <ClipboardCheck className="mr-2 h-4 w-4 shrink-0" />
+                                <span className="truncate">
+                                  {finalEvalEntry?.status === "passed"
+                                    ? "Examen final aprobado"
+                                    : unlocked
+                                    ? "Rendir evaluación final"
+                                    : "Rendimiento disponible próximamente"}
+                                </span>
+                              </Button>
+                            ) : (
+                              <Button
+                                type="button"
+                                variant="outline"
+                                className="w-full rounded-2xl sm:w-auto"
+                                onClick={() => setOpenEvaluationId(null)}
+                              >
+                                Ocultar examen final
+                              </Button>
+                            )}
+                            {courseEligibleForCertificate && certificateData ? (
+                              <>
+                                <Button
+                                  type="button"
+                                  className="w-full rounded-2xl bg-gradient-to-r from-[#7C3AED] to-[#5B5BD6] text-white shadow-[0_10px_30px_rgba(109,76,255,0.28)] hover:brightness-105 sm:w-auto"
+                                  onClick={() => setShowCertificate(true)}
+                                >
+                                  <Award className="mr-2 h-4 w-4 shrink-0" />
+                                  <span className="truncate">Ver mi certificado</span>
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  className="w-full rounded-2xl sm:w-auto"
+                                  onClick={() => setShowCertificate(true)}
+                                >
+                                  <Download className="mr-2 h-4 w-4 shrink-0" />
+                                  <span className="truncate">Descargar / imprimir</span>
+                                </Button>
+                              </>
+                            ) : null}
+                          </div>
                         </div>
+
+                        {openEvaluationId === "final_evaluation" &&
+                        unlocked &&
+                        Array.isArray(course.finalEvaluation.questions) &&
+                        course.finalEvaluation.questions.length ? (
+                          <div className="mt-4 w-full min-w-0">
+                            <EvaluationRenderer
+                              key="final-evaluation"
+                              compact={true}
+                              questions={course.finalEvaluation.questions}
+                              title={course.finalEvaluation.title}
+                              description={course.finalEvaluation.description}
+                              passingScore={course.finalEvaluation.passingScore}
+                              maxAttempts={course.finalEvaluation.maxAttempts}
+                              attemptsUsed={finalEvaluationUsedAttempts()}
+                              defaultPoints={(course.finalEvaluation as any).defaultPoints}
+                              previousResult={
+                                finalEvalEntry?.reviewedAt ||
+                                (finalEvalEntry && typeof (finalEvalEntry as any).score !== "undefined")
+                                  ? {
+                                      questions: [],
+                                      totalScore: Number((finalEvalEntry as any).score ?? 0),
+                                      totalMaxScore: Number((finalEvalEntry as any).maxScore ?? 0),
+                                      percentage: Number.isFinite(Number((finalEvalEntry as any).percentage))
+                                        ? Number((finalEvalEntry as any).percentage)
+                                        : Number((finalEvalEntry as any).maxScore) > 0
+                                        ? Math.round(
+                                            (Number((finalEvalEntry as any).score ?? 0) /
+                                              Number((finalEvalEntry as any).maxScore)) *
+                                              100
+                                          )
+                                        : 0,
+                                      passingPercentage: Number(
+                                        course.finalEvaluation.passingScore ?? 60
+                                      ),
+                                      correctCount: Number.isFinite(Number((finalEvalEntry as any).correctCount))
+                                        ? Number((finalEvalEntry as any).correctCount)
+                                        : Number.isFinite(Number((finalEvalEntry as any).percentage)) &&
+                                          Array.isArray(course.finalEvaluation.questions)
+                                        ? Math.round(
+                                            ((course.finalEvaluation.questions || []).length *
+                                              Number((finalEvalEntry as any).percentage)) /
+                                              100
+                                          )
+                                        : undefined,
+                                      totalCount: Number.isFinite(Number((finalEvalEntry as any).totalCount))
+                                        ? Number((finalEvalEntry as any).totalCount)
+                                        : Array.isArray(course.finalEvaluation.questions)
+                                        ? (course.finalEvaluation.questions || []).length
+                                        : undefined,
+                                      passed: String((finalEvalEntry as any).status || "")
+                                        .trim()
+                                        .toLowerCase()
+                                        .includes("pass"),
+                                    }
+                                  : undefined
+                              }
+                              onSubmit={submitFinalEvaluation}
+                            />
+                          </div>
+                        ) : null}
                       </div>
                     );
                   })()
@@ -2778,6 +3626,13 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
           </aside>
         </div>
       </div>
+      {certificateData ? (
+        <CourseCertificate
+          open={showCertificate}
+          onClose={() => setShowCertificate(false)}
+          data={certificateData}
+        />
+      ) : null}
     </div>
   );
 }

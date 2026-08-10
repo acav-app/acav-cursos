@@ -73,10 +73,11 @@ export async function PATCH(request: Request, ctx: { params: { id: string } }) {
     if (actor.role === "alumno") {
       const courseId = String(enrollment.courseId || enrollment.jobId || "").trim();
       let allowedLessonIds: Set<string> | null = null;
+      let course: any = null;
       if (courseId) {
         try {
-          const course = await getCourseById(courseId);
-          allowedLessonIds = collectLessonIdsFromCurriculum((course as any)?.curriculum);
+          course = await getCourseById(courseId);
+          allowedLessonIds = collectLessonIdsFromCurriculum(course?.curriculum);
         } catch {
           allowedLessonIds = new Set();
         }
@@ -87,17 +88,62 @@ export async function PATCH(request: Request, ctx: { params: { id: string } }) {
       const incomingLessonProgress = Array.isArray(body?.lessonProgress)
         ? filterProgressAgainstCurriculum(body?.lessonProgress, allowedLessonIds || new Set())
         : undefined;
-      const incomingProgress = Array.isArray(body?.progress)
-        ? filterProgressAgainstCurriculum(body?.progress, allowedLessonIds || new Set())
+      const incomingProgressNumber = Number.isFinite(Number(body?.progress)) && Number(body?.progress) >= 0 && Number(body?.progress) <= 100
+        ? Number(body?.progress)
         : undefined;
       const incomingSubmissions = Array.isArray(body?.activitySubmissions)
         ? filterActivitySubmissionsAgainstCurriculum(body?.activitySubmissions, allowedLessonIds || new Set())
         : undefined;
 
+      const allowedSourceTypes = new Set(["lesson", "final_evaluation", "lesson_evaluation", "quiz", "class_evaluation"]);
+      const rawGradebook = Array.isArray(body?.gradebook) ? body.gradebook : [];
+      const evaluatedLessonIds = allowedLessonIds || new Set();
+      const finalEvaluationEnabled = Boolean(course?.finalEvaluation?.enabled);
+      const filteredGradebook = rawGradebook
+        .filter((entry) => {
+          if (!entry || typeof entry !== "object") return false;
+          const sourceType = String((entry as Record<string, any>).sourceType || "").trim().toLowerCase();
+          if (!allowedSourceTypes.has(sourceType) && sourceType !== "") return false;
+          const sourceId = String((entry as Record<string, any>).sourceId || "").trim();
+          if (!sourceId) return false;
+          if (sourceType === "final_evaluation" || sourceId === "final_evaluation" || sourceId === "final") {
+            return finalEvaluationEnabled;
+          }
+          return evaluatedLessonIds.has(sourceId);
+        })
+        .map((entry) => {
+          const raw = entry as Record<string, any>;
+          const sourceTypeRaw = String(raw.sourceType || "lesson").trim().toLowerCase();
+          const normalizedSourceType =
+            sourceTypeRaw === "final_evaluation" ||
+            sourceTypeRaw === "final" ||
+            String(raw.sourceId || "") === "final_evaluation"
+              ? "final_evaluation"
+              : "lesson";
+          const scoreRaw = Number(raw.score);
+          const maxScoreRaw = Number(raw.maxScore);
+          const weightRaw = Number(raw.weight);
+          return {
+            sourceType: normalizedSourceType,
+            sourceId: String(raw.sourceId || "").trim(),
+            title: String(raw.title || "Evaluación").trim(),
+            score: Number.isFinite(scoreRaw) && scoreRaw >= 0 ? scoreRaw : undefined,
+            maxScore: Number.isFinite(maxScoreRaw) && maxScoreRaw > 0 ? maxScoreRaw : undefined,
+            weight: Number.isFinite(weightRaw) && weightRaw >= 0 && weightRaw <= 1 ? weightRaw : undefined,
+            status: ["pending", "graded", "passed", "failed"].includes(String(raw.status || "").trim())
+              ? String(raw.status).trim()
+              : "graded",
+            reviewedAt: String(raw.reviewedAt || new Date().toISOString()).trim(),
+            feedback: typeof raw.feedback === "string" && raw.feedback.trim() ? raw.feedback.trim() : undefined,
+          };
+        })
+        .filter((entry) => Boolean(entry.sourceId));
+
       safeBody = {
-        progress: incomingProgress,
+        progress: incomingProgressNumber,
         lessonProgress: incomingLessonProgress,
         activitySubmissions: incomingSubmissions,
+        gradebook: filteredGradebook,
       };
     }
 

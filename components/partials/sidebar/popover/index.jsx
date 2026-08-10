@@ -13,6 +13,7 @@ import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { usePathname } from "next/navigation";
 import { useCourseActor } from "@/components/courses/dashboard/use-course-actor";
+import SidebarProfileFooter from "../common/profile-footer";
 
 const PopoverSidebar = ({ trans }) => {
   const { collapsed, sidebarBg } = useSidebar();
@@ -86,7 +87,7 @@ const PopoverSidebar = ({ trans }) => {
       <SidebarLogo collapsed={collapsed} />
       <Separator />
       <ScrollArea
-        className={cn("sidebar-menu  h-[calc(100%-80px)] ", {
+        className={cn("sidebar-menu  h-[calc(100%-80px-190px)] ", {
           "px-4": !collapsed,
         })}
       >
@@ -142,6 +143,8 @@ const PopoverSidebar = ({ trans }) => {
           ))}
         </ul>
       </ScrollArea>
+
+      <SidebarProfileFooter compact={collapsed} />
     </div>
   );
 };

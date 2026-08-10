@@ -38,7 +38,7 @@ function isEmbedUrl(url) {
   return u.includes("youtube.com") || u.includes("youtu.be") || u.includes("vimeo.com");
 }
 
-export default function LessonVideoUploader({ value = "", onChange = () => {} }) {
+export default function LessonVideoUploader({ value = "", onChange = () => {}, compact = false }) {
   const [progress, setProgress] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [manualUrl, setManualUrl] = useState("");
@@ -52,15 +52,20 @@ export default function LessonVideoUploader({ value = "", onChange = () => {} })
       if (!file) return;
 
       if (file.size > COURSE_VIDEO_MAX_SIZE_BYTES) {
-        const maxMB = Math.round(COURSE_VIDEO_MAX_SIZE_BYTES / (1024 * 1024));
-        toast.error(`El video no puede superar los ${maxMB}MB.`);
+        toast.error(`El video supera el máximo permitido de ${formatSize(COURSE_VIDEO_MAX_SIZE_BYTES)}.`);
         return;
       }
 
       try {
         setUploading(true);
         setProgress({ percent: 0, loaded: 0, total: file.size });
-        const rawUrl = await uploadToR2WithProgress(file, "courses/videos", (p) => setProgress(p));
+        const { url: rawUrl } = await uploadToR2WithProgress(file, { folder: "courses/videos" }, (p) =>
+          setProgress({
+            loaded: p.loaded,
+            total: p.total,
+            percent: p.percent,
+          })
+        );
         const normalized = normalizePublicR2Url(rawUrl);
         onChange(normalized, null, {
           mimeType: file.type,
@@ -116,14 +121,150 @@ export default function LessonVideoUploader({ value = "", onChange = () => {} })
       ? "border-[#2356B8] bg-[#EEF4FF]"
       : "border-border/60 bg-card hover:bg-background/60";
 
+  if (compact) {
+    return (
+      <div className="grid gap-3">
+        <div className="inline-flex rounded-xl border border-border/60 bg-background p-1 w-full md:w-auto">
+          <button
+            type="button"
+            onClick={() => setTab("upload")}
+            className={`inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-xs transition md:flex-none ${
+              tab === "upload" ? "bg-[#1B2B50] text-white shadow-sm" : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <UploadCloud className="h-3.5 w-3.5" />
+            Subir
+          </button>
+          <button
+            type="button"
+            onClick={() => setTab("url")}
+            className={`inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-xs transition md:flex-none ${
+              tab === "url" ? "bg-[#1B2B50] text-white shadow-sm" : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <ExternalLink className="h-3.5 w-3.5" />
+            URL
+          </button>
+        </div>
+
+        {current ? (
+          <div className="overflow-hidden rounded-2xl border border-emerald-200 bg-emerald-50/40">
+            <div className="flex flex-wrap items-center gap-3 p-3">
+              <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700">
+                <Video className="h-4 w-4" />
+              </span>
+              <div className="min-w-0 flex-1 grid gap-1">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="text-xs font-semibold text-foreground">Video cargado</span>
+                  <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-white px-1.5 py-0.5 text-[10px] font-bold text-emerald-700">
+                    <CheckCircle2 className="h-2.5 w-2.5" />
+                    Activo
+                  </span>
+                </div>
+                <a
+                  href={current}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="block truncate text-[11px] text-muted-foreground hover:text-foreground"
+                >
+                  {current}
+                </a>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button asChild type="button" variant="outline" size="sm" className="h-7 px-2 text-[11px]">
+                  <a href={current} target="_blank" rel="noreferrer">
+                    <PlayCircle className="mr-1.5 h-3.5 w-3.5" />
+                    Abrir
+                  </a>
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-7 px-2 text-[11px] border-rose-200 text-rose-700 hover:bg-rose-50"
+                  onClick={handleClear}
+                  disabled={uploading}
+                >
+                  <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+                  Quitar
+                </Button>
+              </div>
+            </div>
+          </div>
+        ) : tab === "upload" ? (
+          <div
+            {...getRootProps()}
+            className={`cursor-pointer rounded-2xl border-2 border-dashed px-3 py-4 text-center transition ${dropTone}`}
+          >
+            <input {...getInputProps()} />
+            <div className="flex items-center justify-center gap-3">
+              <div className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-white shadow-sm ring-1 ring-border/60">
+                {uploading ? (
+                  <Loader2 className="h-4 w-4 animate-spin text-[#2356B8]" />
+                ) : isDragActive ? (
+                  <Film className="h-5 w-5" />
+                ) : (
+                  <UploadCloud className="h-5 w-5" />
+                )}
+              </div>
+              <div className="min-w-0 text-left">
+                <div className="text-xs font-semibold text-foreground">
+                  {uploading
+                    ? `Subiendo ${progress?.percent ? `(${progress.percent}%)` : ""}…`
+                    : isDragActive
+                      ? "Soltá para subir el video"
+                      : "Arrastrá o hacé clic para elegir video"}
+                </div>
+                <div className="text-[11px] text-muted-foreground">
+                  MP4 · WebM · MOV · MKV · hasta {formatSize(COURSE_VIDEO_MAX_SIZE_BYTES)}
+                </div>
+              </div>
+            </div>
+            {uploading && progress?.percent != null ? (
+              <div className="mt-3 space-y-1">
+                <Progress value={progress.percent} className="h-2 bg-white" />
+              </div>
+            ) : null}
+            {isDragReject ? (
+              <div className="mt-2 text-[11px] font-semibold text-rose-600">
+                Tipo de archivo no permitido o supera el tamaño máximo.
+              </div>
+            ) : null}
+          </div>
+        ) : (
+          <div className="grid gap-2 rounded-2xl border border-border/60 bg-card p-3">
+            <div className="grid gap-2 md:grid-cols-[1fr_auto] md:items-center">
+              <Input
+                value={manualUrl}
+                onChange={(event) => setManualUrl(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    handleApplyManualUrl();
+                  }
+                }}
+                placeholder="https://www.youtube.com/watch?v=..."
+                className="h-9"
+              />
+              <Button type="button" onClick={handleApplyManualUrl} className="h-9 rounded-xl">
+                <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
+                Aplicar URL
+              </Button>
+            </div>
+            <p className="text-[11px] text-muted-foreground">YouTube / Vimeo. Usa la URL de compartir.</p>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="grid gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <Label>Video principal de la clase</Label>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Sube el video MP4/WebM directamente o pega el link de YouTube / Vimeo.
-            Tamaño máximo: {formatSize(COURSE_VIDEO_MAX_SIZE_BYTES)}.
+        <div className="flex items-start gap-2 text-muted-foreground">
+          <UploadCloud className="mt-0.5 h-4 w-4 shrink-0" />
+          <p className="text-xs leading-5 text-muted-foreground">
+            Subí o pegá un link. Máximo {formatSize(COURSE_VIDEO_MAX_SIZE_BYTES)}.
           </p>
         </div>
         <div className="inline-flex rounded-xl border border-border/60 bg-background p-1">
@@ -135,7 +276,7 @@ export default function LessonVideoUploader({ value = "", onChange = () => {} })
             }`}
           >
             <UploadCloud className="h-4 w-4" />
-            Subir video
+            Subir
           </button>
           <button
             type="button"
@@ -145,7 +286,7 @@ export default function LessonVideoUploader({ value = "", onChange = () => {} })
             }`}
           >
             <ExternalLink className="h-4 w-4" />
-            Link externo
+            URL
           </button>
         </div>
       </div>
@@ -248,7 +389,7 @@ export default function LessonVideoUploader({ value = "", onChange = () => {} })
                       : "Arrastrá el video acá o hacé click para seleccionarlo"}
                 </div>
                 <div className="text-xs leading-5 text-muted-foreground">
-                  Formatos permitidos: MP4, WebM, OGG, QuickTime. Máximo{" "}
+                  Formatos permitidos: MP4, WebM, OGG, MOV, MKV. Máximo{" "}
                   {formatSize(COURSE_VIDEO_MAX_SIZE_BYTES)}.
                 </div>
               </div>

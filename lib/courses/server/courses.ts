@@ -36,6 +36,41 @@ type NormalizedCourse = Record<string, any> & {
   finalEvaluation?: Course["finalEvaluation"];
 };
 
+function normalizeLessonEvaluation(value: Record<string, any> | undefined): Record<string, any> {
+  if (!value || typeof value !== "object") {
+    return {
+      enabled: false,
+      questions: [],
+      requireAllResourcesReady: true,
+      locked: false,
+    };
+  }
+  return {
+    enabled: Boolean(value.enabled),
+    title: value.title || "",
+    description: value.description || "",
+    passingScore: Number.isFinite(Number(value.passingScore)) ? Number(value.passingScore) : undefined,
+    maxAttempts: Number.isFinite(Number(value.maxAttempts)) ? Number(value.maxAttempts) : undefined,
+    questions: Array.isArray(value.questions) ? value.questions : [],
+    requireAllResourcesReady: value?.requireAllResourcesReady === false ? false : true,
+    locked: typeof value?.locked === "boolean" ? value.locked : false,
+  };
+}
+
+function normalizeCurriculum(curriculum: any[] | undefined): any[] {
+  if (!Array.isArray(curriculum)) return [];
+  return curriculum.map((section) => {
+    const lessons = Array.isArray(section?.lessons) ? section.lessons.map((lesson: any) => {
+      const next = { ...(lesson || {}) };
+      if (Object.prototype.hasOwnProperty.call(next, "evaluation") || next?.evaluation) {
+        next.evaluation = normalizeLessonEvaluation(next.evaluation);
+      }
+      return next;
+    }) : [];
+    return { ...(section || {}), lessons };
+  });
+}
+
 function normalizeFinalEvaluation(value: Record<string, any> | undefined): Course["finalEvaluation"] {
   if (value && typeof value === "object") {
     return {
@@ -48,7 +83,7 @@ function normalizeFinalEvaluation(value: Record<string, any> | undefined): Cours
       requireAllResourcesReady: value?.requireAllResourcesReady === false ? false : true,
       requireAllLessonsEvaluationsCompleted:
         value?.requireAllLessonsEvaluationsCompleted === false ? false : true,
-      locked: typeof value?.locked === "boolean" ? value.locked : undefined,
+      locked: typeof value?.locked === "boolean" ? value.locked : false,
     };
   }
 
@@ -61,7 +96,7 @@ function normalizeFinalEvaluation(value: Record<string, any> | undefined): Cours
     questions: [],
     requireAllResourcesReady: true,
     requireAllLessonsEvaluationsCompleted: true,
-    locked: undefined,
+    locked: false,
   };
 }
 
@@ -98,7 +133,7 @@ function normalizeCourse(course: Record<string, any>): NormalizedCourse {
     learningObjectives: Array.isArray(course?.learningObjectives) ? course.learningObjectives : [],
     targetAudience: Array.isArray(course?.targetAudience) ? course.targetAudience : [],
     modules: Array.isArray(course?.modules) ? course.modules : [],
-    curriculum: Array.isArray(course?.curriculum) ? course.curriculum : [],
+    curriculum: normalizeCurriculum(course?.curriculum),
     finalEvaluation: normalizeFinalEvaluation(course?.finalEvaluation),
   }) as NormalizedCourse;
 }
@@ -349,7 +384,7 @@ export async function createCourse(input: unknown, actor: CourseActor) {
     })
   );
 
-  await ref.set(payload);
+  await ref.set(payload, { ignoreUndefinedProperties: true });
   return { id: ref.id, ...(payload as any) } as Course;
 }
 
@@ -396,7 +431,7 @@ export async function updateCourse(id: string, input: unknown, actor: CourseActo
     })
   );
 
-  await ref.set(payload, { merge: true });
+  await ref.set(payload, { merge: true, ignoreUndefinedProperties: true });
   const updated = await ref.get();
   return toCourse(updated);
 }

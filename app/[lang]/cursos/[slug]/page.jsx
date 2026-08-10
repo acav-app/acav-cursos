@@ -99,6 +99,10 @@ function formatCurrency(value) {
   }).format(amount);
 }
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+export const fetchCache = "force-no-store";
+
 export default async function CursoDetailPage({ params: { lang, slug } }) {
   const [settings, rawCourse] = await Promise.all([getPublicCourseSettings(), getPublicCourseBySlug(slug)]);
 
@@ -147,15 +151,6 @@ export default async function CursoDetailPage({ params: { lang, slug } }) {
     <PublicCoursesShell lang={lang} settings={settings} navMode="routes">
       <main className="bg-[#F5F7FB] pt-[68px]">
         <section className="mx-auto max-w-[1240px] px-6 py-10 md:py-12">
-          <MotionReveal className="mb-5">
-            <Link
-              href={`/${lang}/cursos`}
-              className="inline-flex items-center gap-2 text-sm font-semibold text-[#31456F] transition hover:text-[#1B2B50]"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              Volver a cursos
-            </Link>
-          </MotionReveal>
 
           <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
             <MotionStagger className="space-y-4">

@@ -3,6 +3,7 @@ import { siteConfig } from "@/config/site";
 import { persist, createJSONStorage } from "zustand/middleware";
 
 const FORCED_LAYOUT = "semibox";
+const FORCED_NAVBAR = "hidden";
 
 export const useThemeStore = create(
   persist(
@@ -20,11 +21,11 @@ export const useThemeStore = create(
         }
         if (FORCED_LAYOUT === "horizontal") {
           useSidebar.setState({ sidebarType: "classic" });
-          useThemeStore.setState({ navbarType: "sticky" });
         }
+        set({ navbarType: FORCED_NAVBAR });
       },
-      navbarType: siteConfig.navbarType,
-      setNavbarType: (value) => set({ navbarType: value }),
+      navbarType: FORCED_NAVBAR,
+      setNavbarType: (_value) => set({ navbarType: FORCED_NAVBAR }),
       footerType: siteConfig.footerType,
       setFooterType: (value) => set({ footerType: value }),
       isRtl: false,
@@ -41,14 +42,15 @@ export const useThemeStore = create(
             theme: siteConfig.theme,
             radius: siteConfig.radius,
             layout: FORCED_LAYOUT,
-            navbarType: siteConfig.navbarType,
+            navbarType: FORCED_NAVBAR,
           };
         }
-        return { ...state, layout: FORCED_LAYOUT };
+        return { ...state, layout: FORCED_LAYOUT, navbarType: FORCED_NAVBAR };
       },
       onRehydrateStorage: () => (state) => {
         if (state) {
           state.layout = FORCED_LAYOUT;
+          state.navbarType = FORCED_NAVBAR;
           const sidebarStore = useSidebar.getState();
           if (FORCED_LAYOUT === "semibox" && sidebarStore.sidebarType !== "popover") {
             sidebarStore.setSidebarType("popover");

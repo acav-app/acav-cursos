@@ -66,10 +66,15 @@ export default function ResourceUploader({ onFileReady = () => {} }) {
       try {
         setUploading(true);
         setProgress({ percent: 0, loaded: 0, total: file.size });
-        const rawUrl = await uploadToR2WithProgress(
+        const { url: rawUrl } = await uploadToR2WithProgress(
           file,
-          isVideo ? "courses/lesson-resources/videos" : "courses/lesson-resources/files",
-          (p) => setProgress(p)
+          { folder: isVideo ? "courses/lesson-resources/videos" : "courses/lesson-resources/files" },
+          (p) =>
+            setProgress({
+              loaded: p.loaded,
+              total: p.total,
+              percent: p.percent,
+            })
         );
         const url = normalizePublicR2Url(rawUrl);
         const rawName = String(file.name || "").trim();
@@ -82,8 +87,10 @@ export default function ResourceUploader({ onFileReady = () => {} }) {
           label,
           url,
           kind: "file",
+          status: "ready",
           mimeType: String(file.type || "application/octet-stream"),
           fileSize: Number(file.size || 0),
+          uploadedAt: new Date().toISOString(),
         };
         onFileReady(entry, file);
         toast.success("Archivo adjuntado correctamente.");
@@ -137,7 +144,7 @@ export default function ResourceUploader({ onFileReady = () => {} }) {
       {...getRootProps()}
       className={`grid gap-3 rounded-[18px] border border-dashed p-3 transition ${dropTone}`}
     >
-      <input {...getInputProps()} />
+      <input {...getInputProps()} className="sr-only" />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2 text-sm">
           <Paperclip className="h-4 w-4 text-[#1B2B50]" />

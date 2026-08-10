@@ -12,6 +12,7 @@ import SingleMenuItem from "./single-menu-item";
 import SubMenuHandler from "./sub-menu-handler";
 import NestedSubMenu from "../common/nested-menus";
 import { useCourseActor } from "@/components/courses/dashboard/use-course-actor";
+import SidebarProfileFooter from "../common/profile-footer";
 
 const ClassicSidebar = ({ trans }) => {
   const { sidebarBg } = useSidebar();
@@ -90,7 +91,7 @@ const ClassicSidebar = ({ trans }) => {
       <SidebarLogo hovered={hovered} />
 
       <ScrollArea
-        className={cn("sidebar-menu  h-[calc(100%-80px)] ", {
+        className={cn("sidebar-menu  h-[calc(100%-80px-190px)] ", {
           "px-4": !collapsed || hovered,
         })}
       >
@@ -150,6 +151,8 @@ const ClassicSidebar = ({ trans }) => {
           ))}
         </ul>
       </ScrollArea>
+
+      <SidebarProfileFooter compact={collapsed && !hovered} />
     </div>
   );
 };
