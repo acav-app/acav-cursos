@@ -121,13 +121,10 @@ function createSignedPutUrl({
   query.set("X-Amz-Credential", `${accessKeyId}/${credentialScope}`);
   query.set("X-Amz-Date", amzDate);
   query.set("X-Amz-Expires", String(expires));
-  query.set("X-Amz-Content-SHA256", UNSIGNED_PAYLOAD);
-  query.set("X-Amz-SignedHeaders", "host;x-amz-content-sha256");
+  query.set("X-Amz-SignedHeaders", "host");
 
-  const signedHeaders = "host;x-amz-content-sha256";
-  const canonicalHeaders =
-    `host:${urlParsed.host.toLowerCase()}\n` +
-    `x-amz-content-sha256:${UNSIGNED_PAYLOAD}\n`;
+  const signedHeaders = "host";
+  const canonicalHeaders = `host:${urlParsed.host.toLowerCase()}\n`;
 
   const canonicalQueryString = Array.from(query.entries())
     .sort(([a], [b]) => a.localeCompare(b))

@@ -271,17 +271,40 @@ export async function POST(request) {
       headers: {
         "Content-Type": contentType,
         "X-Amz-Content-SHA256": "UNSIGNED-PAYLOAD",
+        "User-Agent": "acav-cursos-stream-upload/1.0",
       },
-      // @ts-ignore - duplex es permitido en Node.js >= 18
+      // @ts-ignore
       body: request.body,
       duplex: "half",
+      allowHTTP1: true,
     });
 
     if (!r2Response.ok) {
-      const body = await r2Response.text().catch(() => "");
+      let r2Body = "";
+      try {
+        r2Body = await r2Response.text();
+      } catch (_) {}
+      const codeMatch = (r2Body || "").match(/<Code>([^<]+)<\/Code>/i);
+      const msgMatch = (r2Body || "").match(/<Message>([^<]+)<\/Message>/i);
+      const r2Code = codeMatch ? codeMatch[1] : null;
+      const r2Message = msgMatch ? msgMatch[1] : r2Body.slice(0, 800);
+      console.error(
+        "[api:upload:stream] R2 returned HTTP",
+        r2Response.status,
+        "code=",
+        r2Code,
+        "msg=",
+        r2Message
+      );
       return NextResponse.json(
         {
-          error: `Error al subir a R2 (HTTP ${r2Response.status}): ${body.slice(0, 500)}`,
+          error: `Error al subir a R2 (HTTP ${r2Response.status}${
+            r2Code ? ` · ${r2Code}` : ""
+          }): ${r2Message || "sin cuerpo de respuesta"}`,
+          r2_status: r2Response.status,
+          r2_code: r2Code,
+          r2_message: r2Message,
+          r2_body: (r2Body || "").slice(0, 2000),
         },
         { status: 502 }
       );

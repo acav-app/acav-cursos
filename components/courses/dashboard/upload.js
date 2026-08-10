@@ -214,23 +214,24 @@ export async function uploadToR2(file, folderOrOptions) {
   const onProgress = () => {};
 
   try {
-    const presigned = await fetchPresignedUploadOptions({ folder, key, file });
-    return await presignedUploadPromise({ file, presigned, onProgress });
-  } catch (err) {
-    const msg = String(err?.message || err || "");
-    if (!shouldFallbackPresignedToStream(msg) &&
-        !msg.includes("presigned_404") &&
-        !msg.includes("presigned_500") &&
-        !msg.includes("r2_not_configured")) {
-      throw err;
-    }
-  }
-
-  try {
     return await streamingUploadPromise({ file, folder, key, onProgress });
   } catch (err) {
     const msg = String(err?.message || err || "");
-    if (!shouldFallbackStreamToMultipart(msg)) throw err;
+    if (!shouldFallbackStreamToMultipart(msg)) {
+      try {
+        const presigned = await fetchPresignedUploadOptions({ folder, key, file });
+        return await presignedUploadPromise({ file, presigned, onProgress });
+      } catch (presignedErr) {
+        const pMsg = String(presignedErr?.message || presignedErr || "");
+        if (!shouldFallbackPresignedToStream(pMsg) &&
+            !pMsg.includes("presigned_404") &&
+            !pMsg.includes("presigned_500") &&
+            !pMsg.includes("r2_not_configured")) {
+          throw presignedErr;
+        }
+      }
+      throw err;
+    }
   }
 
   return multipartUploadPromise({ file, folder, key, onProgress });
@@ -253,26 +254,28 @@ export function uploadToR2WithProgress(file, folderOrOptions, onProgress) {
 
   return (async () => {
     try {
-      const presigned = await fetchPresignedUploadOptions({ folder, key, file });
-      return await presignedUploadPromise({ file, presigned, onProgress });
-    } catch (err) {
-      const msg = String(err?.message || err || "");
-      const presignedSoftFail =
-        msg.includes("presigned_404") ||
-        msg.includes("presigned_500") ||
-        msg.includes("r2_not_configured") ||
-        shouldFallbackPresignedToStream(msg);
-      if (!presignedSoftFail) throw err;
-    }
-
-    try {
       return await streamingUploadPromise({ file, folder, key, onProgress });
     } catch (err) {
       const msg = String(err?.message || err || "");
-      if (!shouldFallbackStreamToMultipart(msg)) throw err;
-    }
+      if (shouldFallbackStreamToMultipart(msg)) {
+        return multipartUploadPromise({ file, folder, key, onProgress });
+      }
 
-    return multipartUploadPromise({ file, folder, key, onProgress });
+      try {
+        const presigned = await fetchPresignedUploadOptions({ folder, key, file });
+        return await presignedUploadPromise({ file, presigned, onProgress });
+      } catch (presignedErr) {
+        const pMsg = String(presignedErr?.message || presignedErr || "");
+        const presignedSoftFail =
+          pMsg.includes("presigned_404") ||
+          pMsg.includes("presigned_500") ||
+          pMsg.includes("r2_not_configured") ||
+          shouldFallbackPresignedToStream(pMsg);
+        if (!presignedSoftFail) throw presignedErr;
+      }
+
+      return multipartUploadPromise({ file, folder, key, onProgress });
+    }
   })();
 }
 
