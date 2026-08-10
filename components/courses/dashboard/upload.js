@@ -44,6 +44,16 @@ export function uploadToR2WithProgress(file, folderOrOptions, onProgress) {
     key = folderOrOptions?.key || null;
   }
   return new Promise((resolve, reject) => {
+    const total = Number(file?.size) || 0;
+    if (typeof onProgress === "function") {
+      onProgress({
+        loaded: 0,
+        total,
+        percent: 0,
+        ratio: 0,
+      });
+    }
+
     const formData = new FormData();
     formData.set("file", file);
     if (folder) formData.set("folder", folder);
@@ -53,22 +63,33 @@ export function uploadToR2WithProgress(file, folderOrOptions, onProgress) {
     xhr.open("POST", "/api/upload", true);
 
     xhr.upload.onprogress = (event) => {
-      if (event.lengthComputable && typeof onProgress === "function") {
-        const ratio = Math.min(1, event.loaded / Math.max(1, event.total));
-        const percentInt = Math.min(100, Math.round(ratio * 100));
-        onProgress({
-          loaded: event.loaded,
-          total: event.total,
-          percent: percentInt,
-          ratio,
-        });
-      }
+      if (typeof onProgress !== "function") return;
+      const loaded = Number(event.loaded) || 0;
+      const resolvedTotal =
+        event.lengthComputable && Number(event.total) > 0 ? Number(event.total) : total;
+      const ratio = resolvedTotal > 0 ? Math.min(1, loaded / Math.max(1, resolvedTotal)) : 0;
+      const percentInt = Math.min(100, Math.round(ratio * 100));
+      onProgress({
+        loaded,
+        total: resolvedTotal,
+        percent: percentInt,
+        ratio,
+      });
     };
 
     xhr.onload = () => {
       try {
         const data = JSON.parse(xhr.responseText || "{}");
         if (xhr.status >= 200 && xhr.status < 300) {
+          if (typeof onProgress === "function") {
+            const resolvedTotal = Number(file?.size) || 0;
+            onProgress({
+              loaded: resolvedTotal,
+              total: resolvedTotal,
+              percent: 100,
+              ratio: 1,
+            });
+          }
           resolve(buildResultPayload(data));
         } else {
           reject(new Error(data?.error || "upload_failed"));

@@ -578,51 +578,6 @@ export default function EvaluationRenderer({
             </Badge>
           </div>
         </div>
-        {resultSummary ? (
-          <Card
-            className={cn(
-              "w-full min-w-0 border transition shrink-0",
-              cardPad,
-              resultSummary.passed ? "border-emerald-200 bg-emerald-50/60" : "border-rose-200 bg-rose-50/60"
-            )}
-          >
-            <div className="flex w-full flex-col gap-2">
-              <div className="flex min-w-0 items-start gap-2">
-                {resultSummary.passed ? (
-                  <Trophy className="mt-1 h-5 w-5 shrink-0 text-emerald-600" />
-                ) : (
-                  <Sparkles className="mt-1 h-5 w-5 shrink-0 text-rose-600" />
-                )}
-                <div className="min-w-0 flex-1">
-                  <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 break-words">
-                    Rendimiento
-                  </div>
-                  <div className={cn("text-lg font-semibold break-words", resultSummary.passed ? "text-emerald-700" : "text-rose-700")}>
-                    {resultSummary.percentage}%
-                  </div>
-                </div>
-              </div>
-              <div className="min-w-0 flex-1 text-left text-xs text-slate-600 break-words">
-                <div className="font-semibold">
-                  {resultSummary.correctCount ?? 0}/{resultSummary.totalCount} correctas
-                </div>
-                <div className="mt-0.5 text-[11px]">
-                  Pasa el mínimo: {resultSummary.passed ? "Sí" : "No"}
-                </div>
-              </div>
-            </div>
-            <Progress
-              value={resultSummary.percentage}
-              size="sm"
-              className={cn(
-                "mt-3",
-                resultSummary.passed
-                  ? "bg-emerald-100 [&>div]:bg-emerald-500"
-                  : "bg-rose-100 [&>div]:bg-rose-500"
-              )}
-            />
-          </Card>
-        ) : null}
       </div>
 
       {!safeQuestions.length ? (

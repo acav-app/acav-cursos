@@ -1559,7 +1559,15 @@ function LessonVideoSection({ videoUrl, videoAsset, onVideoUrlChange, onVideoAss
 
   const handleCombinedChange = (nextUrl, assetData) => {
     const url = String(nextUrl || "").trim();
-    onVideoUrlChange(url || "");
+    const clearing = !url;
+
+    if (clearing) {
+      onVideoUrlChange("");
+      onVideoAssetChange(undefined);
+      return;
+    }
+
+    onVideoUrlChange(url);
     if (assetData && typeof assetData === "object") {
       onVideoAssetChange({
         url: assetData.url || url || videoAsset?.url || "",
@@ -1571,8 +1579,6 @@ function LessonVideoSection({ videoUrl, videoAsset, onVideoUrlChange, onVideoAss
         uploadedAt: assetData.uploadedAt || videoAsset?.uploadedAt || new Date().toISOString(),
         originalName: assetData.originalName || videoAsset?.originalName || undefined,
       });
-    } else if (!url) {
-      onVideoAssetChange(undefined);
     } else if (isExternalVideoOnly({ url, mimeType: undefined })) {
       onVideoAssetChange(undefined);
     }
@@ -2005,20 +2011,122 @@ function CoursePromoVideoSection({
   promoVideo,
   promoVideoFileName,
   promoVideoSizeBytes,
-  busy,
   onVideoAssetChange,
   onVideoUrlChange,
-  onVideoFileUpload,
+  validateVideoFile,
+  extractVideoMetadata,
+  onPromoMetadataChange,
   errors,
 }) {
   const hasAsset = promoVideoAsset && typeof promoVideoAsset === "object" && (promoVideoAsset.url || promoVideoAsset.storageKey);
   const hasUrl = Boolean(promoVideo);
   const onlyExternal = hasUrl && !hasAsset && isExternalVideoOnly({ url: String(promoVideo || ""), mimeType: undefined });
   const state = hasAsset
-    ? { tone: resourceStatusBadge(promoVideoAsset.status || "ready").tone, label: hasAsset ? "Asset subido" : "Sin video" }
+    ? { tone: resourceStatusBadge(promoVideoAsset.status || "ready").tone, label: "Asset subido" }
     : hasUrl
-      ? { tone: resourceStatusBadge("pending").tone, label: "URL externa" }
+      ? { tone: resourceStatusBadge("pending").tone, label: onlyExternal ? "URL externa" : "URL activa" }
       : null;
+
+  const handleCombinedChange = async (nextUrl, assetData, extras) => {
+    const url = String(nextUrl || "").trim();
+    const clearing = !url;
+    const file = extras && extras.file ? extras.file : null;
+
+    if (clearing) {
+      onVideoAssetChange(undefined);
+      onVideoUrlChange("");
+      onPromoMetadataChange?.({
+        promoVideoFileName: undefined,
+        promoVideoMimeType: undefined,
+        promoVideoSizeBytes: undefined,
+        promoVideoDurationSeconds: undefined,
+        sourceFile: null,
+      });
+      return;
+    }
+
+    if (file && typeof validateVideoFile === "function") {
+      const validationMessage = validateVideoFile(file);
+      if (validationMessage) {
+        onPromoMetadataChange?.({
+          validationError: validationMessage,
+          sourceFile: null,
+        });
+        return;
+      }
+    }
+
+    let durationSeconds = undefined;
+    if (file && typeof extractVideoMetadata === "function") {
+      try {
+        const info = await extractVideoMetadata(file).catch(() => null);
+        durationSeconds = info && Number.isFinite(Number(info.durationSeconds)) ? Number(info.durationSeconds) : undefined;
+      } catch {
+        durationSeconds = undefined;
+      }
+    }
+
+    if (assetData && typeof assetData === "object") {
+      const nextAsset = {
+        url: assetData.url || url || promoVideoAsset?.url || "",
+        storageKey: assetData.storageKey || promoVideoAsset?.storageKey || undefined,
+        mimeType: assetData.mimeType || promoVideoAsset?.mimeType || undefined,
+        fileSize: assetData.fileSize ?? promoVideoAsset?.fileSize ?? undefined,
+        status: assetData.status || promoVideoAsset?.status || "ready",
+        checksum: assetData.checksum || promoVideoAsset?.checksum || undefined,
+        uploadedAt: assetData.uploadedAt || promoVideoAsset?.uploadedAt || new Date().toISOString(),
+        originalName: assetData.originalName || promoVideoAsset?.originalName || undefined,
+        qualities: promoVideoAsset?.qualities || [],
+        subtitles: promoVideoAsset?.subtitles || [],
+      };
+      const finalUrl = nextAsset.url || url || "";
+      const inferredFileName =
+        nextAsset.originalName ||
+        promoVideoFileName ||
+        (finalUrl ? String(finalUrl).split("/").pop()?.split("?")[0] || "" : "");
+      onVideoAssetChange(nextAsset);
+      onVideoUrlChange(finalUrl);
+      onPromoMetadataChange?.({
+        promoVideoFileName: inferredFileName || undefined,
+        promoVideoMimeType: nextAsset.mimeType || undefined,
+        promoVideoSizeBytes: Number.isFinite(Number(nextAsset.fileSize)) ? nextAsset.fileSize : undefined,
+        promoVideoDurationSeconds: durationSeconds,
+        sourceFile: file,
+      });
+    } else if (isExternalVideoOnly({ url, mimeType: undefined })) {
+      onVideoAssetChange(undefined);
+      onVideoUrlChange(url);
+      onPromoMetadataChange?.({
+        promoVideoFileName: promoVideoFileName || undefined,
+        promoVideoMimeType: undefined,
+        promoVideoSizeBytes: undefined,
+        promoVideoDurationSeconds: undefined,
+        sourceFile: null,
+      });
+    } else {
+      onVideoUrlChange(url);
+      onPromoMetadataChange?.({
+        sourceFile: null,
+      });
+    }
+  };
+
+  const handleBeforeUpload = async (file) => {
+    if (typeof validateVideoFile !== "function") return true;
+    const validationMessage = validateVideoFile(file);
+    if (validationMessage) {
+      onPromoMetadataChange?.({
+        validationError: validationMessage,
+        sourceFile: null,
+      });
+      return false;
+    }
+    onPromoMetadataChange?.({
+      validationError: undefined,
+      sourceFile: file,
+    });
+    return true;
+  };
 
   return (
     <div className="grid gap-4 rounded-[20px] border border-border/60 bg-background p-4">
@@ -2028,7 +2136,7 @@ function CoursePromoVideoSection({
             <FileVideo className="h-4 w-4 text-[#1B2B50]" />
             Video promocional
           </Label>
-          <p className="mt-1 text-xs text-muted-foreground">MP4 / WebM / MOV / MKV · hasta 4 GB.</p>
+          <p className="mt-1 text-xs text-muted-foreground">MP4 / WebM / MOV / MKV · hasta 4 GB. YouTube/Vimeo permitidos como alternativa.</p>
         </div>
         {state ? (
           <Badge variant="outline" className={cn(state.tone)}>
@@ -2037,108 +2145,19 @@ function CoursePromoVideoSection({
         ) : null}
       </div>
 
-      <MediaUploader
-        mode="video"
-        multiple={false}
-        maxFiles={1}
-        maxSizeBytes={COURSE_VIDEO_MAX_SIZE_BYTES}
-        acceptedFileTypes={COURSE_VIDEO_ALLOWED_TYPES}
-        folderPrefix="courses/promo-videos"
-        value={hasAsset ? [promoVideoAsset] : []}
-        onChange={(next) => {
-          const first = Array.isArray(next) ? next[0] : null;
-          if (!first) {
-            onVideoAssetChange(null);
-            return;
-          }
-          onVideoAssetChange({
-            url: first.url || promoVideoAsset?.url || "",
-            storageKey: first.storageKey || promoVideoAsset?.storageKey || undefined,
-            mimeType: first.mimeType || promoVideoAsset?.mimeType || undefined,
-            fileSize: first.fileSize ?? promoVideoAsset?.fileSize ?? undefined,
-            status: first.status || "pending",
-            checksum: first.checksum || promoVideoAsset?.checksum || undefined,
-            uploadedAt: first.uploadedAt || promoVideoAsset?.uploadedAt || new Date().toISOString(),
-            qualities: promoVideoAsset?.qualities || [],
-            subtitles: promoVideoAsset?.subtitles || [],
-          });
-        }}
-        compact
-      />
-
-      {hasAsset ? (
-        <div className="rounded-2xl border border-border/60 bg-card px-3 py-2.5">
-          <div className="flex flex-wrap items-center gap-2">
-            <FileVideo className="h-4 w-4 text-[#1B2B50]" />
-            <span className="text-sm font-medium text-foreground">
-              {promoVideoAsset?.url?.split("/").pop()?.split("?")[0] || promoVideoFileName || "Video subido"}
-            </span>
-            {promoVideoAsset?.mimeType ? (
-              <Badge variant="outline" className="h-5 px-2 text-[10px] uppercase">
-                {promoVideoAsset.mimeType.includes("mp4")
-                  ? "MP4"
-                  : promoVideoAsset.mimeType.includes("webm")
-                    ? "WebM"
-                    : promoVideoAsset.mimeType.includes("quicktime")
-                      ? "MOV"
-                      : promoVideoAsset.mimeType.includes("matroska")
-                        ? "MKV"
-                        : "Video"}
-              </Badge>
-            ) : null}
-          </div>
-          <div className="mt-1.5 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
-            <span className="rounded-full bg-slate-100 px-2 py-0.5 font-medium">
-              {resourceFormatSize(promoVideoAsset?.fileSize ?? promoVideoSizeBytes)}
-            </span>
-            {promoVideoAsset?.checksum ? (
-              <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5">
-                <ShieldCheck className="h-3 w-3" /> SHA-256 {promoVideoAsset.checksum.slice(0, 8)}…
-              </span>
-            ) : null}
-            {promoVideoAsset?.url ? (
-              <Button asChild type="button" variant="ghost" size="sm" className="ml-auto h-7 px-2 text-[11px]">
-                <a href={promoVideoAsset.url} target="_blank" rel="noreferrer">
-                  Abrir archivo
-                </a>
-              </Button>
-            ) : null}
-          </div>
-        </div>
-      ) : null}
-
       <div className="grid gap-3">
-        <div className="rounded-[20px] border border-border/60 bg-background p-4">
-          <div className="flex items-center justify-between gap-3">
-            <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-              Upload legacy (solo fallback)
-            </div>
-            <div className="text-[11px] text-muted-foreground">
-              {Math.round(COURSE_VIDEO_MAX_SIZE_BYTES / (1024 * 1024 * 1024))} GB máximo
-            </div>
+        <LessonVideoUploader
+          value={promoVideo || ""}
+          asset={promoVideoAsset}
+          onChange={handleCombinedChange}
+          folderPrefix="courses/promo-videos"
+          onBeforeUpload={handleBeforeUpload}
+        />
+        {onlyExternal ? (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-[11px] leading-5 text-amber-800">
+            Estás usando un enlace externo. Recomendamos subir el video aquí para garantizar compatibilidad cross-browser y control total del contenido.
           </div>
-          <div className="mt-3 grid gap-3">
-            <Input
-              type="file"
-              accept={COURSE_VIDEO_ALLOWED_TYPES.join(",")}
-              onChange={(e) => onVideoFileUpload(e.target.files?.[0])}
-              disabled={busy}
-            />
-            {onlyExternal ? (
-              <div className="rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-[11px] leading-5 text-amber-800">
-                Estás usando un enlace externo. Recomendamos subir el video aquí para compatibilidad cross-browser y control total del contenido.
-              </div>
-            ) : null}
-            {hasUrl && !hasAsset ? (
-              <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
-                <span className="rounded-full border border-border/60 bg-card px-3 py-1">
-                  {promoVideoFileName || "Video cargado"}
-                </span>
-                <span className="rounded-full border border-border/60 bg-card px-3 py-1">{formatBytes(promoVideoSizeBytes)}</span>
-              </div>
-            ) : null}
-          </div>
-        </div>
+        ) : null}
         <FieldError error={errors?.promoVideo} />
       </div>
     </div>
@@ -2374,7 +2393,17 @@ function CurriculumField({ curriculum, onChange, error }) {
   const updateLesson = (sectionIndex, lessonIndex, patch) => {
     const section = safeCurriculum[sectionIndex] || {};
     const lessons = Array.isArray(section.lessons) ? [...section.lessons] : [];
-    lessons[lessonIndex] = { ...lessons[lessonIndex], ...patch };
+    const prev = lessons[lessonIndex] || {};
+    const next = { ...prev, ...patch };
+    const clearingVideoUrl = Object.prototype.hasOwnProperty.call(patch, "videoUrl") && !String(patch.videoUrl || "").trim();
+    const clearingVideoAsset = Object.prototype.hasOwnProperty.call(patch, "videoAsset") && (patch.videoAsset === undefined || patch.videoAsset === null);
+    if (clearingVideoUrl && !Object.prototype.hasOwnProperty.call(patch, "videoAsset")) {
+      next.videoAsset = undefined;
+    }
+    if (clearingVideoAsset && !Object.prototype.hasOwnProperty.call(patch, "videoUrl")) {
+      next.videoUrl = "";
+    }
+    lessons[lessonIndex] = next;
     updateSection(sectionIndex, { lessons });
   };
 
@@ -2606,7 +2635,9 @@ function CurriculumField({ curriculum, onChange, error }) {
                     updateLesson(selectedSectionIndex, selectedLessonIndex, { videoUrl: nextVideoUrl || "" })
                   }
                   onVideoAssetChange={(nextVideoAsset) =>
-                    updateLesson(selectedSectionIndex, selectedLessonIndex, { videoAsset: nextVideoAsset })
+                    updateLesson(selectedSectionIndex, selectedLessonIndex, {
+                      videoAsset: nextVideoAsset || undefined,
+                    })
                   }
                 />
 
@@ -3948,10 +3979,40 @@ export default function CourseWizard({ jobId }) {
                   promoVideo={values.promoVideo || ""}
                   promoVideoFileName={values.promoVideoFileName || ""}
                   promoVideoSizeBytes={values.promoVideoSizeBytes}
-                  busy={busy}
-                  onVideoAssetChange={(next) => setValue("promoVideoAsset", next, { shouldValidate: true, shouldDirty: true })}
+                  onVideoAssetChange={(next) => setValue("promoVideoAsset", next || undefined, { shouldValidate: true, shouldDirty: true })}
                   onVideoUrlChange={(next) => setValue("promoVideo", next || "", { shouldValidate: true, shouldDirty: true })}
-                  onVideoFileUpload={handleVideoUpload}
+                  validateVideoFile={validateVideoFile}
+                  extractVideoMetadata={extractVideoMetadata}
+                  onPromoMetadataChange={(patch) => {
+                    if (!patch) return;
+                    if (Object.prototype.hasOwnProperty.call(patch, "promoVideoFileName")) {
+                      setValue("promoVideoFileName", patch.promoVideoFileName || "", { shouldValidate: false, shouldDirty: true });
+                    }
+                    if (Object.prototype.hasOwnProperty.call(patch, "promoVideoMimeType")) {
+                      setValue("promoVideoMimeType", patch.promoVideoMimeType || "", { shouldValidate: false, shouldDirty: true });
+                    }
+                    if (Object.prototype.hasOwnProperty.call(patch, "promoVideoSizeBytes")) {
+                      setValue("promoVideoSizeBytes", patch.promoVideoSizeBytes ?? undefined, { shouldValidate: false, shouldDirty: true });
+                    }
+                    if (Object.prototype.hasOwnProperty.call(patch, "promoVideoDurationSeconds")) {
+                      setValue("promoVideoDurationSeconds", patch.promoVideoDurationSeconds ?? 0, { shouldValidate: false, shouldDirty: true });
+                    }
+                    if (patch.validationError) {
+                      setError("promoVideo", { type: "manual", message: String(patch.validationError) });
+                      toast.error(String(patch.validationError), { position: "top-right" });
+                    } else {
+                      clearErrors("promoVideo");
+                    }
+                    if (patch.sourceFile && typeof patch.sourceFile === "object" && patch.sourceFile instanceof window?.File) {
+                      extractVideoMetadata(patch.sourceFile)
+                        .then((meta) => {
+                          if (meta && Number.isFinite(Number(meta.durationSeconds))) {
+                            setValue("promoVideoDurationSeconds", Number(meta.durationSeconds) || 0, { shouldValidate: false, shouldDirty: true });
+                          }
+                        })
+                        .catch(() => {});
+                    }
+                  }}
                   errors={errors}
                 />
                 {(values.promoVideoAsset?.url || values.promoVideo) ? (

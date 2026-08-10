@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useDropzone } from "react-dropzone";
 import toast from "react-hot-toast";
 import {
@@ -43,11 +43,26 @@ export default function LessonVideoUploader({
   asset,
   onChange = () => {},
   compact = false,
+  folderPrefix = "courses/lessons/videos",
+  onBeforeUpload,
 }) {
-  const [progress, setProgress] = useState(null);
+  const [progress, setProgress] = useState({ percent: 0, loaded: 0, total: 0 });
   const [uploading, setUploading] = useState(false);
   const [manualUrl, setManualUrl] = useState("");
   const [tab, setTab] = useState("upload");
+  const [preview, setPreview] = useState(null);
+
+  useEffect(() => {
+    if (!preview || !preview.objectUrl) return;
+    const url = preview.objectUrl;
+    return () => {
+      try {
+        URL.revokeObjectURL(url);
+      } catch {
+        /* noop */
+      }
+    };
+  }, [preview?.objectUrl]);
 
   const current = String(value || "").trim();
   const hasAsset = asset && typeof asset === "object" && (asset.url || asset.storageKey);
@@ -56,6 +71,16 @@ export default function LessonVideoUploader({
   const assetChecksum = hasAsset ? asset.checksum : undefined;
   const assetUploadedAt = hasAsset ? asset.uploadedAt : undefined;
   const assetStorageKey = hasAsset ? asset.storageKey : undefined;
+
+  const displayUrl = useMemo(() => {
+    if (current) return current;
+    if (preview?.objectUrl) return preview.objectUrl;
+    return "";
+  }, [current, preview?.objectUrl]);
+
+  const displayHasAssetLike = Boolean(current || (preview && preview.objectUrl));
+  const displayMime = assetMime || preview?.mimeType;
+  const displaySize = assetSize ?? preview?.fileSize;
 
   const handleDrop = useCallback(
     async (acceptedFiles) => {
@@ -68,16 +93,34 @@ export default function LessonVideoUploader({
       }
 
       try {
+        let objectUrl = null;
+        try {
+          objectUrl = URL.createObjectURL(file);
+        } catch {
+          objectUrl = null;
+        }
+        setPreview({
+          objectUrl,
+          mimeType: file.type,
+          fileSize: file.size,
+          originalName: file.name,
+        });
+
+        if (typeof onBeforeUpload === "function") {
+          const ok = await onBeforeUpload(file);
+          if (ok === false) return;
+        }
         setUploading(true);
         setProgress({ percent: 0, loaded: 0, total: file.size });
         const ts = new Date().toISOString().replace(/[:.]/g, "-");
         const rand = Math.random().toString(36).slice(2, 8);
         const extension = String(file.name || "").split(".").pop() || "mp4";
-        const storageKey = `courses/lessons/videos/${ts}_${rand}.${extension}`;
+        const safeFolder = String(folderPrefix || "courses/lessons/videos").replace(/\/$/, "");
+        const storageKey = `${safeFolder}/${ts}_${rand}.${extension}`;
 
         const { url: rawUrl, etag } = await uploadToR2WithProgress(
           file,
-          { folder: "courses/lessons/videos", key: storageKey },
+          { folder: safeFolder, key: storageKey },
           (p) =>
             setProgress({
               loaded: p.loaded,
@@ -101,16 +144,18 @@ export default function LessonVideoUploader({
           mimeType: file.type,
           fileSize: file.size,
           originalName: file.name,
+          file,
         });
         toast.success("Video cargado correctamente.");
       } catch (error) {
         toast.error(error?.message || "No pudimos subir el video. Intenta nuevamente.");
+        setPreview(null);
       } finally {
         setUploading(false);
-        setProgress(null);
+        setTimeout(() => setProgress({ percent: 0, loaded: 0, total: 0 }), 600);
       }
     },
-    [onChange]
+    [folderPrefix, onChange, onBeforeUpload]
   );
 
   const { getRootProps, getInputProps, isDragActive, isDragReject } = useDropzone({
@@ -142,7 +187,8 @@ export default function LessonVideoUploader({
   };
 
   const handleClear = () => {
-    onChange("");
+    setPreview(null);
+    onChange("", null, null);
   };
 
   const dropTone = isDragReject
@@ -177,7 +223,7 @@ export default function LessonVideoUploader({
           </button>
         </div>
 
-        {current ? (
+        {displayHasAssetLike ? (
           <div className="overflow-hidden rounded-2xl border border-emerald-200 bg-emerald-50/40">
             <div className="grid gap-3 p-3">
               <div className="flex flex-wrap items-center gap-3">
@@ -186,33 +232,45 @@ export default function LessonVideoUploader({
                 </span>
                 <div className="min-w-0 flex-1 grid gap-1">
                   <div className="flex flex-wrap items-center gap-1.5">
-                    <span className="text-xs font-semibold text-foreground">Video cargado</span>
+                    <span className="text-xs font-semibold text-foreground">
+                      {displayUrl && displayUrl.startsWith("blob:") ? "Cargando video…" : "Video cargado"}
+                    </span>
                     <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-white px-1.5 py-0.5 text-[10px] font-bold text-emerald-700">
                       <CheckCircle2 className="h-2.5 w-2.5" />
-                      {hasAsset ? "Asset" : "Activo"}
+                      {displayUrl && displayUrl.startsWith("blob:")
+                        ? uploading
+                          ? "Subiendo"
+                          : "Previsualizando"
+                        : hasAsset
+                          ? "Asset"
+                          : "Activo"}
                     </span>
-                    {assetSize ? (
+                    {displaySize != null ? (
                       <span className="inline-flex items-center rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-700">
-                        {formatSize(assetSize)}
+                        {formatSize(displaySize)}
                       </span>
                     ) : null}
                   </div>
                   <a
-                    href={current}
+                    href={displayUrl}
                     target="_blank"
                     rel="noreferrer"
                     className="block truncate text-[11px] text-muted-foreground hover:text-foreground"
                   >
-                    {current}
+                    {displayUrl && displayUrl.startsWith("blob:")
+                      ? preview?.originalName || "Vista previa local"
+                      : displayUrl}
                   </a>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Button asChild type="button" variant="outline" size="sm" className="h-7 px-2 text-[11px]">
-                    <a href={current} target="_blank" rel="noreferrer">
-                      <PlayCircle className="mr-1.5 h-3.5 w-3.5" />
-                      Abrir
-                    </a>
-                  </Button>
+                  {displayUrl && !displayUrl.startsWith("blob:") ? (
+                    <Button asChild type="button" variant="outline" size="sm" className="h-7 px-2 text-[11px]">
+                      <a href={displayUrl} target="_blank" rel="noreferrer">
+                        <PlayCircle className="mr-1.5 h-3.5 w-3.5" />
+                        Abrir
+                      </a>
+                    </Button>
+                  ) : null}
                   <Button
                     type="button"
                     variant="outline"
@@ -227,10 +285,10 @@ export default function LessonVideoUploader({
                 </div>
               </div>
               <div className="relative aspect-video w-full overflow-hidden rounded-xl border border-emerald-200 bg-slate-900">
-                {isEmbedUrl(current) ? (
+                {displayUrl && isEmbedUrl(displayUrl) ? (
                   <iframe
                     title="Vista previa del video"
-                    src={current}
+                    src={displayUrl}
                     className="absolute inset-0 h-full w-full"
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                     allowFullScreen
@@ -240,10 +298,22 @@ export default function LessonVideoUploader({
                     controls
                     preload="metadata"
                     className="absolute inset-0 h-full w-full object-contain bg-black"
-                    src={current}
+                    src={displayUrl}
                   />
                 )}
               </div>
+              {uploading && progress?.percent != null ? (
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-700">
+                    <span className="inline-flex items-center gap-1">
+                      <Loader2 className="h-3 w-3 animate-spin text-[#2356B8]" />
+                      Subiendo video al almacenamiento…
+                    </span>
+                    <span>{progress.percent}%</span>
+                  </div>
+                  <Progress value={progress.percent} className="h-2 bg-white" />
+                </div>
+              ) : null}
             </div>
           </div>
         ) : tab === "upload" ? (
@@ -346,14 +416,14 @@ export default function LessonVideoUploader({
         </div>
       </div>
 
-      {current ? (
+      {displayHasAssetLike ? (
         <div className="overflow-hidden rounded-[22px] border border-emerald-200 bg-emerald-50/40">
           <div className="grid gap-4 p-4 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
             <div className="relative aspect-video w-full overflow-hidden rounded-[18px] border border-emerald-200 bg-slate-900">
-              {isEmbedUrl(current) ? (
+              {displayUrl && isEmbedUrl(displayUrl) ? (
                 <iframe
                   title="Vista previa del video"
-                  src={current}
+                  src={displayUrl}
                   className="absolute inset-0 h-full w-full"
                   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                   allowFullScreen
@@ -363,7 +433,7 @@ export default function LessonVideoUploader({
                   controls
                   preload="metadata"
                   className="absolute inset-0 h-full w-full object-contain bg-black"
-                  src={current}
+                  src={displayUrl}
                 />
               )}
             </div>
@@ -374,44 +444,54 @@ export default function LessonVideoUploader({
                 </span>
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-1.5">
-                    <span className="text-sm font-semibold text-foreground">Video cargado</span>
+                    <span className="text-sm font-semibold text-foreground">
+                      {displayUrl && displayUrl.startsWith("blob:") ? "Cargando video…" : "Video cargado"}
+                    </span>
                     <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-white px-2 py-0.5 text-[11px] font-bold text-emerald-700">
                       <CheckCircle2 className="h-3 w-3" />
-                      {hasAsset ? "Asset almacenado" : "Activo"}
+                      {displayUrl && displayUrl.startsWith("blob:")
+                        ? uploading
+                          ? "Subiendo"
+                          : "Previsualizando"
+                        : hasAsset
+                          ? "Asset almacenado"
+                          : "Activo"}
                     </span>
                   </div>
                   <a
-                    href={current}
+                    href={displayUrl}
                     target="_blank"
                     rel="noreferrer"
                     className="mt-1 block truncate text-xs text-muted-foreground hover:text-foreground"
                   >
-                    {current}
+                    {displayUrl && displayUrl.startsWith("blob:")
+                      ? preview?.originalName || "Vista previa local"
+                      : displayUrl}
                   </a>
                 </div>
               </div>
 
-              {hasAsset ? (
+              {displayMime || displaySize != null || assetChecksum || assetUploadedAt || assetStorageKey ? (
                 <div className="grid gap-1.5 rounded-2xl border border-emerald-200/80 bg-white/60 p-3">
                   <div className="flex flex-wrap items-center gap-1.5">
-                    {assetMime ? (
+                    {displayMime ? (
                       <span className="inline-flex items-center rounded-full border border-border/60 bg-background px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-foreground">
-                        {assetMime.includes("mp4")
+                        {String(displayMime).includes("mp4")
                           ? "MP4"
-                          : assetMime.includes("webm")
+                          : String(displayMime).includes("webm")
                             ? "WebM"
-                            : assetMime.includes("quicktime") || assetMime.includes("mov")
+                            : String(displayMime).includes("quicktime") || String(displayMime).includes("mov")
                               ? "MOV"
-                              : assetMime.includes("matroska") || assetMime.includes("mkv")
+                              : String(displayMime).includes("matroska") || String(displayMime).includes("mkv")
                                 ? "MKV"
-                                : assetMime.includes("m4v")
+                                : String(displayMime).includes("m4v")
                                   ? "M4V"
                                   : "Video"}
                       </span>
                     ) : null}
-                    {assetSize ? (
+                    {displaySize != null ? (
                       <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-700">
-                        {formatSize(assetSize)}
+                        {formatSize(displaySize)}
                       </span>
                     ) : null}
                   </div>
@@ -436,19 +516,40 @@ export default function LessonVideoUploader({
                 </div>
               ) : null}
 
+              {uploading && progress?.percent != null ? (
+                <div className="space-y-1 rounded-2xl border border-sky-200 bg-sky-50/60 p-3">
+                  <div className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-700">
+                    <span className="inline-flex items-center gap-1">
+                      <Loader2 className="h-3 w-3 animate-spin text-[#2356B8]" />
+                      Subiendo video al almacenamiento…
+                    </span>
+                    <span>{progress.percent}%</span>
+                  </div>
+                  <Progress value={progress.percent} className="h-2 bg-white" />
+                  <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+                    <span>
+                      {formatSize(progress.loaded || 0)} / {formatSize(progress.total || 0)}
+                    </span>
+                    <span className="font-medium">R2 · {folderPrefix}</span>
+                  </div>
+                </div>
+              ) : null}
+
               <div className="grid grid-cols-1 gap-2">
-                <Button
-                  asChild
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="justify-start rounded-xl"
-                >
-                  <a href={current} target="_blank" rel="noreferrer">
-                    <PlayCircle className="mr-2 h-4 w-4" />
-                    Abrir en nueva pestaña
-                  </a>
-                </Button>
+                {displayUrl && !displayUrl.startsWith("blob:") ? (
+                  <Button
+                    asChild
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="justify-start rounded-xl"
+                  >
+                    <a href={displayUrl} target="_blank" rel="noreferrer">
+                      <PlayCircle className="mr-2 h-4 w-4" />
+                      Abrir en nueva pestaña
+                    </a>
+                  </Button>
+                ) : null}
                 <Button
                   type="button"
                   variant="outline"
