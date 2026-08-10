@@ -740,15 +740,15 @@ const DashboardPageView = () => {
                 <Button asChild variant="outline">
                   <Link href={`/${lang}/dashboard/mis-cursos`}>Mis cursos</Link>
                 </Button>
-                <Button asChild variant="outline">
+                {/* <Button asChild variant="outline">
                   <Link href={`/${lang}/dashboard/inscripciones`}>Mis inscripciones</Link>
-                </Button>
+                </Button> */}
                 <Button asChild variant="outline">
                   <Link href={`/${lang}/dashboard/certificados`}>Mis certificados</Link>
                 </Button>
-                <Button asChild variant="outline">
+                {/* <Button asChild variant="outline">
                   <Link href={`/${lang}/dashboard/pagos`}>Historial de pagos</Link>
-                </Button>
+                </Button> */}
               </div>
             </CardContent>
           </Card>

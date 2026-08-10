@@ -75,7 +75,25 @@ export async function listEnrollments(options: {
 
   if (isStudentRole(options.actor.role)) {
     const actorEmail = String(options.actor.email || "").trim().toLowerCase();
-    enrollments = enrollments.filter((enrollment) => String(enrollment.email || "").trim().toLowerCase() === actorEmail);
+    const actorUid = String(options.actor.uid || options.actor.id || "").trim();
+    const actorPhone = String(options.actor.phone || options.actor.mobile || "").trim().toLowerCase();
+    enrollments = enrollments.filter((enrollment) => {
+      const eEmail = String(enrollment.email || "").trim().toLowerCase();
+      const eUid = String(enrollment.userId || enrollment.uid || enrollment.user || "").trim();
+      const ePhone = String(enrollment.phone || enrollment.mobile || "").trim().toLowerCase();
+      const emailMatch = Boolean(actorEmail) && Boolean(eEmail) && actorEmail === eEmail;
+      const uidMatch = Boolean(actorUid) && Boolean(eUid) && actorUid === eUid;
+      const phoneMatch = Boolean(actorPhone) && Boolean(ePhone) && actorPhone === ePhone;
+      if (emailMatch || uidMatch || phoneMatch) return true;
+      const legacyCandidates = [
+        enrollment.candidateEmail,
+        enrollment.studentEmail,
+        enrollment.contactEmail,
+        enrollment.alumnoEmail,
+      ].map((c) => String(c || "").trim().toLowerCase());
+      const legacyEmailMatch = legacyCandidates.some((c) => c && c === actorEmail);
+      return legacyEmailMatch;
+    });
   }
 
   const filters = options.filters || {};
