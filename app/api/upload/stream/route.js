@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
-import { randomBytes } from "crypto";
+import { randomBytes, createHmac, createHash } from "crypto";
 import { COURSE_VIDEO_ALLOWED_TYPES, COURSE_VIDEO_MAX_SIZE_BYTES } from "@/lib/courses/constants";
 
 export const runtime = "nodejs";
@@ -40,17 +39,132 @@ function sanitizeFolder(folderRaw, fallback) {
   );
 }
 
-function buildR2Client() {
+function readEnv() {
   const endpoint = String(process.env.R2_ENDPOINT || "").trim();
   const accessKeyId = String(process.env.R2_ACCESS_KEY_ID || "").trim();
   const secretAccessKey = String(process.env.R2_SECRET_ACCESS_KEY || "").trim();
-  if (!endpoint || !accessKeyId || !secretAccessKey) throw new Error("r2_not_configured");
-  return new S3Client({
-    region: "auto",
-    endpoint,
-    credentials: { accessKeyId, secretAccessKey },
-    forcePathStyle: true,
-  });
+  const bucket = String(process.env.R2_BUCKET || "").trim();
+  const publicBase = buildPublicBase(process.env.R2_PUBLIC_BASE, bucket);
+  if (!endpoint || !accessKeyId || !secretAccessKey || !bucket || !publicBase) {
+    throw new Error("r2_not_configured");
+  }
+  return { endpoint, accessKeyId, secretAccessKey, bucket, publicBase };
+}
+
+function isoDate(date) {
+  const d = date instanceof Date ? date : new Date(date);
+  const pad = (n) => String(n).padStart(2, "0");
+  return (
+    d.getUTCFullYear().toString() +
+    pad(d.getUTCMonth() + 1) +
+    pad(d.getUTCDate()) +
+    "T" +
+    pad(d.getUTCHours()) +
+    pad(d.getUTCMinutes()) +
+    pad(d.getUTCSeconds()) +
+    "Z"
+  );
+}
+
+function ymd(date) {
+  return isoDate(date).slice(0, 8);
+}
+
+function uriEncodeComponent(str, encodeSlash = true) {
+  return encodeURIComponent(str)
+    .replace(/%2F/g, encodeSlash ? "%2F" : "/")
+    .replace(/[!'()*]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`);
+}
+
+function hmacSha256(key, data) {
+  return createHmac("sha256", key).update(data, "utf8").digest();
+}
+
+function sha256Hex(data) {
+  return createHash("sha256").update(data, "utf8").digest("hex");
+}
+
+/**
+ * Firma SigV4 en modo query string compatible con Cloudflare R2.
+ * Incluye X-Amz-Content-SHA256=UNSIGNED-PAYLOAD para evitar que R2 intente
+ * recalcular el hash de streaming (evita el error "Unable to calculate hash
+ * for flowing readable stream").
+ */
+function createSignedPutUrl({
+  endpoint,
+  bucket,
+  key,
+  region = "auto",
+  accessKeyId,
+  secretAccessKey,
+  expiresInSeconds = 30 * 60,
+  now = new Date(),
+}) {
+  const X_AMZ_ALGORITHM = "AWS4-HMAC-SHA256";
+  const UNSIGNED_PAYLOAD = "UNSIGNED-PAYLOAD";
+
+  const amzDate = isoDate(now);
+  const dateStamp = ymd(now);
+  const expires = Math.max(1, Math.min(604800, Number(expiresInSeconds) || 1800));
+  const credentialScope = `${dateStamp}/${region}/s3/aws4_request`;
+
+  const urlParsed = new URL(
+    endpoint.endsWith(`/${bucket}`) || endpoint.includes(`${bucket}.`)
+      ? endpoint
+      : `${endpoint.replace(/\/$/, "")}/${bucket}`
+  );
+  const finalKey = String(key || "").replace(/^\/+/, "");
+  const canonicalUri = `/${uriEncodeComponent(finalKey, false)}`;
+
+  const query = new Map();
+  query.set("X-Amz-Algorithm", X_AMZ_ALGORITHM);
+  query.set("X-Amz-Credential", `${accessKeyId}/${credentialScope}`);
+  query.set("X-Amz-Date", amzDate);
+  query.set("X-Amz-Expires", String(expires));
+  query.set("X-Amz-Content-SHA256", UNSIGNED_PAYLOAD);
+  query.set("X-Amz-SignedHeaders", "host;x-amz-content-sha256");
+
+  const signedHeaders = "host;x-amz-content-sha256";
+  const canonicalHeaders =
+    `host:${urlParsed.host.toLowerCase()}\n` +
+    `x-amz-content-sha256:${UNSIGNED_PAYLOAD}\n`;
+
+  const canonicalQueryString = Array.from(query.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
+    .join("&");
+
+  const canonicalRequest = [
+    "PUT",
+    canonicalUri,
+    canonicalQueryString,
+    canonicalHeaders,
+    signedHeaders,
+    UNSIGNED_PAYLOAD,
+  ].join("\n");
+
+  const hashedCanonical = sha256Hex(canonicalRequest);
+  const stringToSign = [
+    X_AMZ_ALGORITHM,
+    amzDate,
+    credentialScope,
+    hashedCanonical,
+  ].join("\n");
+
+  const kDate = hmacSha256(`AWS4${secretAccessKey}`, dateStamp);
+  const kRegion = hmacSha256(kDate, region);
+  const kService = hmacSha256(kRegion, "s3");
+  const kSigning = hmacSha256(kService, "aws4_request");
+  const signature = createHmac("sha256", kSigning)
+    .update(stringToSign, "utf8")
+    .digest("hex");
+
+  const finalQuery = new URLSearchParams(canonicalQueryString);
+  finalQuery.set("X-Amz-Signature", signature);
+
+  const final = new URL(urlParsed.toString().replace(/\/?$/, "") + canonicalUri);
+  final.search = finalQuery.toString();
+  return final.toString();
 }
 
 const ALLOWED_GENERIC_TYPES = new Set([
@@ -108,12 +222,11 @@ export async function POST(request) {
       );
     }
 
-    const headerMime = request.headers.get("content-type") || mimeType;
-    const bucket = String(process.env.R2_BUCKET || "").trim();
-    const publicBase = buildPublicBase(process.env.R2_PUBLIC_BASE, bucket);
-    if (!bucket || !publicBase) {
-      return NextResponse.json({ error: "r2_not_configured" }, { status: 500 });
+    if (!request.body) {
+      return NextResponse.json({ error: "upload_missing_body" }, { status: 400 });
     }
+
+    const { endpoint, accessKeyId, secretAccessKey, bucket, publicBase } = readEnv();
 
     let storageKey;
     const extension = originalName ? originalName.split(".").pop() || "bin" : "bin";
@@ -137,25 +250,45 @@ export async function POST(request) {
       storageKey = `${folder}/${timestamp}-${randomString}.${extension}`;
     }
 
-    if (!request.body) {
-      return NextResponse.json({ error: "upload_missing_body" }, { status: 400 });
-    }
+    const uploadUrl = createSignedPutUrl({
+      endpoint,
+      bucket,
+      key: storageKey,
+      region: "auto",
+      accessKeyId,
+      secretAccessKey,
+      expiresInSeconds: 30 * 60,
+    });
 
+    const headerMime = request.headers.get("content-type");
     const contentType =
       headerMime && headerMime !== "application/octet-stream"
         ? headerMime
         : mimeType || (effectiveIsVideo ? "video/mp4" : "application/octet-stream");
 
-    const client = buildR2Client();
-    const command = new PutObjectCommand({
-      Bucket: bucket,
-      Key: storageKey,
-      ContentType: contentType,
-      ContentLength: size > 0 ? size : undefined,
-      Body: request.body,
+    const r2Response = await fetch(uploadUrl, {
+      method: "PUT",
+      headers: {
+        "Content-Type": contentType,
+        "X-Amz-Content-SHA256": "UNSIGNED-PAYLOAD",
+      },
+      // @ts-ignore - duplex es permitido en Node.js >= 18
+      body: request.body,
+      duplex: "half",
     });
 
-    const putResult = await client.send(command);
+    if (!r2Response.ok) {
+      const body = await r2Response.text().catch(() => "");
+      return NextResponse.json(
+        {
+          error: `Error al subir a R2 (HTTP ${r2Response.status}): ${body.slice(0, 500)}`,
+        },
+        { status: 502 }
+      );
+    }
+
+    const etagRaw = r2Response.headers.get("ETag");
+    const etag = etagRaw ? String(etagRaw).replace(/^"|"$/g, "") : null;
     const publicUrl = `${publicBase}/${storageKey}`;
 
     return NextResponse.json({
@@ -168,7 +301,7 @@ export async function POST(request) {
       type: contentType,
       mimeType: contentType,
       size: size > 0 ? size : null,
-      etag: putResult?.ETag ? String(putResult.ETag).replace(/^"|"$/g, "") : null,
+      etag,
       originalName: originalName || undefined,
     });
   } catch (error) {

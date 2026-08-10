@@ -86,10 +86,9 @@ function sha256Hex(data) {
 
 /**
  * Genera una URL prefirmada compatible con S3 / Cloudflare R2 para método PUT,
- * usando AWS SigV4 (query params, sin headers). No necesita dependencias externas.
- *
- * SigV4 en query string:
- * https://docs.aws.amazon.com/AmazonS3/latest/API/sigv4-query-string-auth.html
+ * usando AWS SigV4 (query params, sin headers externos). No necesita dependencias.
+ * Incluye X-Amz-Content-SHA256=UNSIGNED-PAYLOAD para que Cloudflare R2 no intente
+ * recalcular el hash del stream durante un upload streaming.
  */
 function createSignedPutUrl({
   endpoint,
@@ -122,10 +121,13 @@ function createSignedPutUrl({
   query.set("X-Amz-Credential", `${accessKeyId}/${credentialScope}`);
   query.set("X-Amz-Date", amzDate);
   query.set("X-Amz-Expires", String(expires));
-  query.set("X-Amz-SignedHeaders", "host");
+  query.set("X-Amz-Content-SHA256", UNSIGNED_PAYLOAD);
+  query.set("X-Amz-SignedHeaders", "host;x-amz-content-sha256");
 
-  const signedHeaders = "host";
-  const canonicalHeaders = `host:${urlParsed.host.toLowerCase()}\n`;
+  const signedHeaders = "host;x-amz-content-sha256";
+  const canonicalHeaders =
+    `host:${urlParsed.host.toLowerCase()}\n` +
+    `x-amz-content-sha256:${UNSIGNED_PAYLOAD}\n`;
 
   const canonicalQueryString = Array.from(query.entries())
     .sort(([a], [b]) => a.localeCompare(b))
@@ -264,7 +266,7 @@ export async function GET(request) {
       bucket,
       contentType,
       maxSizeBytes,
-      signatureAlgorithm: "sigv4_query",
+      signatureAlgorithm: "sigv4_query_unsigned_payload",
     });
   } catch (error) {
     console.error("Error al generar URL presigned de upload:", error);

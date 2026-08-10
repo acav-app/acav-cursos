@@ -139,6 +139,7 @@ function presignedUploadPromise({ file, presigned, onProgress }) {
     if (contentType && contentType !== "application/octet-stream") {
       xhr.setRequestHeader("Content-Type", contentType);
     }
+    xhr.setRequestHeader("X-Amz-Content-SHA256", "UNSIGNED-PAYLOAD");
 
     xhr.upload.onprogress = (event) => {
       if (typeof onProgress !== "function") return;
