@@ -2318,7 +2318,7 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
                                               ) : (
                                                 <Circle className="mr-2 h-4 w-4" />
                                               )}
-                                              {completed ? "Pendiente" : "Completar"}
+                                              {completed ? "Pendiente" : "Completa"}
                                             </Button>
                                           </span>
                                         </TooltipTrigger>
@@ -2856,7 +2856,7 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
                             </div>
                           </div>
 
-                          <div className="flex flex-wrap gap-2">
+                          {/* <div className="flex flex-wrap gap-2">
                             {["video", "text", "live", "download"].includes(item.type) && item.id ? (
                               <Button
                                 type="button"
@@ -2886,7 +2886,7 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
                                 {String(item.status) === "completed" ? "Finalizada" : "Marcar completa"}
                               </Button>
                             ) : null}
-                          </div>
+                          </div> */}
                         </div>
                       </article>
                     );
