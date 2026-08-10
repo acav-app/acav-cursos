@@ -71,10 +71,16 @@ function multipartUploadPromise({ file, folder, key, onProgress }) {
           }
           resolve(buildResultPayload(data));
         } else {
-          reject(new Error(data?.error || "upload_failed"));
+          const slice = String(xhr.responseText || "").slice(0, 800);
+          const inferred =
+          data && typeof data === "object"
+            ? data.error || JSON.stringify(data).slice(0, 400)
+            : slice;
+          reject(new Error(inferred || `upload_multipart_http_${xhr.status}`));
         }
       } catch (err) {
-        reject(new Error("upload_failed_invalid_response"));
+        const slice = String(xhr.responseText || "").slice(0, 800);
+        reject(new Error(slice || "upload_multipart_invalid_response"));
       }
     };
 
@@ -106,20 +112,27 @@ function streamingUploadPromise({ file, folder, key, onProgress }) {
     };
 
     xhr.onload = () => {
+      const statusOk = xhr.status >= 200 && xhr.status < 300;
+      let data = null;
       try {
-        const data = JSON.parse(xhr.responseText || "{}");
-        if (xhr.status >= 200 && xhr.status < 300) {
-          if (typeof onProgress === "function") {
-            const resolvedTotal = Number(file?.size) || 0;
-            onProgress({ loaded: resolvedTotal, total: resolvedTotal, percent: 100, ratio: 1 });
-          }
-          resolve(buildResultPayload(data));
-        } else {
-          reject(new Error(data?.error || "upload_stream_failed"));
-        }
+        data = JSON.parse(xhr.responseText || "{}");
       } catch (err) {
-        reject(new Error("upload_failed_invalid_response"));
+        data = null;
       }
+      if (typeof onProgress === "function" && statusOk) {
+        const resolvedTotal = Number(file?.size) || 0;
+        onProgress({ loaded: resolvedTotal, total: resolvedTotal, percent: 100, ratio: 1 });
+      }
+      if (statusOk) {
+        resolve(buildResultPayload(data));
+        return;
+      }
+      const slice = String(xhr.responseText || "").slice(0, 800);
+      const inferred =
+        data && typeof data === "object"
+          ? data.error || data.r2_message || data.r2_code || JSON.stringify(data).slice(0, 400)
+          : slice;
+      reject(new Error(inferred || `upload_stream_http_${xhr.status}`));
     };
 
     xhr.onerror = () => reject(new Error("upload_network_error"));
@@ -171,10 +184,12 @@ function presignedUploadPromise({ file, presigned, onProgress }) {
             })
           );
         } else {
-          reject(new Error(`upload_presigned_http_${xhr.status}`));
+          const slice = String(xhr.responseText || "").slice(0, 800);
+          reject(new Error(slice || `upload_presigned_http_${xhr.status}`));
         }
       } catch (err) {
-        reject(new Error("upload_failed_invalid_response"));
+        const slice = String(xhr.responseText || "").slice(0, 800);
+        reject(new Error(slice || "upload_presigned_invalid_response"));
       }
     };
 
