@@ -185,14 +185,19 @@ export async function POST(request) {
     const encodedKey = encodeURIComponent(storageKey).replace(/%2F/g, "/");
     const targetUrl = `${env.endpoint.replace(/\/$/, "")}/${bucket}/${encodedKey}`;
 
-    // @ts-ignore
-    const r2Response = await aws.fetch(targetUrl, {
+    // aws.fetch() de aws4fetch filtra props desconocidas y borra `duplex: "half"`.
+    // En Vercel Edge Runtime, `fetch(ReadableStream body)` requiere duplex explícito.
+    // Solución: usar aws.sign() para obtener Request firmado, luego fetch() pasándole duplex.
+    const signedRequest = await aws.sign(targetUrl, {
       method: "PUT",
       headers: {
         "Content-Type": contentType,
         "X-Amz-Content-SHA256": "UNSIGNED-PAYLOAD",
       },
       body: request.body,
+    });
+
+    const r2Response = await fetch(signedRequest, {
       // @ts-ignore
       duplex: "half",
     });
