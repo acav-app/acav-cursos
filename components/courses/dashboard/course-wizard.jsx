@@ -1551,14 +1551,32 @@ function LessonVideoSection({ videoUrl, videoAsset, onVideoUrlChange, onVideoAss
   const hasAsset = videoAsset && typeof videoAsset === "object" && (videoAsset.url || videoAsset.storageKey);
   const hasUrl = Boolean(videoUrl);
   const isExternalOnly = hasUrl && !hasAsset && isExternalVideoOnly({ url: String(videoUrl || ""), mimeType: undefined });
-  const metadataMime = hasAsset ? videoAsset.mimeType : undefined;
-  const metadataSize = hasAsset ? videoAsset.fileSize : undefined;
-  const metadataChecksum = hasAsset ? videoAsset.checksum : undefined;
   const state = hasAsset
     ? { tone: resourceStatusBadge(videoAsset.status || "ready").tone, label: "Asset subido" }
     : hasUrl
-      ? { tone: resourceStatusBadge("pending").tone, label: "URL externa" }
+      ? { tone: resourceStatusBadge("pending").tone, label: isExternalOnly ? "URL externa" : "URL activa" }
       : null;
+
+  const handleCombinedChange = (nextUrl, assetData) => {
+    const url = String(nextUrl || "").trim();
+    onVideoUrlChange(url || "");
+    if (assetData && typeof assetData === "object") {
+      onVideoAssetChange({
+        url: assetData.url || url || videoAsset?.url || "",
+        storageKey: assetData.storageKey || videoAsset?.storageKey || undefined,
+        mimeType: assetData.mimeType || videoAsset?.mimeType || undefined,
+        fileSize: assetData.fileSize ?? videoAsset?.fileSize ?? undefined,
+        status: assetData.status || videoAsset?.status || "ready",
+        checksum: assetData.checksum || videoAsset?.checksum || undefined,
+        uploadedAt: assetData.uploadedAt || videoAsset?.uploadedAt || new Date().toISOString(),
+        originalName: assetData.originalName || videoAsset?.originalName || undefined,
+      });
+    } else if (!url) {
+      onVideoAssetChange(undefined);
+    } else if (isExternalVideoOnly({ url, mimeType: undefined })) {
+      onVideoAssetChange(undefined);
+    }
+  };
 
   return (
     <div className="grid gap-4 rounded-[20px] border border-border/60 bg-background p-4">
@@ -1568,7 +1586,7 @@ function LessonVideoSection({ videoUrl, videoAsset, onVideoUrlChange, onVideoAss
             <FileVideo className="h-4 w-4 text-[#1B2B50]" />
             Video de la clase
           </Label>
-          <p className="mt-1 text-xs text-muted-foreground">MP4 / WebM / MOV / MKV · hasta 4 GB. YouTube/Vimeo permitidos como fallback.</p>
+          <p className="mt-1 text-xs text-muted-foreground">MP4 / WebM / MOV / MKV · hasta 4 GB. YouTube/Vimeo permitidos como alternativa.</p>
         </div>
         {state ? (
           <Badge variant="outline" className={cn(state.tone)}>
@@ -1577,78 +1595,13 @@ function LessonVideoSection({ videoUrl, videoAsset, onVideoUrlChange, onVideoAss
         ) : null}
       </div>
 
-      <MediaUploader
-        mode="video"
-        multiple={false}
-        maxFiles={1}
-        maxSizeBytes={COURSE_VIDEO_MAX_SIZE_BYTES}
-        acceptedFileTypes={COURSE_VIDEO_ALLOWED_TYPES}
-        folderPrefix="courses/lessons/videos"
-        value={hasAsset ? [videoAsset] : []}
-        onChange={(next) => {
-          const first = Array.isArray(next) ? next[0] : null;
-          if (!first) {
-            onVideoAssetChange(undefined);
-            return;
-          }
-          onVideoAssetChange({
-            url: first.url || videoAsset?.url || "",
-            storageKey: first.storageKey || videoAsset?.storageKey || undefined,
-            mimeType: first.mimeType || videoAsset?.mimeType || undefined,
-            fileSize: first.fileSize ?? videoAsset?.fileSize ?? undefined,
-            status: first.status || "pending",
-            checksum: first.checksum || videoAsset?.checksum || undefined,
-            uploadedAt: first.uploadedAt || videoAsset?.uploadedAt || new Date().toISOString(),
-          });
-        }}
-        compact
-      />
-
-      {hasAsset ? (
-        <div className="rounded-2xl border border-border/60 bg-card px-3 py-2.5">
-          <div className="flex flex-wrap items-center gap-2">
-            <FileVideo className="h-4 w-4 text-[#1B2B50]" />
-            <span className="text-sm font-medium text-foreground">
-              {videoAsset?.url?.split("/").pop()?.split("?")[0] || "Video subido"}
-            </span>
-            {metadataMime ? (
-              <Badge variant="outline" className="h-5 px-2 text-[10px] uppercase">
-                {metadataMime.includes("mp4")
-                  ? "MP4"
-                  : metadataMime.includes("webm")
-                    ? "WebM"
-                    : metadataMime.includes("quicktime")
-                      ? "MOV"
-                      : metadataMime.includes("matroska")
-                        ? "MKV"
-                        : "Video"}
-              </Badge>
-            ) : null}
-          </div>
-          <div className="mt-1.5 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
-            {metadataSize ? (
-              <span className="rounded-full bg-slate-100 px-2 py-0.5 font-medium">
-                {resourceFormatSize(metadataSize)}
-              </span>
-            ) : null}
-            {metadataChecksum ? (
-              <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5">
-                <ShieldCheck className="h-3 w-3" /> SHA-256 {metadataChecksum.slice(0, 8)}…
-              </span>
-            ) : null}
-            {videoAsset?.url ? (
-              <Button asChild type="button" variant="ghost" size="sm" className="ml-auto h-7 px-2 text-[11px]">
-                <a href={videoAsset.url} target="_blank" rel="noreferrer">
-                  Abrir archivo
-                </a>
-              </Button>
-            ) : null}
-          </div>
-        </div>
-      ) : null}
-
       <div className="grid gap-3">
-        <LessonVideoUploader value={videoUrl || ""} onChange={onVideoUrlChange} compact />
+        <LessonVideoUploader
+          value={videoUrl || ""}
+          asset={videoAsset}
+          onChange={handleCombinedChange}
+          compact
+        />
         {isExternalOnly ? (
           <div className="rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-[11px] leading-5 text-amber-800">
             Estás usando un enlace externo. Recomendamos subir el video aquí para garantizar compatibilidad cross-browser y control total del contenido.

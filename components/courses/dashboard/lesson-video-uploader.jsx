@@ -38,13 +38,24 @@ function isEmbedUrl(url) {
   return u.includes("youtube.com") || u.includes("youtu.be") || u.includes("vimeo.com");
 }
 
-export default function LessonVideoUploader({ value = "", onChange = () => {}, compact = false }) {
+export default function LessonVideoUploader({
+  value = "",
+  asset,
+  onChange = () => {},
+  compact = false,
+}) {
   const [progress, setProgress] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [manualUrl, setManualUrl] = useState("");
   const [tab, setTab] = useState("upload");
 
   const current = String(value || "").trim();
+  const hasAsset = asset && typeof asset === "object" && (asset.url || asset.storageKey);
+  const assetMime = hasAsset ? asset.mimeType : undefined;
+  const assetSize = hasAsset ? asset.fileSize : undefined;
+  const assetChecksum = hasAsset ? asset.checksum : undefined;
+  const assetUploadedAt = hasAsset ? asset.uploadedAt : undefined;
+  const assetStorageKey = hasAsset ? asset.storageKey : undefined;
 
   const handleDrop = useCallback(
     async (acceptedFiles) => {
@@ -59,15 +70,34 @@ export default function LessonVideoUploader({ value = "", onChange = () => {}, c
       try {
         setUploading(true);
         setProgress({ percent: 0, loaded: 0, total: file.size });
-        const { url: rawUrl } = await uploadToR2WithProgress(file, { folder: "courses/videos" }, (p) =>
-          setProgress({
-            loaded: p.loaded,
-            total: p.total,
-            percent: p.percent,
-          })
+        const ts = new Date().toISOString().replace(/[:.]/g, "-");
+        const rand = Math.random().toString(36).slice(2, 8);
+        const extension = String(file.name || "").split(".").pop() || "mp4";
+        const storageKey = `courses/lessons/videos/${ts}_${rand}.${extension}`;
+
+        const { url: rawUrl, etag } = await uploadToR2WithProgress(
+          file,
+          { folder: "courses/lessons/videos", key: storageKey },
+          (p) =>
+            setProgress({
+              loaded: p.loaded,
+              total: p.total,
+              percent: p.percent,
+            })
         );
         const normalized = normalizePublicR2Url(rawUrl);
-        onChange(normalized, null, {
+        const uploadedAt = new Date().toISOString();
+        const assetData = {
+          url: normalized,
+          storageKey,
+          mimeType: file.type,
+          fileSize: file.size,
+          status: "ready",
+          checksum: etag || undefined,
+          uploadedAt,
+          originalName: file.name,
+        };
+        onChange(normalized, assetData, {
           mimeType: file.type,
           fileSize: file.size,
           originalName: file.name,
@@ -149,45 +179,70 @@ export default function LessonVideoUploader({ value = "", onChange = () => {}, c
 
         {current ? (
           <div className="overflow-hidden rounded-2xl border border-emerald-200 bg-emerald-50/40">
-            <div className="flex flex-wrap items-center gap-3 p-3">
-              <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700">
-                <Video className="h-4 w-4" />
-              </span>
-              <div className="min-w-0 flex-1 grid gap-1">
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <span className="text-xs font-semibold text-foreground">Video cargado</span>
-                  <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-white px-1.5 py-0.5 text-[10px] font-bold text-emerald-700">
-                    <CheckCircle2 className="h-2.5 w-2.5" />
-                    Activo
-                  </span>
-                </div>
-                <a
-                  href={current}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="block truncate text-[11px] text-muted-foreground hover:text-foreground"
-                >
-                  {current}
-                </a>
-              </div>
-              <div className="flex items-center gap-2">
-                <Button asChild type="button" variant="outline" size="sm" className="h-7 px-2 text-[11px]">
-                  <a href={current} target="_blank" rel="noreferrer">
-                    <PlayCircle className="mr-1.5 h-3.5 w-3.5" />
-                    Abrir
+            <div className="grid gap-3 p-3">
+              <div className="flex flex-wrap items-center gap-3">
+                <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700">
+                  <Video className="h-4 w-4" />
+                </span>
+                <div className="min-w-0 flex-1 grid gap-1">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span className="text-xs font-semibold text-foreground">Video cargado</span>
+                    <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-white px-1.5 py-0.5 text-[10px] font-bold text-emerald-700">
+                      <CheckCircle2 className="h-2.5 w-2.5" />
+                      {hasAsset ? "Asset" : "Activo"}
+                    </span>
+                    {assetSize ? (
+                      <span className="inline-flex items-center rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-700">
+                        {formatSize(assetSize)}
+                      </span>
+                    ) : null}
+                  </div>
+                  <a
+                    href={current}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="block truncate text-[11px] text-muted-foreground hover:text-foreground"
+                  >
+                    {current}
                   </a>
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-7 px-2 text-[11px] border-rose-200 text-rose-700 hover:bg-rose-50"
-                  onClick={handleClear}
-                  disabled={uploading}
-                >
-                  <Trash2 className="mr-1.5 h-3.5 w-3.5" />
-                  Quitar
-                </Button>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button asChild type="button" variant="outline" size="sm" className="h-7 px-2 text-[11px]">
+                    <a href={current} target="_blank" rel="noreferrer">
+                      <PlayCircle className="mr-1.5 h-3.5 w-3.5" />
+                      Abrir
+                    </a>
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-7 px-2 text-[11px] border-rose-200 text-rose-700 hover:bg-rose-50"
+                    onClick={handleClear}
+                    disabled={uploading}
+                  >
+                    <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+                    Quitar
+                  </Button>
+                </div>
+              </div>
+              <div className="relative aspect-video w-full overflow-hidden rounded-xl border border-emerald-200 bg-slate-900">
+                {isEmbedUrl(current) ? (
+                  <iframe
+                    title="Vista previa del video"
+                    src={current}
+                    className="absolute inset-0 h-full w-full"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                  />
+                ) : (
+                  <video
+                    controls
+                    preload="metadata"
+                    className="absolute inset-0 h-full w-full object-contain bg-black"
+                    src={current}
+                  />
+                )}
               </div>
             </div>
           </div>
@@ -216,7 +271,7 @@ export default function LessonVideoUploader({ value = "", onChange = () => {}, c
                       : "Arrastrá o hacé clic para elegir video"}
                 </div>
                 <div className="text-[11px] text-muted-foreground">
-                  MP4 · WebM · MOV · MKV · hasta {formatSize(COURSE_VIDEO_MAX_SIZE_BYTES)}
+                  MP4 · WebM · MOV · MKV · M4V · hasta {formatSize(COURSE_VIDEO_MAX_SIZE_BYTES)}
                 </div>
               </div>
             </div>
@@ -264,7 +319,7 @@ export default function LessonVideoUploader({ value = "", onChange = () => {}, c
         <div className="flex items-start gap-2 text-muted-foreground">
           <UploadCloud className="mt-0.5 h-4 w-4 shrink-0" />
           <p className="text-xs leading-5 text-muted-foreground">
-            Subí o pegá un link. Máximo {formatSize(COURSE_VIDEO_MAX_SIZE_BYTES)}.
+            Subí archivo (MP4/WebM/MOV/MKV) o pegá un link de YouTube/Vimeo. Máximo {formatSize(COURSE_VIDEO_MAX_SIZE_BYTES)}.
           </p>
         </div>
         <div className="inline-flex rounded-xl border border-border/60 bg-background p-1">
@@ -322,7 +377,7 @@ export default function LessonVideoUploader({ value = "", onChange = () => {}, c
                     <span className="text-sm font-semibold text-foreground">Video cargado</span>
                     <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-white px-2 py-0.5 text-[11px] font-bold text-emerald-700">
                       <CheckCircle2 className="h-3 w-3" />
-                      Activo
+                      {hasAsset ? "Asset almacenado" : "Activo"}
                     </span>
                   </div>
                   <a
@@ -335,6 +390,52 @@ export default function LessonVideoUploader({ value = "", onChange = () => {}, c
                   </a>
                 </div>
               </div>
+
+              {hasAsset ? (
+                <div className="grid gap-1.5 rounded-2xl border border-emerald-200/80 bg-white/60 p-3">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {assetMime ? (
+                      <span className="inline-flex items-center rounded-full border border-border/60 bg-background px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-foreground">
+                        {assetMime.includes("mp4")
+                          ? "MP4"
+                          : assetMime.includes("webm")
+                            ? "WebM"
+                            : assetMime.includes("quicktime") || assetMime.includes("mov")
+                              ? "MOV"
+                              : assetMime.includes("matroska") || assetMime.includes("mkv")
+                                ? "MKV"
+                                : assetMime.includes("m4v")
+                                  ? "M4V"
+                                  : "Video"}
+                      </span>
+                    ) : null}
+                    {assetSize ? (
+                      <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-700">
+                        {formatSize(assetSize)}
+                      </span>
+                    ) : null}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-1.5 text-[10px] text-muted-foreground">
+                    {assetChecksum ? (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5">
+                        <CheckCircle2 className="h-2.5 w-2.5 text-emerald-600" />
+                        Checksum {String(assetChecksum).slice(0, 10)}…
+                      </span>
+                    ) : null}
+                    {assetUploadedAt ? (
+                      <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5">
+                        Subido {new Date(assetUploadedAt).toLocaleDateString("es-AR")}
+                      </span>
+                    ) : null}
+                    {assetStorageKey ? (
+                      <span className="inline-flex max-w-full items-center rounded-full bg-slate-100 px-2 py-0.5">
+                        <span className="truncate">{String(assetStorageKey).split("/").pop()}</span>
+                      </span>
+                    ) : null}
+                  </div>
+                </div>
+              ) : null}
+
               <div className="grid grid-cols-1 gap-2">
                 <Button
                   asChild
@@ -389,7 +490,7 @@ export default function LessonVideoUploader({ value = "", onChange = () => {}, c
                       : "Arrastrá el video acá o hacé click para seleccionarlo"}
                 </div>
                 <div className="text-xs leading-5 text-muted-foreground">
-                  Formatos permitidos: MP4, WebM, OGG, MOV, MKV. Máximo{" "}
+                  Formatos permitidos: MP4, WebM, MOV, MKV, M4V. Máximo{" "}
                   {formatSize(COURSE_VIDEO_MAX_SIZE_BYTES)}.
                 </div>
               </div>

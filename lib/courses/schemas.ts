@@ -27,8 +27,12 @@ export type CourseResourceStatus = (typeof COURSE_RESOURCE_STATUSES)[number];
 export const COURSE_VIDEO_MIME_TYPES = [
   "video/mp4",
   "video/webm",
+  "video/ogg",
   "video/quicktime",
+  "video/x-matroska",
   "video/x-m4v",
+  "video/avi",
+  "video/x-msvideo",
 ] as const;
 export const COURSE_DOCUMENT_MIME_TYPES = [
   "application/pdf",
@@ -128,6 +132,7 @@ const CourseVideoAssetSchema = z.object({
   status: CourseResourceStatusSchema.default("pending"),
   checksum: z.string().optional(),
   uploadedAt: CourseIsoDateString.optional(),
+  originalName: z.string().optional(),
   qualities: z
     .array(
       z.object({

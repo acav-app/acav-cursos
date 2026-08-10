@@ -57,11 +57,76 @@ function normalizeLessonEvaluation(value: Record<string, any> | undefined): Reco
   };
 }
 
+function normalizeLessonVideoAsset(value: Record<string, any> | undefined): Record<string, any> | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const url = String(value.url || "").trim();
+  const storageKey = String(value.storageKey || "").trim();
+  if (!url && !storageKey) return undefined;
+  return {
+    id: value.id ? String(value.id) : undefined,
+    url: url || undefined,
+    storageKey: storageKey || undefined,
+    mimeType: value.mimeType ? String(value.mimeType) : undefined,
+    fileSize: Number.isFinite(Number(value.fileSize)) ? Number(value.fileSize) : undefined,
+    durationSeconds: Number.isFinite(Number(value.durationSeconds)) ? Number(value.durationSeconds) : undefined,
+    width: Number.isFinite(Number(value.width)) ? Number(value.width) : undefined,
+    height: Number.isFinite(Number(value.height)) ? Number(value.height) : undefined,
+    status: ["pending", "uploading", "ready", "corrupt", "missing"].includes(String(value.status || ""))
+      ? String(value.status)
+      : "pending",
+    checksum: value.checksum ? String(value.checksum) : undefined,
+    uploadedAt: value.uploadedAt ? String(value.uploadedAt) : undefined,
+    originalName: value.originalName ? String(value.originalName) : undefined,
+    qualities: Array.isArray(value.qualities)
+      ? value.qualities
+          .map((q: any) => {
+            const label = String(q?.label || "").trim();
+            const qUrl = String(q?.url || "").trim();
+            if (!label || !qUrl) return null;
+            return {
+              label,
+              url: qUrl,
+              width: Number.isFinite(Number(q?.width)) ? Number(q?.width) : undefined,
+              height: Number.isFinite(Number(q?.height)) ? Number(q?.height) : undefined,
+            };
+          })
+          .filter(Boolean)
+      : [],
+    subtitles: Array.isArray(value.subtitles)
+      ? value.subtitles
+          .map((s: any) => {
+            const label = String(s?.label || "").trim();
+            const src = String(s?.src || "").trim();
+            const srclang = String(s?.srclang || "").trim();
+            if (!label || !src || !srclang) return null;
+            return {
+              label,
+              src,
+              srclang: srclang.slice(0, 5),
+              default: typeof s?.default === "boolean" ? s.default : undefined,
+            };
+          })
+          .filter(Boolean)
+      : [],
+  };
+}
+
 function normalizeCurriculum(curriculum: any[] | undefined): any[] {
   if (!Array.isArray(curriculum)) return [];
   return curriculum.map((section) => {
     const lessons = Array.isArray(section?.lessons) ? section.lessons.map((lesson: any) => {
       const next = { ...(lesson || {}) };
+      if (Object.prototype.hasOwnProperty.call(next, "videoAsset") || next?.videoAsset) {
+        const normalizedAsset = normalizeLessonVideoAsset(next.videoAsset);
+        if (normalizedAsset) {
+          next.videoAsset = normalizedAsset;
+          if (!next.videoUrl && normalizedAsset.url) {
+            next.videoUrl = normalizedAsset.url;
+          }
+        } else {
+          delete next.videoAsset;
+        }
+      }
       if (Object.prototype.hasOwnProperty.call(next, "evaluation") || next?.evaluation) {
         next.evaluation = normalizeLessonEvaluation(next.evaluation);
       }
