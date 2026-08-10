@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
-import { randomBytes, createHmac, createHash } from "crypto";
+import { S3Client } from "@aws-sdk/client-s3";
+import { Upload } from "@aws-sdk/lib-storage";
+import { randomBytes } from "crypto";
 import { COURSE_VIDEO_ALLOWED_TYPES, COURSE_VIDEO_MAX_SIZE_BYTES } from "@/lib/courses/constants";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const maxDuration = 300;
+export const maxDuration = 600;
 
 function normalizeBaseUrl(url) {
   const s = String(url || "").trim();
@@ -33,138 +35,23 @@ function buildPublicBase(publicBase, bucket) {
 function sanitizeFolder(folderRaw, fallback) {
   return (
     String(folderRaw || fallback || "")
-      .replace(/[^a-zA-Z0-9/_-]/g, "")
+      .replace(/[^a-zA-Z0-9/_.-]/g, "")
       .replace(/^\/+/, "")
       .replace(/\/+$/, "") || fallback
   );
 }
 
-function readEnv() {
+function buildR2Client() {
   const endpoint = String(process.env.R2_ENDPOINT || "").trim();
   const accessKeyId = String(process.env.R2_ACCESS_KEY_ID || "").trim();
   const secretAccessKey = String(process.env.R2_SECRET_ACCESS_KEY || "").trim();
-  const bucket = String(process.env.R2_BUCKET || "").trim();
-  const publicBase = buildPublicBase(process.env.R2_PUBLIC_BASE, bucket);
-  if (!endpoint || !accessKeyId || !secretAccessKey || !bucket || !publicBase) {
-    throw new Error("r2_not_configured");
-  }
-  return { endpoint, accessKeyId, secretAccessKey, bucket, publicBase };
-}
-
-function isoDate(date) {
-  const d = date instanceof Date ? date : new Date(date);
-  const pad = (n) => String(n).padStart(2, "0");
-  return (
-    d.getUTCFullYear().toString() +
-    pad(d.getUTCMonth() + 1) +
-    pad(d.getUTCDate()) +
-    "T" +
-    pad(d.getUTCHours()) +
-    pad(d.getUTCMinutes()) +
-    pad(d.getUTCSeconds()) +
-    "Z"
-  );
-}
-
-function ymd(date) {
-  return isoDate(date).slice(0, 8);
-}
-
-function uriEncodeComponent(str, encodeSlash = true) {
-  return encodeURIComponent(str)
-    .replace(/%2F/g, encodeSlash ? "%2F" : "/")
-    .replace(/[!'()*]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`);
-}
-
-function hmacSha256(key, data) {
-  return createHmac("sha256", key).update(data, "utf8").digest();
-}
-
-function sha256Hex(data) {
-  return createHash("sha256").update(data, "utf8").digest("hex");
-}
-
-/**
- * Firma SigV4 en modo query string compatible con Cloudflare R2.
- * Incluye X-Amz-Content-SHA256=UNSIGNED-PAYLOAD para evitar que R2 intente
- * recalcular el hash de streaming (evita el error "Unable to calculate hash
- * for flowing readable stream").
- */
-function createSignedPutUrl({
-  endpoint,
-  bucket,
-  key,
-  region = "auto",
-  accessKeyId,
-  secretAccessKey,
-  expiresInSeconds = 30 * 60,
-  now = new Date(),
-}) {
-  const X_AMZ_ALGORITHM = "AWS4-HMAC-SHA256";
-  const UNSIGNED_PAYLOAD = "UNSIGNED-PAYLOAD";
-
-  const amzDate = isoDate(now);
-  const dateStamp = ymd(now);
-  const expires = Math.max(1, Math.min(604800, Number(expiresInSeconds) || 1800));
-  const credentialScope = `${dateStamp}/${region}/s3/aws4_request`;
-
-  const urlParsed = new URL(
-    endpoint.endsWith(`/${bucket}`) || endpoint.includes(`${bucket}.`)
-      ? endpoint
-      : `${endpoint.replace(/\/$/, "")}/${bucket}`
-  );
-  const finalKey = String(key || "").replace(/^\/+/, "");
-  const canonicalUri = `/${uriEncodeComponent(finalKey, false)}`;
-
-  const query = new Map();
-  query.set("X-Amz-Algorithm", X_AMZ_ALGORITHM);
-  query.set("X-Amz-Credential", `${accessKeyId}/${credentialScope}`);
-  query.set("X-Amz-Date", amzDate);
-  query.set("X-Amz-Expires", String(expires));
-  query.set("X-Amz-Content-SHA256", UNSIGNED_PAYLOAD);
-  query.set("X-Amz-SignedHeaders", "host;x-amz-content-sha256");
-
-  const signedHeaders = "host;x-amz-content-sha256";
-  const canonicalHeaders =
-    `host:${urlParsed.host.toLowerCase()}\n` +
-    `x-amz-content-sha256:${UNSIGNED_PAYLOAD}\n`;
-
-  const canonicalQueryString = Array.from(query.entries())
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
-    .join("&");
-
-  const canonicalRequest = [
-    "PUT",
-    canonicalUri,
-    canonicalQueryString,
-    canonicalHeaders,
-    signedHeaders,
-    UNSIGNED_PAYLOAD,
-  ].join("\n");
-
-  const hashedCanonical = sha256Hex(canonicalRequest);
-  const stringToSign = [
-    X_AMZ_ALGORITHM,
-    amzDate,
-    credentialScope,
-    hashedCanonical,
-  ].join("\n");
-
-  const kDate = hmacSha256(`AWS4${secretAccessKey}`, dateStamp);
-  const kRegion = hmacSha256(kDate, region);
-  const kService = hmacSha256(kRegion, "s3");
-  const kSigning = hmacSha256(kService, "aws4_request");
-  const signature = createHmac("sha256", kSigning)
-    .update(stringToSign, "utf8")
-    .digest("hex");
-
-  const finalQuery = new URLSearchParams(canonicalQueryString);
-  finalQuery.set("X-Amz-Signature", signature);
-
-  const final = new URL(urlParsed.toString().replace(/\/?$/, "") + canonicalUri);
-  final.search = finalQuery.toString();
-  return final.toString();
+  if (!endpoint || !accessKeyId || !secretAccessKey) throw new Error("r2_not_configured");
+  return new S3Client({
+    region: "auto",
+    endpoint,
+    credentials: { accessKeyId, secretAccessKey },
+    forcePathStyle: true,
+  });
 }
 
 const ALLOWED_GENERIC_TYPES = new Set([
@@ -226,7 +113,11 @@ export async function POST(request) {
       return NextResponse.json({ error: "upload_missing_body" }, { status: 400 });
     }
 
-    const { endpoint, accessKeyId, secretAccessKey, bucket, publicBase } = readEnv();
+    const bucket = String(process.env.R2_BUCKET || "").trim();
+    const publicBase = buildPublicBase(process.env.R2_PUBLIC_BASE, bucket);
+    if (!bucket || !publicBase) {
+      return NextResponse.json({ error: "r2_not_configured" }, { status: 500 });
+    }
 
     let storageKey;
     const extension = originalName ? originalName.split(".").pop() || "bin" : "bin";
@@ -250,69 +141,30 @@ export async function POST(request) {
       storageKey = `${folder}/${timestamp}-${randomString}.${extension}`;
     }
 
-    const uploadUrl = createSignedPutUrl({
-      endpoint,
-      bucket,
-      key: storageKey,
-      region: "auto",
-      accessKeyId,
-      secretAccessKey,
-      expiresInSeconds: 30 * 60,
-    });
-
     const headerMime = request.headers.get("content-type");
     const contentType =
       headerMime && headerMime !== "application/octet-stream"
         ? headerMime
         : mimeType || (effectiveIsVideo ? "video/mp4" : "application/octet-stream");
 
-    const r2Response = await fetch(uploadUrl, {
-      method: "PUT",
-      headers: {
-        "Content-Type": contentType,
-        "X-Amz-Content-SHA256": "UNSIGNED-PAYLOAD",
-        "User-Agent": "acav-cursos-stream-upload/1.0",
+    const client = buildR2Client();
+    const partSize = 8 * 1024 * 1024;
+    const upload = new Upload({
+      client,
+      params: {
+        Bucket: bucket,
+        Key: storageKey,
+        ContentType: contentType,
+        Body: request.body,
       },
-      // @ts-ignore
-      body: request.body,
-      duplex: "half",
-      allowHTTP1: true,
+      queueSize: 1,
+      partSize,
+      leavePartsOnError: false,
     });
 
-    if (!r2Response.ok) {
-      let r2Body = "";
-      try {
-        r2Body = await r2Response.text();
-      } catch (_) {}
-      const codeMatch = (r2Body || "").match(/<Code>([^<]+)<\/Code>/i);
-      const msgMatch = (r2Body || "").match(/<Message>([^<]+)<\/Message>/i);
-      const r2Code = codeMatch ? codeMatch[1] : null;
-      const r2Message = msgMatch ? msgMatch[1] : r2Body.slice(0, 800);
-      console.error(
-        "[api:upload:stream] R2 returned HTTP",
-        r2Response.status,
-        "code=",
-        r2Code,
-        "msg=",
-        r2Message
-      );
-      return NextResponse.json(
-        {
-          error: `Error al subir a R2 (HTTP ${r2Response.status}${
-            r2Code ? ` · ${r2Code}` : ""
-          }): ${r2Message || "sin cuerpo de respuesta"}`,
-          r2_status: r2Response.status,
-          r2_code: r2Code,
-          r2_message: r2Message,
-          r2_body: (r2Body || "").slice(0, 2000),
-        },
-        { status: 502 }
-      );
-    }
-
-    const etagRaw = r2Response.headers.get("ETag");
-    const etag = etagRaw ? String(etagRaw).replace(/^"|"$/g, "") : null;
+    const putResult = await upload.done();
     const publicUrl = `${publicBase}/${storageKey}`;
+    const etag = putResult?.ETag ? String(putResult.ETag).replace(/^"|"$/g, "") : null;
 
     return NextResponse.json({
       ok: true,
@@ -328,10 +180,16 @@ export async function POST(request) {
       originalName: originalName || undefined,
     });
   } catch (error) {
-    console.error("Error al realizar upload streaming a R2:", error);
+    console.error("[api:upload:stream] Error streaming upload:", error);
+    const msg = error?.message || String(error) || "upload_stream_failed";
+    const code = error?.Code || error?.name || error?.code || null;
     return NextResponse.json(
-      { error: `Error interno: ${error?.message || String(error)}` },
-      { status: 500 }
+      {
+        error: `Error interno: ${msg}`,
+        error_code: code,
+        error_name: error?.name || null,
+      },
+      { status: code === "r2_not_configured" || msg.includes("r2_not_configured") ? 500 : 502 }
     );
   }
 }

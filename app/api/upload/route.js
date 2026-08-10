@@ -1,9 +1,12 @@
 import { NextResponse } from "next/server";
-import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client } from "@aws-sdk/client-s3";
+import { Upload } from "@aws-sdk/lib-storage";
 import { randomBytes } from "crypto";
 import { COURSE_VIDEO_ALLOWED_TYPES, COURSE_VIDEO_MAX_SIZE_BYTES } from "@/lib/courses/constants";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+export const maxDuration = 600;
 
 function normalizeBaseUrl(url) {
   const s = String(url || "").trim();
@@ -37,7 +40,7 @@ function buildPublicBase(publicBase, bucket) {
 function sanitizeFolder(folderRaw, fallback) {
   return (
     String(folderRaw || fallback || "")
-      .replace(/[^a-zA-Z0-9/_-]/g, "")
+      .replace(/[^a-zA-Z0-9/_.-]/g, "")
       .replace(/^\/+/, "")
       .replace(/\/+$/, "") || fallback
   );
@@ -132,15 +135,22 @@ export async function POST(request) {
     }
 
     const client = buildR2Client();
-    const body = Buffer.from(await file.arrayBuffer());
-    const putResp = await client.send(
-      new PutObjectCommand({
+    const contentType = file.type || (effectiveIsVideo ? "video/mp4" : "application/octet-stream");
+    const partSize = 8 * 1024 * 1024;
+    const upload = new Upload({
+      client,
+      params: {
         Bucket: bucket,
         Key: fileName,
-        Body: body,
-        ContentType: file.type || (effectiveIsVideo ? "video/mp4" : "application/octet-stream"),
-      })
-    );
+        ContentType: contentType,
+        Body: file.stream(),
+      },
+      queueSize: 1,
+      partSize,
+      leavePartsOnError: false,
+    });
+    const putResp = await upload.done();
+
     const url = `${publicBase}/${fileName}`;
     const etag = putResp?.ETag ? String(putResp.ETag).replace(/^"|"$/g, "") : undefined;
 
@@ -149,14 +159,16 @@ export async function POST(request) {
       fileName,
       storageKey: fileName,
       size: file.size,
-      type: file.type || (effectiveIsVideo ? "video/mp4" : "application/octet-stream"),
+      type: contentType,
       etag,
     });
 
   } catch (error) {
-    console.error('Error al subir archivo:', error);
+    console.error('Error al subir archivo (multipart):', error);
+    const msg = error?.message || String(error) || "upload_failed";
+    const code = error?.Code || error?.name || error?.code || null;
     return NextResponse.json(
-      { error: `Error interno del servidor: ${error?.message || String(error)}` },
+      { error: `Error interno del servidor: ${msg}`, error_code: code, error_name: error?.name || null },
       { status: 500 }
     );
   }

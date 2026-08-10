@@ -212,11 +212,16 @@ export async function uploadToR2(file, folderOrOptions) {
   const folder = hasFolder ? folderOrOptions : folderOrOptions?.folder;
   const key = hasFolder ? undefined : folderOrOptions?.key;
   const onProgress = () => {};
+  const size = Number(file?.size) || 0;
+  const safeForLegacyFallback = size > 0 && size <= 4 * 1024 * 1024;
 
   try {
     return await streamingUploadPromise({ file, folder, key, onProgress });
   } catch (err) {
     const msg = String(err?.message || err || "");
+    if (!safeForLegacyFallback) {
+      throw err;
+    }
     if (!shouldFallbackStreamToMultipart(msg)) {
       try {
         const presigned = await fetchPresignedUploadOptions({ folder, key, file });
@@ -248,6 +253,7 @@ export function uploadToR2WithProgress(file, folderOrOptions, onProgress) {
   }
 
   const total = Number(file?.size) || 0;
+  const safeForLegacyFallback = total > 0 && total <= 4 * 1024 * 1024;
   if (typeof onProgress === "function") {
     onProgress({ loaded: 0, total, percent: 0, ratio: 0 });
   }
@@ -257,6 +263,9 @@ export function uploadToR2WithProgress(file, folderOrOptions, onProgress) {
       return await streamingUploadPromise({ file, folder, key, onProgress });
     } catch (err) {
       const msg = String(err?.message || err || "");
+      if (!safeForLegacyFallback) {
+        throw err;
+      }
       if (shouldFallbackStreamToMultipart(msg)) {
         return multipartUploadPromise({ file, folder, key, onProgress });
       }
