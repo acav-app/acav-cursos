@@ -93,7 +93,10 @@ export default function CourseCertificate({ open, onClose, data }: CourseCertifi
 
   return (
     <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
-      <DialogContent className="max-w-[1100px] border-slate-200 bg-[#F6F7FB] p-0 overflow-hidden rounded-[28px]">
+      <DialogContent
+        hiddenCloseIcon={true}
+        className="max-w-[1100px] border-slate-200 bg-[#F6F7FB] p-0 overflow-hidden rounded-[28px]"
+      >
         <div className="flex items-center justify-between gap-3 px-5 py-3 border-b border-slate-200 bg-white">
           <div className="flex items-center gap-2 text-slate-900">
             <Award className="h-5 w-5 text-[#6D4CFF]" />

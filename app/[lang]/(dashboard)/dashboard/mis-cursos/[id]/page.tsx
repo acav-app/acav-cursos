@@ -967,21 +967,33 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
     const lessonId = String(lesson?.id || "").trim();
     if (!lessonId) return;
     const alreadyCompleted = isLessonCompleted(lessonId);
+    const prevLessonProgress = lessonProgress;
     const nextLessonProgress = alreadyCompleted
       ? lessonProgress.filter((item) => String(item?.lessonId || "") !== lessonId)
       : [...lessonProgress, { lessonId, completedAt: new Date().toISOString() }];
     const nextProgress = totalLessons ? Math.round((nextLessonProgress.length / totalLessons) * 100) : 0;
 
+    // Optimistic UI instantáneo — no esperamos al backend para reflejar el cambio
+    setLessonProgress(nextLessonProgress);
     try {
       setSavingLesson(lessonId);
-      await persistEnrollment(
+      const stored = await persistEnrollment(
         {
           lessonProgress: nextLessonProgress,
           progress: nextProgress,
         },
         alreadyCompleted ? "Clase marcada como pendiente." : "Clase completada."
       );
+      // Si el backend respondió con enrollment pero sin progress/lessonProgress, aseguramos consistencia final
+      if (stored) {
+        const finalProgress = Array.isArray(stored.lessonProgress) ? stored.lessonProgress : nextLessonProgress;
+        if (finalProgress.length !== nextLessonProgress.length) {
+          setLessonProgress(finalProgress);
+        }
+      }
     } catch (error) {
+      // Rollback exacto para no dejar UI desincronizada si falla el backend
+      setLessonProgress(prevLessonProgress);
       toast.error(error?.message || "No pudimos actualizar el progreso.", { position: "top-right" });
     } finally {
       setSavingLesson("");
@@ -1012,11 +1024,14 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
       status: "submitted",
       submittedAt: new Date().toISOString(),
     };
+    const prevSubmissions = activitySubmissions;
     const nextSubmissions = [
       ...activitySubmissions.filter((item) => String(item?.lessonId || "") !== lessonId),
       nextSubmission,
     ];
 
+    // Optimistic UI instantáneo
+    setActivitySubmissions(nextSubmissions);
     try {
       setSavingActivity(lessonId);
       await persistEnrollment(
@@ -1026,6 +1041,7 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
         "Entrega guardada correctamente."
       );
     } catch (error) {
+      setActivitySubmissions(prevSubmissions);
       toast.error(error?.message || "No pudimos registrar la actividad.", { position: "top-right" });
     } finally {
       setSavingActivity("");
@@ -1412,10 +1428,9 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
   }) {
     if (!user || !result) return null;
     const reviewedAt = new Date().toISOString();
-    const currentGradebook = Array.isArray(enrollment?.gradebook)
-      ? [...enrollment.gradebook]
-      : [];
-    const prevAttempts = currentGradebook.filter(
+    const prevEnrollment = enrollment;
+    const prevGradebook = Array.isArray(enrollment?.gradebook) ? [...enrollment.gradebook] : [];
+    const prevAttempts = prevGradebook.filter(
       (entry) =>
         String(entry?.sourceId || "") === String(sourceId) &&
         String(entry?.sourceType || "") === String(sourceType)
@@ -1443,7 +1458,7 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
           ? `Aprobaste con ${result.percentage}% (${result.correctCount ?? "—"}/${result.totalCount ?? "—"} correctas). ¡Buen trabajo!`
           : `Obtuviste ${result.percentage}% (${result.correctCount ?? "—"}/${result.totalCount ?? "—"} correctas). Podés volver a intentarlo si tenés intentos disponibles.`,
     };
-    const filtered = currentGradebook.filter(
+    const filtered = prevGradebook.filter(
       (entry) =>
         !(
           String(entry?.sourceId || "") === String(sourceId) &&
@@ -1451,19 +1466,43 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
         )
     );
     const nextGradebook = [...filtered, nextEntry];
-    const data = await authedFetch(user, `/api/enrollments/${id}`, {
-      method: "PATCH",
-      body: JSON.stringify({ gradebook: nextGradebook }),
-    });
-    const nextEnrollment = data?.enrollment || {
-      ...(enrollment || {}),
+
+    // Optimistic UI instantáneo: aplicar cambios al gradebook ANTES de que termine el fetch
+    // para que badges + porcentajes se actualicen sin recarga de página.
+    const optimisticEnrollment = {
+      ...(prevEnrollment || {}),
       gradebook: nextGradebook,
     };
-    setEnrollment(nextEnrollment);
+    setEnrollment(optimisticEnrollment);
     if (successMessage) {
       toast.success(successMessage, { position: "top-right" });
     }
-    return nextEnrollment;
+
+    try {
+      const data = await authedFetch(user, `/api/enrollments/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ gradebook: nextGradebook }),
+      });
+      const storedEnrollment = data?.enrollment || optimisticEnrollment;
+      const finalGradebook = Array.isArray(storedEnrollment?.gradebook)
+        ? storedEnrollment.gradebook
+        : nextGradebook;
+      // Merge final: evitar rollback espurio si el backend no devolvió gradebook modificado
+      const nextFinalEnrollment = {
+        ...(storedEnrollment || optimisticEnrollment),
+        gradebook: finalGradebook,
+      };
+      setEnrollment(nextFinalEnrollment);
+      return nextFinalEnrollment;
+    } catch (error) {
+      // Rollback exacto al estado anterior si falla el backend
+      setEnrollment(prevEnrollment);
+      toast.error(
+        error?.message || "No pudimos guardar la evaluación. Revisá la conexión y volvé a intentarlo.",
+        { position: "top-right" }
+      );
+      return prevEnrollment;
+    }
   }
 
   async function submitLessonEvaluation(lesson, result: GradedEvaluation) {
@@ -1476,6 +1515,7 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
       result.passed &&
       lessonId &&
       !lessonProgress.some((p) => String(p?.lessonId || "") === lessonId);
+    const prevLessonProgress = lessonProgress;
     const gradebookResp = await persistEvaluationGradebook({
       sourceId: lessonId,
       sourceType: "lesson",
@@ -1487,14 +1527,20 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
     });
     let mergedEnrollment = gradebookResp || enrollment;
     if (passAndUpdateProgress && user) {
+      const nextLessonProgress = [
+        ...lessonProgress,
+        { lessonId, completedAt: new Date().toISOString(), kind: "lesson" },
+      ];
+      // Optimistic progress update: marcar la clase como completada instantáneamente
+      // (sin esperar el PATCH del backend) para que el badge de progreso actualice al instante.
+      setLessonProgress(nextLessonProgress);
       try {
-        const nextLessonProgress = [
-          ...lessonProgress,
-          { lessonId, completedAt: new Date().toISOString(), kind: "lesson" },
-        ];
         const patchResp = await authedFetch(user, `/api/enrollments/${id}`, {
           method: "PATCH",
-          body: JSON.stringify({ lessonProgress: nextLessonProgress }),
+          body: JSON.stringify({
+            lessonProgress: nextLessonProgress,
+            progress: totalLessons ? Math.round((nextLessonProgress.length / totalLessons) * 100) : 0,
+          }),
         });
         const patchedEnrollment = patchResp?.enrollment || {
           ...(mergedEnrollment || {}),
@@ -1502,9 +1548,16 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
         };
         mergedEnrollment = patchedEnrollment;
         setEnrollment(patchedEnrollment);
-        setLessonProgress(nextLessonProgress);
-      } catch {
-        /* non-blocking */
+        const finalProgress = Array.isArray(patchedEnrollment.lessonProgress)
+          ? patchedEnrollment.lessonProgress
+          : nextLessonProgress;
+        setLessonProgress(finalProgress);
+      } catch (error) {
+        // Rollback progress al estado previo, gradebook ya está persistido (no lo volvemos atrás)
+        setLessonProgress(prevLessonProgress);
+        toast.error(error?.message || "No pudimos actualizar el progreso de la clase.", {
+          position: "top-right",
+        });
       }
     }
     return mergedEnrollment;
@@ -1513,6 +1566,7 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
   async function submitFinalEvaluation(result: GradedEvaluation) {
     const title =
       course?.finalEvaluation?.title || "Evaluación final";
+    const prevLessonProgress = lessonProgress;
     const resp = await persistEvaluationGradebook({
       sourceId: "final_evaluation",
       sourceType: "final_evaluation",
@@ -1523,13 +1577,14 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
         : "Evaluación final enviada. Si no la aprobaste, podés reintentarlo.",
     });
     let mergedEnrollment = resp || enrollment;
+    let updatedProgressTo100 = false;
 
     if (result.passed && user) {
       const allLessonIds = new Set<string>();
       curriculum.forEach((section) => {
         (Array.isArray(section?.lessons) ? section.lessons : []).forEach((lesson) => {
-          const lessonId = String(lesson?.id || "").trim();
-          if (lessonId) allLessonIds.add(lessonId);
+          const lId = String(lesson?.id || "").trim();
+          if (lId) allLessonIds.add(lId);
         });
       });
       if (allLessonIds.size > 0) {
@@ -1539,15 +1594,18 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
             .filter(Boolean)
         );
         const newEntries = Array.from(allLessonIds.values())
-          .filter((lessonId) => !existing.has(lessonId))
-          .map((lessonId) => ({
-            lessonId,
+          .filter((lId) => !existing.has(lId))
+          .map((lId) => ({
+            lessonId: lId,
             completedAt: new Date().toISOString(),
             kind: "lesson" as const,
           }));
         if (newEntries.length > 0) {
+          const mergedProgress = [...lessonProgress, ...newEntries];
+          // Optimistic: marcar todas las clases restantes como completadas al aprobar el final
+          setLessonProgress(mergedProgress);
+          updatedProgressTo100 = true;
           try {
-            const mergedProgress = [...lessonProgress, ...newEntries];
             const patchResp = await authedFetch(user, `/api/enrollments/${id}`, {
               method: "PATCH",
               body: JSON.stringify({
@@ -1562,11 +1620,16 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
             };
             mergedEnrollment = patched;
             setEnrollment(patched);
-            setLessonProgress(mergedProgress);
-          } catch {
-            /* non-blocking */
+            const finalProgress = Array.isArray(patched.lessonProgress) ? patched.lessonProgress : mergedProgress;
+            setLessonProgress(finalProgress);
+          } catch (error) {
+            setLessonProgress(prevLessonProgress);
+            toast.error(error?.message || "No pudimos actualizar el progreso general.", {
+              position: "top-right",
+            });
           }
-        } else if (typeof (mergedEnrollment as any)?.progress !== "number" || (mergedEnrollment as any).progress < 100) {
+        } else {
+          // Ya estaban todas las clases completadas → solo aseguramos progress = 100
           try {
             const patchResp = await authedFetch(user, `/api/enrollments/${id}`, {
               method: "PATCH",
@@ -1578,38 +1641,44 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
             };
             mergedEnrollment = patched;
             setEnrollment(patched);
-          } catch {
-            /* non-blocking */
+          } catch (error) {
+            toast.error(error?.message || "No pudimos finalizar el progreso del curso.", {
+              position: "top-right",
+            });
           }
         }
       }
     }
 
-    if (mergedEnrollment && result.passed) {
+    if (result.passed) {
+      // Calcular elegibilidad certificado con los estados EN MEMORIA (optimistic)
+      // sin esperar una recarga de la página.
       setTimeout(() => {
         if (!course?.includesCertificate) return;
-        const finalProgress = Array.isArray((mergedEnrollment as any)?.lessonProgress)
+        const gradebookSnapshot = Array.isArray((mergedEnrollment as any)?.gradebook)
+          ? (mergedEnrollment as any).gradebook
+          : Array.isArray(enrollment?.gradebook)
+          ? enrollment.gradebook
+          : [];
+        const lessonStatesSnapshot = buildLessonEvaluationStatesFromEnrollment(
+          curriculum,
+          gradebookSnapshot
+        );
+        const perClassSnapshot = perClassEvaluationProgress(curriculum, lessonStatesSnapshot);
+        const progressSnapshot = updatedProgressTo100
+          ? totalLessons
+          : Array.isArray((mergedEnrollment as any)?.lessonProgress)
           ? (mergedEnrollment as any).lessonProgress.length
           : lessonProgress.length;
-        const allLessonsFinished =
-          totalLessons === 0 || finalProgress >= totalLessons;
-        const tempPerClass = perClassEvaluationProgress(
-          curriculum,
-          buildLessonEvaluationStatesFromEnrollment(
-            curriculum,
-            Array.isArray((mergedEnrollment as any)?.gradebook)
-              ? (mergedEnrollment as any).gradebook
-              : gradebook
-          )
-        );
-        if (allLessonsFinished && tempPerClass.allPassed) {
+        const allLessonsFinished = totalLessons === 0 || progressSnapshot >= totalLessons;
+        if (allLessonsFinished && perClassSnapshot.allPassed) {
           setShowCertificate(true);
           return;
         }
         if (courseEligibleForCertificate) {
           setShowCertificate(true);
         }
-      }, 500);
+      }, 450);
     }
     return mergedEnrollment;
   }
