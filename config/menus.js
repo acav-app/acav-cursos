@@ -1,4 +1,4 @@
-import { BarChart3, Bookmark, Briefcase, Users2 } from "lucide-react";
+import { BarChart3, Bookmark, Briefcase, CreditCard, FileText, Users2 } from "lucide-react";
 
 function withRoles(item) {
   return item;
@@ -120,6 +120,18 @@ export const menusConfig = {
       roles: ["admin"],
     }),
     withRoles({
+      title: "Inscripciones",
+      icon: FileText,
+      href: "/dashboard/inscripciones",
+      roles: ["admin"],
+    }),
+    withRoles({
+      title: "Pagos",
+      icon: CreditCard,
+      href: "/dashboard/pagos",
+      roles: ["admin"],
+    }),
+    withRoles({
       title: "Mi panel",
       icon: BarChart3,
       href: "/dashboard",
@@ -155,6 +167,18 @@ export const menusConfig = {
         title: "Alumnos",
         icon: Users2,
         href: "/dashboard/usuarios",
+        roles: ["admin"],
+      }),
+      withRoles({
+        title: "Inscripciones",
+        icon: FileText,
+        href: "/dashboard/inscripciones",
+        roles: ["admin"],
+      }),
+      withRoles({
+        title: "Pagos",
+        icon: CreditCard,
+        href: "/dashboard/pagos",
         roles: ["admin"],
       }),
       withRoles({
@@ -196,6 +220,18 @@ export const menusConfig = {
         title: "Alumnos",
         icon: Users2,
         href: "/dashboard/usuarios",
+        roles: ["admin"],
+      }),
+      withRoles({
+        title: "Inscripciones",
+        icon: FileText,
+        href: "/dashboard/inscripciones",
+        roles: ["admin"],
+      }),
+      withRoles({
+        title: "Pagos",
+        icon: CreditCard,
+        href: "/dashboard/pagos",
         roles: ["admin"],
       }),
       withRoles({

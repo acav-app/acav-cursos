@@ -61,11 +61,43 @@ function getDefaultCorrectAnswers(type: QuestionType): string[] {
 export function normalizeCorrectAnswers(question: CourseQuestionInput | Record<string, any>): string[] {
   const q = question || {};
   const type = String((q as any).type || "single_choice").trim() || "single_choice";
+  const options = Array.isArray((q as any).options)
+    ? (q as any).options.map((o: unknown) => String(o || "").trim()).filter(Boolean)
+    : [];
+  const indexToOptionText = (idx: number): string | null => {
+    if (!Number.isFinite(idx) || idx < 0) return null;
+    if (!options.length || idx >= options.length) return null;
+    const text = String(options[idx] || "").trim();
+    return text || null;
+  };
+  const letterToIndex = (ch: string): number => {
+    const c = ch.trim().toLowerCase();
+    if (/^[a-z]$/.test(c)) return c.charCodeAt(0) - 97;
+    if (/^[1-9]\d*$/.test(c)) return Number(c) - 1;
+    return -1;
+  };
+  const tryResolvePointer = (raw: string): string | null => {
+    const candidate = String(raw || "").trim();
+    if (!candidate) return null;
+    if (/^\d+$/.test(candidate)) {
+      const text = indexToOptionText(Number(candidate));
+      if (text) return text;
+    }
+    if (/^[a-z]$/i.test(candidate)) {
+      const text = indexToOptionText(letterToIndex(candidate));
+      if (text) return text;
+    }
+    return null;
+  };
   const raw = (q as any).correctAnswers;
   if (Array.isArray(raw)) {
-    const mapped = raw
-      .map((item) => String(item || "").trim())
-      .filter(Boolean);
+    const mapped: string[] = [];
+    for (const item of raw) {
+      const asString = String(item || "").trim();
+      if (!asString) continue;
+      const resolved = tryResolvePointer(asString);
+      mapped.push(resolved || asString);
+    }
     if (mapped.length > 0) return mapped;
   }
   if (typeof raw === "string" && raw.trim()) {
@@ -73,7 +105,9 @@ export function normalizeCorrectAnswers(question: CourseQuestionInput | Record<s
       .split(/[,;|]/)
       .map((item) => item.trim())
       .filter(Boolean);
-    if (split.length > 0) return split;
+    if (split.length > 0) {
+      return split.map((s) => tryResolvePointer(s) || s);
+    }
   }
   if (type === "true_false") {
     const legacy = (q as any).correctAnswer;
@@ -89,7 +123,16 @@ export function normalizeCorrectAnswers(question: CourseQuestionInput | Record<s
       .split(/[,;|]/)
       .map((item) => item.trim())
       .filter(Boolean);
-    if (split.length) return split;
+    if (split.length) return split.map((s) => tryResolvePointer(s) || s);
+  }
+  if (type === "boolean") {
+    const idxCorrect = Number(
+      Array.isArray(raw) && raw[0] != null
+        ? raw[0]
+        : (legacyField != null ? String(legacyField) : NaN)
+    );
+    if (idxCorrect === 0) return ["Verdadero", "true", "verdadero"];
+    if (idxCorrect === 1) return ["Falso", "false", "falso"];
   }
   return getDefaultCorrectAnswers(type as QuestionType);
 }
@@ -168,7 +211,8 @@ export function evaluateQuestion(
   runtimePoints: number
 ): GradedQuestion {
   const q = question || {};
-  const type = (String((q as any).type || "single_choice").trim() || "single_choice") as QuestionType;
+  const rawType = (String((q as any).type || "single_choice").trim() || "single_choice");
+  const type: QuestionType = rawType === "boolean" ? "true_false" : (rawType as QuestionType);
   const id = String((q as any).id || "");
   const prompt = String((q as any).prompt || (q as any).enunciado || "Pregunta sin título");
   const explanation = (q as any).explanation ? String((q as any).explanation) : undefined;

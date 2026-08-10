@@ -3515,7 +3515,7 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
                                     ? "Examen final aprobado"
                                     : unlocked
                                     ? "Rendir evaluación final"
-                                    : "Rendimiento disponible próximamente"}
+                                    : "Próximamente"}
                                 </span>
                               </Button>
                             ) : (

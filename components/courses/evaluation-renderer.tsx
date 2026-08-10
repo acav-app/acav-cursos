@@ -65,6 +65,7 @@ function questionTypeLabel(type: QuestionType | string): string {
     case "multiple_choice":
       return "Selección múltiple";
     case "true_false":
+    case "boolean":
       return "Verdadero / Falso";
     case "short_answer":
       return "Respuesta corta";
@@ -72,6 +73,13 @@ function questionTypeLabel(type: QuestionType | string): string {
     default:
       return "Opción simple";
   }
+}
+
+function normalizeQuestionType(type: QuestionType | string): QuestionType {
+  const raw = String(type || "").trim();
+  if (raw === "boolean") return "true_false";
+  if (raw === "multiple_choice" || raw === "single_choice" || raw === "short_answer" || raw === "true_false") return raw;
+  return "single_choice";
 }
 
 export default function EvaluationRenderer({
@@ -107,7 +115,7 @@ export default function EvaluationRenderer({
     const map: Record<string, AnswerValue> = {};
     safeQuestions.forEach((q, idx) => {
       const id = qidFor(q as any, idx);
-      map[id] = emptyAnswerForType(String((q as any)?.type || "single_choice"));
+      map[id] = emptyAnswerForType(normalizeQuestionType(String((q as any)?.type || "single_choice")));
     });
     return map;
   }, [safeQuestions, qidFor]);
@@ -121,7 +129,7 @@ export default function EvaluationRenderer({
   const answeredCount = useMemo(() => {
     return safeQuestions.filter((q, idx) => {
       const id = qidFor(q as any, idx);
-      return hasAnswer(answers[id], String((q as any)?.type || "single_choice"));
+      return hasAnswer(answers[id], normalizeQuestionType(String((q as any)?.type || "single_choice")));
     }).length;
   }, [answers, safeQuestions, qidFor]);
 
@@ -421,7 +429,7 @@ export default function EvaluationRenderer({
   }
 
   function renderQuestion(q: Record<string, any>, idx: number) {
-    const type = String((q as any)?.type || "single_choice").trim() || "single_choice";
+    const type = normalizeQuestionType(String((q as any)?.type || "single_choice").trim() || "single_choice");
     const questionId = qidFor(q as any, idx);
     const points = Number.isFinite(Number((q as any)?.points)) && Number((q as any)?.points) > 0
       ? Number((q as any)?.points)
