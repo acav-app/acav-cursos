@@ -1,6 +1,6 @@
 // @ts-nocheck
 "use client";
-
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
@@ -68,7 +68,7 @@ import { authedFetch } from "@/lib/auth/authed-fetch";
 import { cn, useLocalizedPath } from "@/lib/utils";
 import PaymentReceiptUploader from "@/components/courses/dashboard/payment-receipt-uploader";
 import { resolveEducationalStatusMeta, resolvePaymentStatusMeta } from "@/lib/courses/status-meta";
-import VideoPlayer from "@/components/courses/video-player";
+const VideoPlayer = dynamic(() => import("@/components/courses/video-player"), { ssr: false });
 import DocumentPreviewCard from "@/components/courses/document-preview";
 import EvaluationRenderer from "@/components/courses/evaluation-renderer";
 import CourseCertificate from "@/components/courses/course-certificate";

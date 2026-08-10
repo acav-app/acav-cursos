@@ -175,6 +175,18 @@ export async function POST(request) {
         ? headerMime
         : mimeType || (effectiveIsVideo ? "video/mp4" : "application/octet-stream");
 
+    // Cloudflare R2 requiere Content-Length header (HTTP 411 MissingContentLength)
+    // para PUTs de tamaño conocido. Edge Runtime no lo propaga si el body llega
+    // como ReadableStream chunked; lo agregamos explícitamente:
+    // 1) desde request.headers si el cliente lo envió (XHR/File siempre envía Content-Length)
+    // 2) fallback desde query param size (cliente upload.js envía siempre size)
+    const headerContentLength = Number(request.headers.get("content-length")) || 0;
+    const contentLength = Number.isFinite(headerContentLength) && headerContentLength > 0
+      ? headerContentLength
+      : Number.isFinite(size) && size > 0
+      ? size
+      : 0;
+
     const aws = new AwsClient({
       accessKeyId: env.accessKeyId,
       secretAccessKey: env.secretAccessKey,
@@ -191,12 +203,16 @@ export async function POST(request) {
     // body = request.body y duplex:"half", SIN usar un Request como 1er arg.
     // Pasar Request object + init con body en Vercel Edge Runtime produce
     // "FUNCTION_PAYLOAD_TOO_LARGE" porque intenta serializar/bufferear el stream.
+    const baseHeaders = {
+      "Content-Type": contentType,
+      "X-Amz-Content-SHA256": "UNSIGNED-PAYLOAD",
+    };
+    if (contentLength > 0) {
+      baseHeaders["Content-Length"] = String(contentLength);
+    }
     const signedRequest = await aws.sign(targetUrl, {
       method: "PUT",
-      headers: {
-        "Content-Type": contentType,
-        "X-Amz-Content-SHA256": "UNSIGNED-PAYLOAD",
-      },
+      headers: baseHeaders,
     });
 
     const signedUrl = signedRequest.url;
