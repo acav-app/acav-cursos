@@ -30,57 +30,209 @@ async function fetchPresignedUploadOptions({ folder, key, file }) {
   return data;
 }
 
+function buildStreamUploadUrl({ folder, key, file }) {
+  const params = new URLSearchParams();
+  if (folder) params.set("folder", folder);
+  if (key) params.set("key", key);
+  params.set("fileName", file?.name || "");
+  params.set("mimeType", file?.type || "application/octet-stream");
+  params.set("size", String(file?.size || 0));
+  return `/api/upload/stream?${params.toString()}`;
+}
+
+function multipartUploadPromise({ file, folder, key, onProgress }) {
+  const total = Number(file?.size) || 0;
+  return new Promise((resolve, reject) => {
+    const formData = new FormData();
+    formData.set("file", file);
+    if (folder) formData.set("folder", folder);
+    if (key) formData.set("key", key);
+
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", "/api/upload", true);
+
+    xhr.upload.onprogress = (event) => {
+      if (typeof onProgress !== "function") return;
+      const loaded = Number(event.loaded) || 0;
+      const resolvedTotal =
+        event.lengthComputable && Number(event.total) > 0 ? Number(event.total) : total;
+      const ratio = resolvedTotal > 0 ? Math.min(1, loaded / Math.max(1, resolvedTotal)) : 0;
+      const percentInt = Math.min(100, Math.round(ratio * 100));
+      onProgress({ loaded, total: resolvedTotal, percent: percentInt, ratio });
+    };
+
+    xhr.onload = () => {
+      try {
+        const data = JSON.parse(xhr.responseText || "{}");
+        if (xhr.status >= 200 && xhr.status < 300) {
+          if (typeof onProgress === "function") {
+            const resolvedTotal = Number(file?.size) || 0;
+            onProgress({ loaded: resolvedTotal, total: resolvedTotal, percent: 100, ratio: 1 });
+          }
+          resolve(buildResultPayload(data));
+        } else {
+          reject(new Error(data?.error || "upload_failed"));
+        }
+      } catch (err) {
+        reject(new Error("upload_failed_invalid_response"));
+      }
+    };
+
+    xhr.onerror = () => reject(new Error("upload_network_error"));
+    xhr.onabort = () => reject(new Error("upload_aborted"));
+    xhr.send(formData);
+  });
+}
+
+function streamingUploadPromise({ file, folder, key, onProgress }) {
+  const total = Number(file?.size) || 0;
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", buildStreamUploadUrl({ folder, key, file }), true);
+    const contentType =
+      file?.type && file.type !== "application/octet-stream"
+        ? file.type
+        : "application/octet-stream";
+    xhr.setRequestHeader("Content-Type", contentType);
+
+    xhr.upload.onprogress = (event) => {
+      if (typeof onProgress !== "function") return;
+      const loaded = Number(event.loaded) || 0;
+      const resolvedTotal =
+        event.lengthComputable && Number(event.total) > 0 ? Number(event.total) : total;
+      const ratio = resolvedTotal > 0 ? Math.min(1, loaded / Math.max(1, resolvedTotal)) : 0;
+      const percentInt = Math.min(100, Math.round(ratio * 100));
+      onProgress({ loaded, total: resolvedTotal, percent: percentInt, ratio });
+    };
+
+    xhr.onload = () => {
+      try {
+        const data = JSON.parse(xhr.responseText || "{}");
+        if (xhr.status >= 200 && xhr.status < 300) {
+          if (typeof onProgress === "function") {
+            const resolvedTotal = Number(file?.size) || 0;
+            onProgress({ loaded: resolvedTotal, total: resolvedTotal, percent: 100, ratio: 1 });
+          }
+          resolve(buildResultPayload(data));
+        } else {
+          reject(new Error(data?.error || "upload_stream_failed"));
+        }
+      } catch (err) {
+        reject(new Error("upload_failed_invalid_response"));
+      }
+    };
+
+    xhr.onerror = () => reject(new Error("upload_network_error"));
+    xhr.onabort = () => reject(new Error("upload_aborted"));
+    xhr.send(file);
+  });
+}
+
+function presignedUploadPromise({ file, presigned, onProgress }) {
+  const total = Number(file?.size) || 0;
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("PUT", presigned.uploadUrl, true);
+    const contentType =
+      (file?.type && file.type !== "application/octet-stream" ? file.type : presigned?.contentType) ||
+      "application/octet-stream";
+    if (contentType && contentType !== "application/octet-stream") {
+      xhr.setRequestHeader("Content-Type", contentType);
+    }
+
+    xhr.upload.onprogress = (event) => {
+      if (typeof onProgress !== "function") return;
+      const loaded = Number(event.loaded) || 0;
+      const resolvedTotal =
+        event.lengthComputable && Number(event.total) > 0 ? Number(event.total) : total;
+      const ratio = resolvedTotal > 0 ? Math.min(1, loaded / Math.max(1, resolvedTotal)) : 0;
+      const percentInt = Math.min(100, Math.round(ratio * 100));
+      onProgress({ loaded, total: resolvedTotal, percent: percentInt, ratio });
+    };
+
+    xhr.onload = () => {
+      try {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          if (typeof onProgress === "function") {
+            const resolvedTotal = total || 0;
+            onProgress({ loaded: resolvedTotal, total: resolvedTotal, percent: 100, ratio: 1 });
+          }
+          const etagRaw = xhr.getResponseHeader("ETag");
+          const etag = etagRaw ? String(etagRaw).replace(/^"|"$/g, "") : null;
+          resolve(
+            buildResultPayload({
+              url: presigned.publicUrl,
+              fileName: presigned.storageKey,
+              storageKey: presigned.storageKey,
+              size: Number(file?.size) || 0,
+              type: file?.type || presigned.contentType || null,
+              etag,
+            })
+          );
+        } else {
+          reject(new Error(`upload_presigned_http_${xhr.status}`));
+        }
+      } catch (err) {
+        reject(new Error("upload_failed_invalid_response"));
+      }
+    };
+
+    xhr.onerror = () => reject(new Error("upload_network_error"));
+    xhr.onabort = () => reject(new Error("upload_aborted"));
+    xhr.send(file);
+  });
+}
+
+function shouldFallbackPresignedToStream(errMsg) {
+  const msg = String(errMsg || "");
+  if (!msg) return false;
+  return (
+    msg.includes("upload_network_error") ||
+    msg.includes("upload_presigned_http_") ||
+    msg.includes("cors") ||
+    msg.toLowerCase().includes("blocked by CORS".toLowerCase())
+  );
+}
+
+function shouldFallbackStreamToMultipart(errMsg) {
+  const msg = String(errMsg || "");
+  if (!msg) return false;
+  return (
+    msg.includes("r2_not_configured") ||
+    msg.includes("413") ||
+    msg.includes("Payload Too Large") ||
+    msg.includes("stream_404") ||
+    msg.includes("upload_stream_failed 5")
+  );
+}
+
 export async function uploadToR2(file, folderOrOptions) {
   const hasFolder = typeof folderOrOptions === "string";
   const folder = hasFolder ? folderOrOptions : folderOrOptions?.folder;
   const key = hasFolder ? undefined : folderOrOptions?.key;
+  const onProgress = () => {};
 
   try {
     const presigned = await fetchPresignedUploadOptions({ folder, key, file });
-    await new Promise((resolve, reject) => {
-      const xhr = new XMLHttpRequest();
-      xhr.open("PUT", presigned.uploadUrl, true);
-      if (presigned.contentType) {
-        xhr.setRequestHeader("Content-Type", presigned.contentType);
-      }
-      xhr.onload = () => {
-        if (xhr.status >= 200 && xhr.status < 300) resolve();
-        else reject(new Error(`upload_presigned_http_${xhr.status}`));
-      };
-      xhr.onerror = () => reject(new Error("upload_network_error"));
-      xhr.onabort = () => reject(new Error("upload_aborted"));
-      xhr.send(file);
-    });
-    return buildResultPayload({
-      url: presigned.publicUrl,
-      fileName: presigned.storageKey,
-      storageKey: presigned.storageKey,
-      size: Number(file?.size) || 0,
-      type: file?.type || presigned.contentType || null,
-      etag: null,
-    });
+    return await presignedUploadPromise({ file, presigned, onProgress });
   } catch (err) {
     const msg = String(err?.message || err || "");
-    const shouldFallback =
-      msg.includes("presigned_404") || msg.includes("presigned_500") || msg.includes("r2_not_configured");
-    if (!shouldFallback) throw err;
+    if (!shouldFallbackPresignedToStream(msg) &&
+        !msg.includes("presigned_404") &&
+        !msg.includes("presigned_500") &&
+        !msg.includes("r2_not_configured")) {
+      throw err;
+    }
   }
 
-  const formData = new FormData();
-  formData.set("file", file);
-  if (folder) formData.set("folder", folder);
-  if (key) formData.set("key", key);
-
-  const res = await fetch("/api/upload", {
-    method: "POST",
-    body: formData,
-  });
-
-  const data = await res.json().catch(() => null);
-  if (!res.ok) {
-    throw new Error(data?.error || "upload_failed");
+  try {
+    return await streamingUploadPromise({ file, folder, key, onProgress });
+  } catch (err) {
+    const msg = String(err?.message || err || "");
+    if (!shouldFallbackStreamToMultipart(msg)) throw err;
   }
-  return buildResultPayload(data);
+
+  return multipartUploadPromise({ file, folder, key, onProgress });
 }
 
 export function uploadToR2WithProgress(file, folderOrOptions, onProgress) {
@@ -99,117 +251,28 @@ export function uploadToR2WithProgress(file, folderOrOptions, onProgress) {
   }
 
   return (async () => {
-    let mode = "presigned";
-    let uploadUrl = null;
-    let contentType = null;
-    let publicUrl = null;
-    let storageKey = null;
-
     try {
       const presigned = await fetchPresignedUploadOptions({ folder, key, file });
-      uploadUrl = presigned.uploadUrl;
-      contentType = presigned.contentType;
-      publicUrl = presigned.publicUrl;
-      storageKey = presigned.storageKey;
+      return await presignedUploadPromise({ file, presigned, onProgress });
     } catch (err) {
       const msg = String(err?.message || err || "");
-      const shouldFallback =
+      const presignedSoftFail =
         msg.includes("presigned_404") ||
         msg.includes("presigned_500") ||
-        msg.includes("r2_not_configured");
-      if (!shouldFallback) throw err;
-      mode = "multipart";
+        msg.includes("r2_not_configured") ||
+        shouldFallbackPresignedToStream(msg);
+      if (!presignedSoftFail) throw err;
     }
 
-    return new Promise((resolve, reject) => {
-      if (mode === "presigned") {
-        const xhr = new XMLHttpRequest();
-        xhr.open("PUT", uploadUrl, true);
-        if (contentType) xhr.setRequestHeader("Content-Type", contentType);
+    try {
+      return await streamingUploadPromise({ file, folder, key, onProgress });
+    } catch (err) {
+      const msg = String(err?.message || err || "");
+      if (!shouldFallbackStreamToMultipart(msg)) throw err;
+    }
 
-        xhr.upload.onprogress = (event) => {
-          if (typeof onProgress !== "function") return;
-          const loaded = Number(event.loaded) || 0;
-          const resolvedTotal =
-            event.lengthComputable && Number(event.total) > 0 ? Number(event.total) : total;
-          const ratio = resolvedTotal > 0 ? Math.min(1, loaded / Math.max(1, resolvedTotal)) : 0;
-          const percentInt = Math.min(100, Math.round(ratio * 100));
-          onProgress({ loaded, total: resolvedTotal, percent: percentInt, ratio });
-        };
-
-        xhr.onload = () => {
-          try {
-            if (xhr.status >= 200 && xhr.status < 300) {
-              if (typeof onProgress === "function") {
-                const resolvedTotal = total || 0;
-                onProgress({ loaded: resolvedTotal, total: resolvedTotal, percent: 100, ratio: 1 });
-              }
-              const etagRaw = xhr.getResponseHeader("ETag");
-              const etag = etagRaw ? String(etagRaw).replace(/^"|"$/g, "") : null;
-              resolve(
-                buildResultPayload({
-                  url: publicUrl,
-                  fileName: storageKey,
-                  storageKey,
-                  size: Number(file?.size) || 0,
-                  type: file?.type || contentType || null,
-                  etag,
-                })
-              );
-            } else {
-              reject(new Error(`upload_presigned_http_${xhr.status}`));
-            }
-          } catch (err) {
-            reject(new Error("upload_failed_invalid_response"));
-          }
-        };
-
-        xhr.onerror = () => reject(new Error("upload_network_error"));
-        xhr.onabort = () => reject(new Error("upload_aborted"));
-        xhr.send(file);
-        return;
-      }
-
-      const formData = new FormData();
-      formData.set("file", file);
-      if (folder) formData.set("folder", folder);
-      if (key) formData.set("key", key);
-
-      const xhr = new XMLHttpRequest();
-      xhr.open("POST", "/api/upload", true);
-
-      xhr.upload.onprogress = (event) => {
-        if (typeof onProgress !== "function") return;
-        const loaded = Number(event.loaded) || 0;
-        const resolvedTotal =
-          event.lengthComputable && Number(event.total) > 0 ? Number(event.total) : total;
-        const ratio = resolvedTotal > 0 ? Math.min(1, loaded / Math.max(1, resolvedTotal)) : 0;
-        const percentInt = Math.min(100, Math.round(ratio * 100));
-        onProgress({ loaded, total: resolvedTotal, percent: percentInt, ratio });
-      };
-
-      xhr.onload = () => {
-        try {
-          const data = JSON.parse(xhr.responseText || "{}");
-          if (xhr.status >= 200 && xhr.status < 300) {
-            if (typeof onProgress === "function") {
-              const resolvedTotal = Number(file?.size) || 0;
-              onProgress({ loaded: resolvedTotal, total: resolvedTotal, percent: 100, ratio: 1 });
-            }
-            resolve(buildResultPayload(data));
-          } else {
-            reject(new Error(data?.error || "upload_failed"));
-          }
-        } catch (err) {
-          reject(new Error("upload_failed_invalid_response"));
-        }
-      };
-
-      xhr.onerror = () => reject(new Error("upload_network_error"));
-      xhr.onabort = () => reject(new Error("upload_aborted"));
-
-      xhr.send(formData);
-    });
+    return multipartUploadPromise({ file, folder, key, onProgress });
   })();
 }
+
 
