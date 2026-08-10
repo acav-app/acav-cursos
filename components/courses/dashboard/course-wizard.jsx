@@ -379,14 +379,49 @@ const schema = z
       ctx.addIssue({ code: "custom", message: "El precio anterior debe ser mayor o igual al precio actual", path: ["oldPrice"] });
     }
     if (values.promoVideo) {
-      if (!String(values.promoVideoFileName || "").trim()) {
-        ctx.addIssue({ code: "custom", message: "Falta el nombre del video cargado", path: ["promoVideo"] });
-      }
-      if (!COURSE_VIDEO_ALLOWED_TYPES.includes(String(values.promoVideoMimeType || "").trim())) {
-        ctx.addIssue({ code: "custom", message: "Formato de video inválido", path: ["promoVideo"] });
-      }
-      if (Number(values.promoVideoSizeBytes || 0) > COURSE_VIDEO_MAX_SIZE_BYTES) {
-        ctx.addIssue({ code: "custom", message: "El video excede el tamaño permitido", path: ["promoVideo"] });
+      const external = isExternalVideoOnly({ url: String(values.promoVideo || ""), mimeType: undefined });
+      if (!external) {
+        const hasAsset =
+          values.promoVideoAsset &&
+          typeof values.promoVideoAsset === "object" &&
+          (values.promoVideoAsset.url || values.promoVideoAsset.storageKey);
+        const assetOriginal = hasAsset ? values.promoVideoAsset.originalName : undefined;
+        const assetStorage = hasAsset ? values.promoVideoAsset.storageKey : undefined;
+        const pathForName = hasAsset
+          ? values.promoVideoAsset.url || values.promoVideoAsset.storageKey || values.promoVideo
+          : values.promoVideo;
+        const inferredFromPath =
+          String(pathForName || "").split("/").pop()?.split("?")[0] || "";
+        const fileName =
+          String(values.promoVideoFileName || "").trim() ||
+          String(assetOriginal || "").trim() ||
+          String(assetStorage || "").trim() ||
+          inferredFromPath;
+        const mimeType =
+          String(values.promoVideoMimeType || "").trim() ||
+          String(hasAsset ? values.promoVideoAsset.mimeType || "" : "").trim() ||
+          (fileName && ["mp4", "m4v"].includes(fileName.split(".").pop()?.toLowerCase() || "")
+            ? "video/mp4"
+            : fileName && ["webm"].includes(fileName.split(".").pop()?.toLowerCase() || "")
+              ? "video/webm"
+              : fileName && ["mov", "qt"].includes(fileName.split(".").pop()?.toLowerCase() || "")
+                ? "video/quicktime"
+                : fileName && ["mkv"].includes(fileName.split(".").pop()?.toLowerCase() || "")
+                  ? "video/x-matroska"
+                  : "");
+        const sizeBytes = Number(
+          values.promoVideoSizeBytes ?? (hasAsset ? values.promoVideoAsset.fileSize : undefined) ?? 0
+        );
+
+        if (!fileName) {
+          ctx.addIssue({ code: "custom", message: "Falta el nombre del video cargado", path: ["promoVideo"] });
+        }
+        if (!COURSE_VIDEO_ALLOWED_TYPES.includes(mimeType)) {
+          ctx.addIssue({ code: "custom", message: "Formato de video inválido", path: ["promoVideo"] });
+        }
+        if (sizeBytes > COURSE_VIDEO_MAX_SIZE_BYTES) {
+          ctx.addIssue({ code: "custom", message: "El video excede el tamaño permitido", path: ["promoVideo"] });
+        }
       }
     }
   });
