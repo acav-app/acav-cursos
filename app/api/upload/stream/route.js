@@ -185,10 +185,13 @@ export async function POST(request) {
     const encodedKey = encodeURIComponent(storageKey).replace(/%2F/g, "/");
     const targetUrl = `${env.endpoint.replace(/\/$/, "")}/${bucket}/${encodedKey}`;
 
-    // aws.sign(url, init) acepta body en init, pero para streams ReadableStream
-    // puede haber problemas de envoltura. Firmamos únicamente method+headers,
-    // luego construimos un Request nuevo pasando el body y duplex explícito.
-    const signedRequestNoBody = await aws.sign(targetUrl, {
+    // aws.sign(url, init) devuelve un Request firmado con SigV4.
+    // NO pasar body a aws.sign() (riesgo de envoltura incompatible con streams).
+    // Luego extraemos URL + headers firmados, y hacemos fetch() nativo con
+    // body = request.body y duplex:"half", SIN usar un Request como 1er arg.
+    // Pasar Request object + init con body en Vercel Edge Runtime produce
+    // "FUNCTION_PAYLOAD_TOO_LARGE" porque intenta serializar/bufferear el stream.
+    const signedRequest = await aws.sign(targetUrl, {
       method: "PUT",
       headers: {
         "Content-Type": contentType,
@@ -196,8 +199,15 @@ export async function POST(request) {
       },
     });
 
-    // Re-ensamblamos el Request para garantizar que body/duplex lleguen intactos
-    const r2Response = await fetch(signedRequestNoBody, {
+    const signedUrl = signedRequest.url;
+    const signedHeaders = {};
+    signedRequest.headers.forEach((value, key) => {
+      signedHeaders[key] = value;
+    });
+
+    const r2Response = await fetch(signedUrl, {
+      method: "PUT",
+      headers: signedHeaders,
       body: request.body,
       // @ts-ignore
       duplex: "half",
