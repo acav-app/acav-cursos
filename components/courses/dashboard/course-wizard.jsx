@@ -4050,14 +4050,6 @@ export default function CourseWizard({ jobId }) {
                   }}
                   errors={errors}
                 />
-                {(values.promoVideoAsset?.url || values.promoVideo) ? (
-                  <FilePreview
-                    url={values.promoVideoAsset?.url || values.promoVideo || ""}
-                    title="Video principal / promocional"
-                    variant="compact"
-                  />
-                ) : null}
-
                 <CourseAttachmentsField
                   attachments={values.attachments || []}
                   onChange={(next) => setValue("attachments", next, { shouldValidate: true, shouldDirty: true })}

@@ -232,9 +232,6 @@ export default function LessonVideoUploader({
                 </span>
                 <div className="min-w-0 flex-1 grid gap-1">
                   <div className="flex flex-wrap items-center gap-1.5">
-                    <span className="text-xs font-semibold text-foreground">
-                      {displayUrl && displayUrl.startsWith("blob:") ? "Cargando video…" : "Video cargado"}
-                    </span>
                     <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-white px-1.5 py-0.5 text-[10px] font-bold text-emerald-700">
                       <CheckCircle2 className="h-2.5 w-2.5" />
                       {displayUrl && displayUrl.startsWith("blob:")
@@ -444,9 +441,6 @@ export default function LessonVideoUploader({
                 </span>
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-1.5">
-                    <span className="text-sm font-semibold text-foreground">
-                      {displayUrl && displayUrl.startsWith("blob:") ? "Cargando video…" : "Video cargado"}
-                    </span>
                     <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-white px-2 py-0.5 text-[11px] font-bold text-emerald-700">
                       <CheckCircle2 className="h-3 w-3" />
                       {displayUrl && displayUrl.startsWith("blob:")

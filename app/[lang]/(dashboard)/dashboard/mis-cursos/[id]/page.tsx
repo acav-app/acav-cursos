@@ -528,6 +528,212 @@ function TonePill({ icon: Icon, label, className }) {
   );
 }
 
+function LessonEvalStatusBadge({ lesson, evalState, evalUnlocked, summary }) {
+  if (!lesson?.evaluation?.enabled) return null;
+  if (evalState?.passed) {
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Badge variant="soft" color="success" className="rounded-full cursor-help">
+            <CheckCircle2 className="mr-1 h-3 w-3" />
+            {typeof evalState.percentage === "number"
+              ? `Aprobada · ${evalState.percentage}%`
+              : "Aprobada"}
+          </Badge>
+        </TooltipTrigger>
+        <TooltipContent side="bottom">
+          <div className="max-w-[240px] leading-5 text-[11px]">
+            Rendiste esta evaluación y la aprobaste. ¡Buen trabajo!
+            {typeof evalState.attempts === "number" && evalState.attempts > 1
+              ? ` (${evalState.attempts} intentos realizados)`
+              : evalState.attempts === 1
+              ? " (1 intento realizado)"
+              : ""}
+          </div>
+        </TooltipContent>
+      </Tooltip>
+    );
+  }
+  if (evalState?.submitted && evalState?.passed === false) {
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Badge variant="soft" color="destructive" className="rounded-full cursor-help">
+            <Circle className="mr-1 h-3 w-3" />
+            {typeof evalState.percentage === "number"
+              ? `Desaprobada · ${evalState.percentage}%`
+              : "Desaprobada"}
+          </Badge>
+        </TooltipTrigger>
+        <TooltipContent side="bottom">
+          <div className="max-w-[240px] leading-5 text-[11px]">
+            Rendiste esta evaluación pero todavía no la aprobaste.
+            {lesson.evaluation.maxAttempts ? (
+              evalState.attempts && evalState.attempts >= lesson.evaluation.maxAttempts
+                ? ` Usaste tus ${lesson.evaluation.maxAttempts} intentos — consultá a la institución.`
+                : ` Tenés más intentos disponibles.`
+            ) : " Podés volver a intentarlo."}
+          </div>
+        </TooltipContent>
+      </Tooltip>
+    );
+  }
+  if (evalUnlocked) {
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Badge variant="soft" color="default" className="rounded-full cursor-help">
+            <ClipboardCheck className="mr-1 h-3 w-3" /> Evaluación habilitada
+          </Badge>
+        </TooltipTrigger>
+        <TooltipContent side="bottom">
+          <div className="max-w-[240px] leading-5 text-[11px]">
+            {lesson.evaluation.requireAllResourcesReady === false
+              ? "Evaluación disponible de inmediato. Rendila cuando quieras."
+              : "Todos los recursos listos — podés rendir la evaluación de la clase."}
+          </div>
+        </TooltipContent>
+      </Tooltip>
+    );
+  }
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Badge variant="soft" color="warning" className="rounded-full cursor-help">
+          <Clock3 className="mr-1 h-3 w-3" /> Evaluación bloqueada
+        </Badge>
+      </TooltipTrigger>
+      <TooltipContent side="bottom">
+        <div className="max-w-[240px] leading-5 text-[11px]">
+          {summary.hasAny && !summary.allReady
+            ? "Esperando a que todos los recursos de esta clase se carguen correctamente."
+            : "Evaluación aún no habilitada por la institución."}
+        </div>
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
+function LessonEvaluationCard({
+  lesson,
+  evalState,
+  evalUnlocked,
+  openEvaluationId,
+  setOpenEvaluationId,
+  onSubmit,
+}) {
+  if (!lesson?.evaluation?.enabled) return null;
+  const lessonId = String(lesson?.id || "");
+  const isOpen = openEvaluationId === lessonId;
+  const questions = Array.isArray(lesson.evaluation.questions) ? lesson.evaluation.questions : [];
+  const maxAttempts = lesson.evaluation.maxAttempts;
+  const attemptsUsed = evalState?.attempts ?? 0;
+  const outOfAttempts = Boolean(maxAttempts && attemptsUsed >= maxAttempts);
+  const passed = evalState?.passed === true;
+
+  const buttonLabel = passed
+    ? "Ya aprobada"
+    : outOfAttempts
+    ? "Sin intentos disponibles"
+    : evalUnlocked
+    ? isOpen
+      ? "Ocultar evaluación"
+      : "Rendir evaluación"
+    : "Esperando recursos";
+  const buttonDisabled = !evalUnlocked || passed || outOfAttempts;
+
+  return (
+    <div
+      id={`clase-${lesson.id || "eval"}`}
+      className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4"
+    >
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="text-sm font-semibold text-slate-950">
+            {lesson.evaluation.title || `Evaluación · ${lesson.title}`}
+          </div>
+          {lesson.evaluation.description ? (
+            <p className="mt-1 text-xs text-slate-500">{lesson.evaluation.description}</p>
+          ) : null}
+          <div className="mt-2 flex flex-wrap gap-2">
+            <Badge variant="soft" color="secondary" className="rounded-full">
+              {questions.length} preguntas
+            </Badge>
+            {lesson.evaluation.passingScore ? (
+              <Badge variant="soft" color="success" className="rounded-full">
+                Mínimo {lesson.evaluation.passingScore}%
+              </Badge>
+            ) : null}
+            {maxAttempts ? (
+              <Badge variant="soft" color="warning" className="rounded-full">
+                {maxAttempts} intentos
+              </Badge>
+            ) : null}
+            {attemptsUsed ? (
+              <Badge variant="soft" color="default" className="rounded-full">
+                {attemptsUsed}/{maxAttempts || "∞"} realizados
+              </Badge>
+            ) : null}
+          </div>
+        </div>
+        <Button
+          type="button"
+          variant={isOpen ? "outline" : "default"}
+          className={cn("rounded-2xl", !isOpen ? "bg-[#1B2B50] hover:bg-[#233A6A]" : "")}
+          disabled={isOpen ? false : buttonDisabled}
+          onClick={() => setOpenEvaluationId(isOpen ? null : lessonId)}
+        >
+          <FileQuestion className="mr-2 h-4 w-4" />
+          {buttonLabel}
+        </Button>
+      </div>
+
+      {isOpen && evalUnlocked && questions.length ? (
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
+          <EvaluationRenderer
+            key={lesson.id}
+            questions={questions}
+            title={lesson.evaluation.title}
+            description={lesson.evaluation.description}
+            passingScore={lesson.evaluation.passingScore}
+            maxAttempts={maxAttempts}
+            attemptsUsed={attemptsUsed}
+            defaultPoints={lesson.evaluation.defaultPoints}
+            previousResult={
+              evalState?.submitted
+                ? {
+                    questions: [],
+                    totalScore: Number(evalState.score ?? 0),
+                    totalMaxScore: Number(evalState.maxScore ?? 0),
+                    percentage: Number.isFinite(Number(evalState.percentage))
+                      ? Number(evalState.percentage)
+                      : Number(evalState.maxScore) > 0
+                      ? Math.round(
+                          (Number(evalState.score ?? 0) / Number(evalState.maxScore)) * 100
+                        )
+                      : 0,
+                    passingPercentage: Number(lesson.evaluation.passingScore ?? 60),
+                    passed: Boolean(evalState.passed),
+                    correctCount: Number.isFinite(Number((evalState.bestEntry || {})?.correctCount))
+                      ? Number((evalState.bestEntry || {}).correctCount)
+                      : typeof evalState.percentage === "number" &&
+                        Number.isFinite(evalState.percentage)
+                      ? Math.round((questions.length * evalState.percentage) / 100)
+                      : undefined,
+                    totalCount: Number.isFinite(Number((evalState.bestEntry || {})?.totalCount))
+                      ? Number((evalState.bestEntry || {}).totalCount)
+                      : questions.length,
+                  }
+                : undefined
+            }
+            onSubmit={async (result) => onSubmit(lesson, result)}
+          />
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export default function DashboardCursoAlumnoPage({ params: { id } }) {
   const buildLocalizedPath = useLocalizedPath();
   const { user } = useAuth();
@@ -2360,97 +2566,12 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
                                                 </div>
                                               </TooltipContent>
                                             </Tooltip>
-                                            {hasEval ? (
-                                              evalState?.passed ? (
-                                                <Tooltip>
-                                                  <TooltipTrigger asChild>
-                                                    <Badge
-                                                      variant="soft"
-                                                      color="success"
-                                                      className="rounded-full cursor-help"
-                                                    >
-                                                      <CheckCircle2 className="mr-1 h-3 w-3" />
-                                                      {typeof evalState.percentage === "number"
-                                                        ? `Aprobada · ${evalState.percentage}%`
-                                                        : "Aprobada"}
-                                                    </Badge>
-                                                  </TooltipTrigger>
-                                                  <TooltipContent side="bottom">
-                                                    <div className="max-w-[240px] leading-5 text-[11px]">
-                                                      Rendiste esta evaluación y la aprobaste. ¡Buen trabajo!
-                                                      {typeof evalState.attempts === "number" && evalState.attempts > 1
-                                                        ? ` (${evalState.attempts} intentos realizados)`
-                                                        : evalState.attempts === 1
-                                                        ? " (1 intento realizado)"
-                                                        : ""}
-                                                    </div>
-                                                  </TooltipContent>
-                                                </Tooltip>
-                                              ) : evalState?.submitted && evalState?.passed === false ? (
-                                                <Tooltip>
-                                                  <TooltipTrigger asChild>
-                                                    <Badge
-                                                      variant="soft"
-                                                      color="destructive"
-                                                      className="rounded-full cursor-help"
-                                                    >
-                                                      <Circle className="mr-1 h-3 w-3" />
-                                                      {typeof evalState.percentage === "number"
-                                                        ? `Desaprobada · ${evalState.percentage}%`
-                                                        : "Desaprobada"}
-                                                    </Badge>
-                                                  </TooltipTrigger>
-                                                  <TooltipContent side="bottom">
-                                                    <div className="max-w-[240px] leading-5 text-[11px]">
-                                                      Rendiste esta evaluación pero todavía no la aprobaste.
-                                                      {lesson.evaluation.maxAttempts ? (
-                                                        evalState.attempts && evalState.attempts >= lesson.evaluation.maxAttempts
-                                                          ? ` Usaste tus ${lesson.evaluation.maxAttempts} intentos — consultá a la institución.`
-                                                          : ` Tenés más intentos disponibles.`
-                                                      ) : " Podés volver a intentarlo."}
-                                                    </div>
-                                                  </TooltipContent>
-                                                </Tooltip>
-                                              ) : evalUnlocked ? (
-                                                <Tooltip>
-                                                  <TooltipTrigger asChild>
-                                                    <Badge
-                                                      variant="soft"
-                                                      color="default"
-                                                      className="rounded-full cursor-help"
-                                                    >
-                                                      <ClipboardCheck className="mr-1 h-3 w-3" /> Evaluación habilitada
-                                                    </Badge>
-                                                  </TooltipTrigger>
-                                                  <TooltipContent side="bottom">
-                                                    <div className="max-w-[240px] leading-5 text-[11px]">
-                                                      {lesson.evaluation.requireAllResourcesReady === false
-                                                        ? "Evaluación disponible de inmediato. Rendila cuando quieras."
-                                                        : "Todos los recursos listos — podés rendir la evaluación de la clase."}
-                                                    </div>
-                                                  </TooltipContent>
-                                                </Tooltip>
-                                              ) : (
-                                                <Tooltip>
-                                                  <TooltipTrigger asChild>
-                                                    <Badge
-                                                      variant="soft"
-                                                      color="warning"
-                                                      className="rounded-full cursor-help"
-                                                    >
-                                                      <Clock3 className="mr-1 h-3 w-3" /> Evaluación bloqueada
-                                                    </Badge>
-                                                  </TooltipTrigger>
-                                                  <TooltipContent side="bottom">
-                                                    <div className="max-w-[240px] leading-5 text-[11px]">
-                                                      {summary.hasAny && !summary.allReady
-                                                        ? "Esperando a que todos los recursos de esta clase se carguen correctamente."
-                                                        : "Evaluación aún no habilitada por la institución."}
-                                                    </div>
-                                                  </TooltipContent>
-                                                </Tooltip>
-                                              )
-                                            ) : null}
+                                            <LessonEvalStatusBadge
+                                              lesson={lesson}
+                                              evalState={evalState}
+                                              evalUnlocked={evalUnlocked}
+                                              summary={summary}
+                                            />
                                           </div>
 
                                           {resources.length ? (
@@ -2465,134 +2586,14 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
                                             </div>
                                           ) : null}
 
-                                          {hasEval ? (
-                                            <div
-                                              id={`clase-${lesson.id || "eval"}`}
-                                              className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4"
-                                            >
-                                              <div className="flex flex-wrap items-start justify-between gap-3">
-                                                <div className="min-w-0 flex-1">
-                                                  <div className="text-sm font-semibold text-slate-950">
-                                                    {lesson.evaluation.title || `Evaluación · ${lesson.title}`}
-                                                  </div>
-                                                  {lesson.evaluation.description ? (
-                                                    <p className="mt-1 text-xs text-slate-500">
-                                                      {lesson.evaluation.description}
-                                                    </p>
-                                                  ) : null}
-                                                  <div className="mt-2 flex flex-wrap gap-2">
-                                                    <Badge variant="soft" color="secondary" className="rounded-full">
-                                                      {(lesson.evaluation.questions || []).length} preguntas
-                                                    </Badge>
-                                                    {lesson.evaluation.passingScore ? (
-                                                      <Badge variant="soft" color="success" className="rounded-full">
-                                                        Mínimo {lesson.evaluation.passingScore}%
-                                                      </Badge>
-                                                    ) : null}
-                                                    {lesson.evaluation.maxAttempts ? (
-                                                      <Badge variant="soft" color="warning" className="rounded-full">
-                                                        {lesson.evaluation.maxAttempts} intentos
-                                                      </Badge>
-                                                    ) : null}
-                                                    {evalState?.attempts ? (
-                                                      <Badge variant="soft" color="default" className="rounded-full">
-                                                        {evalState.attempts}/{lesson.evaluation.maxAttempts || "∞"} realizados
-                                                      </Badge>
-                                                    ) : null}
-                                                  </div>
-                                                </div>
-                                                {openEvaluationId !== String(lesson?.id || "") ? (
-                                                  <Button
-                                                    type="button"
-                                                    disabled={
-                                                      !evalUnlocked ||
-                                                      evalState?.passed === true ||
-                                                      (lesson.evaluation.maxAttempts &&
-                                                        evalState?.attempts &&
-                                                        evalState.attempts >= lesson.evaluation.maxAttempts)
-                                                    }
-                                                    className="rounded-2xl bg-[#1B2B50] hover:bg-[#233A6A]"
-                                                    onClick={() => setOpenEvaluationId(String(lesson?.id || ""))}
-                                                  >
-                                                    <FileQuestion className="mr-2 h-4 w-4" />
-                                                    {evalState?.passed === true
-                                                      ? "Ya aprobada"
-                                                      : lesson.evaluation.maxAttempts &&
-                                                          evalState?.attempts &&
-                                                          evalState.attempts >= lesson.evaluation.maxAttempts
-                                                      ? "Sin intentos disponibles"
-                                                      : evalUnlocked
-                                                      ? "Rendir evaluación"
-                                                      : "Esperando recursos"}
-                                                  </Button>
-                                                ) : (
-                                                  <Button
-                                                    type="button"
-                                                    variant="outline"
-                                                    className="rounded-2xl"
-                                                    onClick={() => setOpenEvaluationId(null)}
-                                                  >
-                                                    Ocultar evaluación
-                                                  </Button>
-                                                )}
-                                              </div>
-
-                                              {openEvaluationId === String(lesson?.id || "") &&
-                                              evalUnlocked &&
-                                              Array.isArray(lesson.evaluation.questions) &&
-                                              lesson.evaluation.questions.length ? (
-                                                <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
-                                                  <EvaluationRenderer
-                                                    key={lesson.id}
-                                                    questions={lesson.evaluation.questions}
-                                                    title={lesson.evaluation.title}
-                                                    description={lesson.evaluation.description}
-                                                    passingScore={lesson.evaluation.passingScore}
-                                                    maxAttempts={lesson.evaluation.maxAttempts}
-                                                    attemptsUsed={evalState?.attempts ?? 0}
-                                                    defaultPoints={lesson.evaluation.defaultPoints}
-                                                    previousResult={
-                                                      evalState?.submitted
-                                                        ? {
-                                                            questions: [],
-                                                            totalScore: Number(evalState.score ?? 0),
-                                                            totalMaxScore: Number(evalState.maxScore ?? 0),
-                                                            percentage: Number.isFinite(Number(evalState.percentage))
-                                                              ? Number(evalState.percentage)
-                                                              : Number(evalState.maxScore) > 0
-                                                              ? Math.round(
-                                                                  (Number(evalState.score ?? 0) / Number(evalState.maxScore)) *
-                                                                    100
-                                                                )
-                                                              : 0,
-                                                            passingPercentage: Number(lesson.evaluation.passingScore ?? 60),
-                                                            passed: Boolean(evalState.passed),
-                                                            correctCount:
-                                                              Number.isFinite(Number((evalState.bestEntry as any)?.correctCount))
-                                                                ? Number((evalState.bestEntry as any).correctCount)
-                                                                : typeof evalState.percentage === "number" &&
-                                                                  Number.isFinite(evalState.percentage)
-                                                                ? Math.round(
-                                                                    ((lesson.evaluation.questions || []).length *
-                                                                      evalState.percentage) /
-                                                                      100
-                                                                  )
-                                                                : undefined,
-                                                            totalCount:
-                                                              Number.isFinite(Number((evalState.bestEntry as any)?.totalCount))
-                                                                ? Number((evalState.bestEntry as any).totalCount)
-                                                                : (lesson.evaluation.questions || []).length,
-                                                          }
-                                                        : undefined
-                                                    }
-                                                    onSubmit={async (result) =>
-                                                      submitLessonEvaluation(lesson, result)
-                                                    }
-                                                  />
-                                                </div>
-                                              ) : null}
-                                            </div>
-                                          ) : null}
+                                          <LessonEvaluationCard
+                                            lesson={lesson}
+                                            evalState={evalState}
+                                            evalUnlocked={evalUnlocked}
+                                            openEvaluationId={openEvaluationId}
+                                            setOpenEvaluationId={setOpenEvaluationId}
+                                            onSubmit={submitLessonEvaluation}
+                                          />
                                         </div>
                                       );
                                     })()}
