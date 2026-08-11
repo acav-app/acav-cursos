@@ -775,7 +775,8 @@ function sanitizeCurriculum(curriculum) {
           const durationMinutes = Number(lesson?.durationMinutes || 0);
           const videoAssetRaw = lesson?.videoAsset;
           const hasVideoAssetShape = videoAssetRaw && typeof videoAssetRaw === "object" && (videoAssetRaw.url || videoAssetRaw.storageKey);
-          const videoAsset = hasVideoAssetShape
+          const videoAssetPurged = hasVideoAssetShape && videoAssetRaw.__purged === true;
+          const videoAsset = hasVideoAssetShape && !videoAssetPurged
             ? {
                 url: String(videoAssetRaw.url || "").trim() || undefined,
                 storageKey: videoAssetRaw.storageKey ? String(videoAssetRaw.storageKey) : undefined,
@@ -804,7 +805,8 @@ function sanitizeCurriculum(curriculum) {
               }
             : undefined;
           const videoUrlCandidate = String(lesson?.videoUrl || lesson?.url || "").trim();
-          const videoUrl = videoUrlCandidate || (videoAsset?.url ? String(videoAsset.url) : "");
+          const videoAssetUrl = videoAsset?.url ? String(videoAsset.url).trim() : "";
+          const videoUrl = videoUrlCandidate || videoAssetUrl;
           const thumbnailUrl = String(lesson?.thumbnailUrl || lesson?.thumbnail || "").trim();
           const content = String(lesson?.content || lesson?.body || "").trim();
           const resources = sanitizeLessonResources(lesson?.resources || lesson?.attachments);
@@ -1654,11 +1656,14 @@ function isExternalVideoOnly(video) {
 
 function LessonVideoSection({ videoUrl, videoAsset, onVideoUrlChange, onVideoAssetChange }) {
   const hasAsset = videoAsset && typeof videoAsset === "object" && (videoAsset.url || videoAsset.storageKey);
-  const hasUrl = Boolean(videoUrl);
-  const isExternalOnly = hasUrl && !hasAsset && isExternalVideoOnly({ url: String(videoUrl || ""), mimeType: undefined });
+  const rawUrl = String(videoUrl || "").trim();
+  const hasUrl = Boolean(rawUrl);
+  const urlSource = rawUrl || (hasAsset ? String(videoAsset?.url || "") : "");
+  const displayValueUrl = urlSource ? (isEmbedUrl(urlSource) ? toEmbedUrl(urlSource) : urlSource) : "";
+  const isExternalOnly = Boolean(displayValueUrl) && !hasAsset && isExternalVideoOnly({ url: displayValueUrl, mimeType: undefined });
   const state = hasAsset
     ? { tone: resourceStatusBadge(videoAsset.status || "ready").tone, label: "Asset subido" }
-    : hasUrl
+    : displayValueUrl
       ? { tone: resourceStatusBadge("pending").tone, label: isExternalOnly ? "URL externa" : "URL activa" }
       : null;
 
@@ -1676,8 +1681,8 @@ function LessonVideoSection({ videoUrl, videoAsset, onVideoUrlChange, onVideoAss
       return;
     }
 
-    onVideoUrlChange(url);
     if (assetData && !forcedClearingAsset && typeof assetData === "object") {
+      onVideoUrlChange(url);
       onVideoAssetChange({
         url: assetData.url || url || videoAsset?.url || "",
         storageKey: assetData.storageKey || videoAsset?.storageKey || undefined,
@@ -1689,6 +1694,7 @@ function LessonVideoSection({ videoUrl, videoAsset, onVideoUrlChange, onVideoAss
         originalName: assetData.originalName || videoAsset?.originalName || undefined,
       });
     } else {
+      onVideoUrlChange(url);
       onVideoAssetChange(undefined);
     }
   };
@@ -1712,7 +1718,7 @@ function LessonVideoSection({ videoUrl, videoAsset, onVideoUrlChange, onVideoAss
 
       <div className="grid gap-3">
         <LessonVideoUploader
-          value={videoUrl || ""}
+          value={displayValueUrl || ""}
           asset={videoAsset}
           onChange={handleCombinedChange}
           compact
@@ -2124,11 +2130,13 @@ function CoursePromoVideoSection({
   errors,
 }) {
   const hasAsset = promoVideoAsset && typeof promoVideoAsset === "object" && (promoVideoAsset.url || promoVideoAsset.storageKey);
-  const hasUrl = Boolean(promoVideo);
-  const onlyExternal = hasUrl && !hasAsset && isExternalVideoOnly({ url: String(promoVideo || ""), mimeType: undefined });
+  const rawUrl = String(promoVideo || "").trim();
+  const urlSource = rawUrl || (hasAsset ? String(promoVideoAsset?.url || "") : "");
+  const displayValueUrl = urlSource ? (isEmbedUrl(urlSource) ? toEmbedUrl(urlSource) : urlSource) : "";
+  const onlyExternal = Boolean(displayValueUrl) && !hasAsset && isExternalVideoOnly({ url: displayValueUrl, mimeType: undefined });
   const state = hasAsset
     ? { tone: resourceStatusBadge(promoVideoAsset.status || "ready").tone, label: "Asset subido" }
-    : hasUrl
+    : displayValueUrl
       ? { tone: resourceStatusBadge("pending").tone, label: onlyExternal ? "URL externa" : "URL activa" }
       : null;
 
@@ -2500,8 +2508,22 @@ function CurriculumField({ curriculum, onChange, error }) {
     const prev = lessons[lessonIndex] || { id: createEntityId("lesson") };
     const isNew = !lessons[lessonIndex];
 
-    const next = { ...prev, ...patch };
+    const prevAssetIsObject = prev?.videoAsset && typeof prev.videoAsset === "object" && (prev.videoAsset.url || prev.videoAsset.storageKey);
+    const incomingAssetObject =
+      patch &&
+      Object.prototype.hasOwnProperty.call(patch, "videoAsset") &&
+      patch.videoAsset &&
+      typeof patch.videoAsset === "object" &&
+      (patch.videoAsset.url || patch.videoAsset.storageKey);
+    const clearingAsset =
+      patch && Object.prototype.hasOwnProperty.call(patch, "videoAsset") && (patch.videoAsset === null || patch.videoAsset === undefined);
 
+    let next = { ...prev, ...patch };
+    if (incomingAssetObject) {
+      next.videoAsset = { ...(prevAssetIsObject ? prev.videoAsset : {}), ...patch.videoAsset };
+    } else if (clearingAsset) {
+      next.videoAsset = undefined;
+    }
     const clearingVideoUrl =
       Object.prototype.hasOwnProperty.call(patch, "videoUrl") && !String(patch.videoUrl || "").trim();
     const clearingVideoAsset =
@@ -2536,6 +2558,9 @@ function CurriculumField({ curriculum, onChange, error }) {
     safeNext.resources = Array.isArray(safeNext.resources) ? safeNext.resources : [];
     if (!Number.isFinite(Number(safeNext.durationMinutes)) || Number(safeNext.durationMinutes) <= 0) {
       safeNext.durationMinutes = undefined;
+    }
+    if (!safeNext.videoUrl) {
+      safeNext.videoAsset = undefined;
     }
 
     if (isNew) {
