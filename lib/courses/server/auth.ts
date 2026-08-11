@@ -64,6 +64,7 @@ export async function requireCourseActor(request: Request): Promise<CourseActor>
       email: String(decoded?.email || "admin@admin.com"),
       displayName: "Dev Admin",
       role: "admin",
+      isMember: false,
       isActive: true,
       accountStatus: "active",
       createdAt: new Date().toISOString(),

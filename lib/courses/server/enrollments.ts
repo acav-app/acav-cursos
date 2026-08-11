@@ -1,5 +1,7 @@
+import { z } from "zod";
 import { getAdminDb } from "@/lib/firebase-admin";
 import { COURSE_COLLECTIONS } from "@/lib/courses/collections";
+import { MAX_SCORE_ATTACHMENT_SIZE_BYTES } from "@/lib/courses/constants";
 import {
   EnrollmentCreateSchema,
   EnrollmentUpdateSchema,
@@ -19,6 +21,9 @@ import {
   notifyStudentPaymentApproved,
   notifyStudentPaymentRejected,
   notifyStudentReceiptRequested,
+  notifyStudentCourseApproved,
+  notifyStudentCourseReproved,
+  notifyStudentCourseSuspended,
 } from "@/lib/courses/server/email";
 
 function normalizeEnrollment(enrollment: Record<string, any>) {
@@ -198,6 +203,12 @@ export async function createEnrollment(input: unknown) {
       portfolioUrl: parsed.portfolioUrl,
       message: parsed.message,
       status: nextEnrollmentStatus,
+      courseStatus: parsed.courseStatus || "in_progress",
+      manualScore: parsed.manualScore,
+      scoreAttachments: parsed.scoreAttachments?.length ? parsed.scoreAttachments : undefined,
+      courseStatusReason: parsed.courseStatusReason,
+      courseStatusUpdatedAt: parsed.courseStatusUpdatedAt,
+      courseStatusUpdatedBy: parsed.courseStatusUpdatedBy,
       paymentId: payment?.id || undefined,
       paymentStatus: nextPaymentStatus,
       paymentAmount: paymentAmount || undefined,
@@ -234,6 +245,7 @@ export async function updateEnrollment(id: string, input: unknown) {
   const reviewNow = nowIso();
   const nextStatus = parsed.status || current.status;
   const nextPaymentStatus = parsed.paymentStatus || current.paymentStatus || current.payment?.status || "";
+  const courseStatusChanged = Boolean(parsed.courseStatus && parsed.courseStatus !== String(current.courseStatus || "").trim());
 
   const payload: EnrollmentUpdateInput & {
     updatedAt: string;
@@ -252,6 +264,8 @@ export async function updateEnrollment(id: string, input: unknown) {
       (nextStatus === "active" && nextPaymentStatus === "approved"
         ? current.approvedBy || parsed.reviewedBy || undefined
         : undefined),
+    courseStatusUpdatedAt: courseStatusChanged ? reviewNow : parsed.courseStatusUpdatedAt,
+    courseStatusUpdatedBy: courseStatusChanged ? parsed.reviewedBy || parsed.courseStatusUpdatedBy : parsed.courseStatusUpdatedBy,
     updatedAt: reviewNow,
   });
 
@@ -374,4 +388,151 @@ export async function bulkPreselectInstitutionEnrollments(input: {
     updatedEnrollments: eligibleDocs.length,
     alreadyProcessedEnrollments: enrollments.length - eligibleDocs.length,
   };
+}
+
+function randomCertificateId(prefix = "acav-cert") {
+  const rnd = Math.random().toString(36).slice(2, 10);
+  const t = Date.now().toString(36);
+  return `${prefix}-${t}-${rnd}`.toLowerCase();
+}
+
+export async function updateEnrollmentCourseStatus(
+  id: string,
+  input: unknown
+) {
+  const schema = z
+    .object({
+      courseStatus: z.enum(["in_progress", "approved", "reproved", "suspended"]),
+      manualScore: z.number().min(0).max(100).optional(),
+      scoreAttachments: z
+        .array(
+          z.object({
+            id: z.string().min(1),
+            name: z.string().min(1),
+            url: z.string().optional(),
+            storagePath: z.string().optional(),
+            mimeType: z.string().min(1),
+            sizeBytes: z.number().nonnegative().max(MAX_SCORE_ATTACHMENT_SIZE_BYTES),
+            uploadedByUid: z.string().optional(),
+            uploadedAt: z.string().optional(),
+          })
+        )
+        .optional(),
+      courseStatusReason: z.string().optional(),
+      reviewedBy: z.string().optional(),
+    })
+    .strict();
+  const parsed = schema.parse(input);
+  const db = getAdminDb();
+  const ref = db.collection(COURSE_COLLECTIONS.enrollments).doc(String(id));
+  const snap = await ref.get();
+  if (!snap.exists) throw err(404, "enrollment_not_found");
+  const current = toEnrollment(snap);
+  const reviewNow = nowIso();
+
+  const basePatch = removeUndefined({
+    courseStatus: parsed.courseStatus,
+    manualScore: parsed.manualScore,
+    scoreAttachments: parsed.scoreAttachments,
+    courseStatusReason: parsed.courseStatusReason,
+    courseStatusUpdatedAt: reviewNow,
+    courseStatusUpdatedBy: parsed.reviewedBy || current.courseStatusUpdatedBy,
+    updatedAt: reviewNow,
+  });
+
+  const patch: Record<string, any> = { ...basePatch };
+
+  if (parsed.courseStatus === "approved") {
+    const existingGradebook = Array.isArray(current.gradebook) ? [...current.gradebook] : [];
+    const updatedGradebook = existingGradebook.length
+      ? existingGradebook.map((item) => ({
+          ...item,
+          status: "passed" as const,
+          score:
+            typeof parsed.manualScore === "number"
+              ? parsed.manualScore
+              : typeof item.maxScore === "number"
+                ? item.maxScore
+                : 100,
+          reviewedAt: item.reviewedAt || reviewNow,
+          feedback: item.feedback || "Aprobado por administración.",
+        }))
+      : [
+          {
+            sourceType: "final_evaluation" as const,
+            sourceId: `admin-aprobacion-${String(id)}`,
+            title: "Evaluación final (aprobación manual)",
+            score: typeof parsed.manualScore === "number" ? parsed.manualScore : 100,
+            maxScore: 100,
+            weight: 1,
+            status: "passed" as const,
+            reviewedAt: reviewNow,
+            feedback: "Aprobado por administración.",
+          },
+        ];
+    patch.gradebook = updatedGradebook;
+    patch.progress = 100;
+    patch.certificateId =
+      String(current.certificateId || "").trim() || randomCertificateId();
+    patch.certificateIssuedAt = current.certificateIssuedAt || reviewNow;
+  } else if (parsed.courseStatus === "reproved") {
+    const existingGradebook = Array.isArray(current.gradebook) ? [...current.gradebook] : [];
+    const updatedGradebook = existingGradebook.length
+      ? existingGradebook.map((item) => ({
+          ...item,
+          status: "failed" as const,
+          score:
+            typeof parsed.manualScore === "number"
+              ? parsed.manualScore
+              : typeof item.maxScore === "number"
+                ? Math.min(parsed.manualScore ?? item.score ?? 0, item.maxScore - 1)
+                : typeof item.score === "number"
+                  ? Math.min(item.score, 59)
+                  : 59,
+          reviewedAt: item.reviewedAt || reviewNow,
+          feedback: item.feedback || "Desaprobado por administración.",
+        }))
+      : [
+          {
+            sourceType: "final_evaluation" as const,
+            sourceId: `admin-desaprobacion-${String(id)}`,
+            title: "Evaluación final (resultado)",
+            score: typeof parsed.manualScore === "number" ? parsed.manualScore : 59,
+            maxScore: 100,
+            weight: 1,
+            status: "failed" as const,
+            reviewedAt: reviewNow,
+            feedback: "Desaprobado por administración.",
+          },
+        ];
+    patch.gradebook = updatedGradebook;
+  }
+
+  const merged = normalizeEnrollment(removeUndefined(patch));
+  await ref.set(merged, { merge: true });
+  const updatedSnap = await ref.get();
+  const updated = toEnrollment(updatedSnap);
+
+  try {
+    if (parsed.courseStatus === "approved") {
+      await notifyStudentCourseApproved(updated, {
+        score: typeof parsed.manualScore === "number" ? parsed.manualScore : undefined,
+        reason: parsed.courseStatusReason,
+      }).catch(() => null);
+    } else if (parsed.courseStatus === "reproved") {
+      await notifyStudentCourseReproved(updated, {
+        score: typeof parsed.manualScore === "number" ? parsed.manualScore : undefined,
+        reason: parsed.courseStatusReason,
+        retakeAvailable: true,
+      }).catch(() => null);
+    } else if (parsed.courseStatus === "suspended") {
+      await notifyStudentCourseSuspended(updated, {
+        reason: parsed.courseStatusReason,
+      }).catch(() => null);
+    }
+  } catch {
+    // Las notificaciones no deben romper el flujo.
+  }
+
+  return updated;
 }

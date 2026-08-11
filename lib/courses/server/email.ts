@@ -414,3 +414,123 @@ export async function sendInstitutionWelcomeEmail(input: {
     text,
   });
 }
+
+export async function notifyStudentCourseApproved(
+  enrollment: any,
+  options: { score?: number; reason?: string } = {}
+) {
+  const settings = await getCourseSettings();
+  if (!settings.notifyStudentOnEnrollment) return { ok: true, skipped: true };
+  const to = normalizeEmail(enrollment?.email);
+  if (!to) return { ok: true, skipped: true };
+
+  const studentName =
+    [enrollment?.firstName, enrollment?.lastName].filter(Boolean).join(" ").trim() ||
+    enrollment?.studentName ||
+    "";
+  const title = String(enrollment.courseTitle || enrollment.jobTitle || "").trim();
+  const score = typeof options.score === "number" ? `Puntaje final: ${options.score}/100.` : "";
+  const subject = `Cursada aprobada — ${title}`;
+  const text = [
+    studentName ? `Hola ${studentName}.` : "Hola.",
+    "",
+    `¡Felicitaciones! Tu cursada de «${title}» fue marcada como aprobada.`,
+    score,
+    "",
+    "Tu certificado oficial ya está disponible para descargar desde tu panel en la sección Mis Cursos:",
+    `${String(process.env.NEXT_PUBLIC_SITE_URL || "")}/dashboard/mis-cursos/${enrollment.id}`,
+    "",
+    "Cualquier duda respondé a este correo.",
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  return sendCourseEmail({
+    type: "course-approved-student",
+    to,
+    subject,
+    text,
+    relatedEnrollmentId: enrollment.id,
+    relatedCourseId: enrollment.courseId || enrollment.jobId,
+  });
+}
+
+export async function notifyStudentCourseReproved(
+  enrollment: any,
+  options: { score?: number; reason?: string; retakeAvailable?: boolean } = {}
+) {
+  const settings = await getCourseSettings();
+  if (!settings.notifyStudentOnEnrollment) return { ok: true, skipped: true };
+  const to = normalizeEmail(enrollment?.email);
+  if (!to) return { ok: true, skipped: true };
+
+  const studentName =
+    [enrollment?.firstName, enrollment?.lastName].filter(Boolean).join(" ").trim() ||
+    enrollment?.studentName ||
+    "";
+  const title = String(enrollment.courseTitle || enrollment.jobTitle || "").trim();
+  const score = typeof options.score === "number" ? `Puntaje final: ${options.score}/100.` : "";
+  const subject = `Resultado de cursada — ${title}`;
+  const text = [
+    studentName ? `Hola ${studentName}.` : "Hola.",
+    "",
+    `Te informamos que tu cursada de «${title}» fue marcada como desaprobada.`,
+    score,
+    options.reason ? `Motivo: ${options.reason}` : "",
+    options.retakeAvailable
+      ? "Tenés disponible una nueva instancia para recursar. Comunicate con administración o revisa tu panel para más información."
+      : "Si querés conocer las instancias disponibles respondé a este correo.",
+    "",
+    "Podés revisar el detalle desde tu panel:",
+    `${String(process.env.NEXT_PUBLIC_SITE_URL || "")}/dashboard/mis-cursos/${enrollment.id}`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  return sendCourseEmail({
+    type: "course-reproved-student",
+    to,
+    subject,
+    text,
+    relatedEnrollmentId: enrollment.id,
+    relatedCourseId: enrollment.courseId || enrollment.jobId,
+  });
+}
+
+export async function notifyStudentCourseSuspended(
+  enrollment: any,
+  options: { reason?: string } = {}
+) {
+  const settings = await getCourseSettings();
+  if (!settings.notifyStudentOnEnrollment) return { ok: true, skipped: true };
+  const to = normalizeEmail(enrollment?.email);
+  if (!to) return { ok: true, skipped: true };
+
+  const studentName =
+    [enrollment?.firstName, enrollment?.lastName].filter(Boolean).join(" ").trim() ||
+    enrollment?.studentName ||
+    "";
+  const title = String(enrollment.courseTitle || enrollment.jobTitle || "").trim();
+  const subject = `Cursada suspendida temporalmente — ${title}`;
+  const text = [
+    studentName ? `Hola ${studentName}.` : "Hola.",
+    "",
+    `Te informamos que el acceso al curso «${title}» fue suspendido temporalmente.`,
+    options.reason ? `Motivo: ${options.reason}` : "",
+    "",
+    "Para regularizar tu situación, por favor respondé a este correo con los datos que te solicitamos o revisa las instrucciones enviadas por la institución.",
+    "",
+    "Mientras la suspensión esté activa no podrás acceder al contenido del campus.",
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  return sendCourseEmail({
+    type: "course-suspended-student",
+    to,
+    subject,
+    text,
+    relatedEnrollmentId: enrollment.id,
+    relatedCourseId: enrollment.courseId || enrollment.jobId,
+  });
+}

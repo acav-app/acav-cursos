@@ -23,9 +23,22 @@ const schema = z
   .object({
     firstName: z.string().min(2, { message: "El nombre es obligatorio." }),
     lastName: z.string().min(2, { message: "El apellido es obligatorio." }),
+    documentNumber: z.string().min(4, { message: "El DNI es obligatorio." }),
     email: z.string().email({ message: "El email es inválido." }),
+    contactEmail: z.string().optional().refine(
+      (value) => {
+        if (!value) return true;
+        const valid = z.string().email().safeParse(value);
+        return valid.success;
+      },
+      { message: "El email de contacto es inválido." }
+    ),
     password: z.string().min(6, { message: "La contraseña debe tener al menos 6 caracteres." }),
     confirmPassword: z.string().min(6, { message: "Repetí la contraseña." }),
+    agency: z.string().optional(),
+    employeeFileNumber: z.string().optional(),
+    phone: z.string().optional(),
+    isMember: z.boolean().default(false),
     acceptedTerms: z.boolean().refine((value) => value === true, {
       message: "Debes aceptar los términos y condiciones.",
     }),
@@ -77,9 +90,15 @@ const RegForm = ({
     defaultValues: {
       firstName: "",
       lastName: "",
+      documentNumber: "",
       email: "",
+      contactEmail: "",
       password: "",
       confirmPassword: "",
+      agency: "",
+      employeeFileNumber: "",
+      phone: "",
+      isMember: false,
       acceptedTerms: false,
     },
   });
@@ -90,8 +109,14 @@ const RegForm = ({
         const payload = {
           firstName: String(data.firstName || "").trim(),
           lastName: String(data.lastName || "").trim(),
+          documentNumber: String(data.documentNumber || "").trim(),
           email: String(data.email || "").trim().toLowerCase(),
+          contactEmail: String(data.contactEmail || "").trim().toLowerCase() || undefined,
           password: data.password,
+          agency: String(data.agency || "").trim() || undefined,
+          employeeFileNumber: String(data.employeeFileNumber || "").trim() || undefined,
+          phone: String(data.phone || "").trim() || undefined,
+          isMember: Boolean(data.isMember),
           acceptedTerms: data.acceptedTerms,
         };
         setSubmitError("");
@@ -198,6 +223,25 @@ const RegForm = ({
         </div>
 
         <div>
+          <Label htmlFor="documentNumber" className="mb-2 font-medium text-default-700">
+            DNI <span className="text-destructive">*</span>
+          </Label>
+          <Input
+            disabled={isPending}
+            {...register("documentNumber")}
+            type="text"
+            id="documentNumber"
+            inputMode="numeric"
+            placeholder="Ej: 12345678"
+            className={cn("rounded-2xl", {
+              "border-destructive": errors.documentNumber,
+            })}
+            size="xl"
+          />
+          {errors.documentNumber && <div className="mt-2 text-sm text-destructive">{errors.documentNumber.message}</div>}
+        </div>
+
+        <div>
           <Label htmlFor="email" className="mb-2 font-medium text-default-700">
             Email
           </Label>
@@ -217,8 +261,99 @@ const RegForm = ({
         </div>
 
         <div>
+          <Label htmlFor="contactEmail" className="mb-2 font-medium text-default-700">
+            Email de contacto
+          </Label>
+          <Input
+            disabled={isPending}
+            {...register("contactEmail", {
+              setValueAs: (value) => (value ? String(value).trim().toLowerCase() : ""),
+            })}
+            type="email"
+            id="contactEmail"
+            placeholder="Opcional. Si es diferente al email de inicio."
+            className={cn("rounded-2xl", {
+              "border-destructive": errors.contactEmail,
+            })}
+            size="xl"
+          />
+          {errors.contactEmail && <div className="mt-2 text-sm text-destructive">{errors.contactEmail.message}</div>}
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-2">
+          <div>
+            <Label htmlFor="phone" className="mb-2 font-medium text-default-700">
+              Teléfono
+            </Label>
+            <Input
+              disabled={isPending}
+              {...register("phone")}
+              type="tel"
+              id="phone"
+              placeholder="Opcional"
+              className={cn("rounded-2xl", {
+                "border-destructive": errors.phone,
+              })}
+              size="xl"
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="agency" className="mb-2 font-medium text-default-700">
+              Agencia
+            </Label>
+            <Input
+              disabled={isPending}
+              {...register("agency")}
+              type="text"
+              id="agency"
+              placeholder="Opcional"
+              className={cn("rounded-2xl", {
+                "border-destructive": errors.agency,
+              })}
+              size="xl"
+            />
+          </div>
+        </div>
+
+        <div>
+          <Label htmlFor="employeeFileNumber" className="mb-2 font-medium text-default-700">
+            Legajo
+          </Label>
+          <Input
+            disabled={isPending}
+            {...register("employeeFileNumber")}
+            type="text"
+            id="employeeFileNumber"
+            placeholder="Opcional"
+            className={cn("rounded-2xl", {
+              "border-destructive": errors.employeeFileNumber,
+            })}
+            size="xl"
+          />
+        </div>
+
+        <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-5 dark:border-slate-800/80 dark:bg-slate-900/30">
+          <div className="flex items-start gap-3">
+            <Checkbox
+              size="sm"
+              className="mt-1 border-default-300 dark:border-slate-700"
+              id="isMember"
+              checked={Boolean(watch("isMember"))}
+              onCheckedChange={(value) => setValue("isMember", Boolean(value), { shouldValidate: true })}
+            />
+            <div>
+              <Label htmlFor="isMember" className="cursor-pointer text-sm font-medium text-default-700">
+                Socio ACAV
+              </Label>
+              <p className="mt-1 text-xs text-muted-foreground">Marca esta opción si eres socio registrado.</p>
+            </div>
+          </div>
+        </div>
+
+        <div>
           <Label htmlFor="password" className="mb-2 font-medium text-default-700">
-            Contraseña
+            Contraseña definitiva
           </Label>
           <div className="relative">
             <Input

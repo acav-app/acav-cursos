@@ -1,10 +1,12 @@
 "use client";
 
-import { useRef } from "react";
-import { Award, Download, Printer, X } from "lucide-react";
+import { useRef, useState } from "react";
+import { Award, Download, X, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+// @ts-ignore - html2pdf.js no distribuye tipos oficiales
+import html2pdf from "html2pdf.js";
 
 export interface CourseCertificateData {
   studentName: string;
@@ -27,6 +29,16 @@ interface CourseCertificateProps {
   data: CourseCertificateData;
 }
 
+function slugify(value: string): string {
+  return String(value || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 48);
+}
+
 function formatDateLong(iso: string): string {
   try {
     const d = new Date(String(iso || ""));
@@ -43,52 +55,57 @@ function formatDateLong(iso: string): string {
 
 export default function CourseCertificate({ open, onClose, data }: CourseCertificateProps) {
   const printRef = useRef<HTMLDivElement>(null);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
 
-  function handlePrint() {
-    if (!printRef.current) return;
-    const printWindow = window.open("", "_blank", "width=1200,height=850");
-    if (!printWindow) return;
-    const content = printRef.current.outerHTML;
-    const styles = Array.from(document.querySelectorAll("link[rel=stylesheet], style"))
-      .map((node) => node.outerHTML)
-      .join("\n");
-    printWindow.document.write(`
-      <!doctype html>
-      <html>
-        <head>
-          <meta charset="utf-8" />
-          <title>Certificado - ${data.courseTitle || "Curso"}</title>
-          ${styles}
-          <style>
-            @media print {
-              body { margin: 0; }
-              @page { size: landscape; margin: 0; }
-            }
-            body { font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; }
-          </style>
-        </head>
-        <body class="bg-white">
-          ${content}
-          <script>
-            (function(){
-              window.onload = function() {
-                setTimeout(function() {
-                  window.focus();
-                  window.print();
-                  window.close();
-                }, 450);
-              };
-            })();
-          <\/script>
-        </body>
-      </html>
-    `);
-    printWindow.document.close();
+  function buildFileName(): string {
+    const id = slugify(data.certificateId) || "certificado";
+    const curso = slugify(data.courseTitle) || "curso";
+    const alumno = slugify(data.studentName) || "alumno";
+    return `${id}-${curso}-${alumno}.pdf`;
   }
 
-  function handleDownloadPng() {
-    if (!printRef.current) return;
-    handlePrint();
+  async function handleDownloadPdf() {
+    if (!printRef.current || downloadingPdf) return;
+    try {
+      setDownloadingPdf(true);
+      const worker = html2pdf().set({
+        margin: 0,
+        filename: buildFileName(),
+        image: { type: "jpeg", quality: 0.98 },
+        html2canvas: {
+          scale: 2,
+          useCORS: true,
+          allowTaint: true,
+          backgroundColor: "#ffffff",
+          letterRendering: true,
+        },
+        jsPDF: {
+          unit: "mm",
+          format: "a4",
+          orientation: "landscape",
+          hotfixes: ["px_scaling"],
+          compress: true,
+        },
+        pagebreak: { mode: ["avoid-all", "css", "legacy"] },
+      });
+      await worker.from(printRef.current).outputPdf("blob").then((blob: Blob) => {
+        if (typeof window === "undefined") return;
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = buildFileName();
+        a.rel = "noopener";
+        a.target = "_self";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 1500);
+      });
+    } catch (err) {
+      console.error("Fallo al generar el PDF del certificado:", err);
+    } finally {
+      setDownloadingPdf(false);
+    }
   }
 
   return (
@@ -107,20 +124,21 @@ export default function CourseCertificate({ open, onClose, data }: CourseCertifi
           <div className="flex items-center gap-2">
             <Button
               type="button"
-              variant="outline"
-              className="rounded-2xl border-slate-200"
-              onClick={handlePrint}
+              className="rounded-2xl bg-[#6D4CFF] hover:bg-[#5E3EF0] disabled:opacity-70 disabled:cursor-not-allowed"
+              onClick={handleDownloadPdf}
+              disabled={downloadingPdf}
             >
-              <Printer className="mr-2 h-4 w-4" />
-              Imprimir
-            </Button>
-            <Button
-              type="button"
-              className="rounded-2xl bg-[#6D4CFF] hover:bg-[#5E3EF0]"
-              onClick={handleDownloadPng}
-            >
-              <Download className="mr-2 h-4 w-4" />
-              Descargar PDF
+              {downloadingPdf ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Generando PDF…
+                </>
+              ) : (
+                <>
+                  <Download className="mr-2 h-4 w-4" />
+                  Descargar PDF
+                </>
+              )}
             </Button>
             <Button
               type="button"
@@ -128,6 +146,7 @@ export default function CourseCertificate({ open, onClose, data }: CourseCertifi
               className="rounded-2xl text-slate-500"
               onClick={onClose}
               aria-label="Cerrar certificado"
+              disabled={downloadingPdf}
             >
               <X className="h-4 w-4" />
             </Button>

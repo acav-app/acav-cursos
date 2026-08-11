@@ -1,4 +1,11 @@
-import { BadgeCheck, Ban, CircleDashed, Clock3, FileSearch, MessageCircle, Users2 } from "lucide-react";
+import { BadgeCheck, Ban, CircleDashed, CircleDot, Clock3, FileSearch, MessageCircle, PauseCircle, Users2, XOctagon } from "lucide-react";
+
+export const COURSE_COMPLETION_STATUS_LABELS = {
+  in_progress: { title: "En curso", description: "El alumno se encuentra cursando la materia.", tone: "info", Icon: CircleDot },
+  approved: { title: "Aprobada", description: "Cursada aprobada. Certificado disponible.", tone: "success", Icon: BadgeCheck },
+  reproved: { title: "Desaprobada", description: "Cursada no superada.", tone: "destructive", Icon: XOctagon },
+  suspended: { title: "Suspendida", description: "Acceso temporalmente suspendido.", tone: "warning", Icon: PauseCircle },
+};
 
 export const EDUCATIONAL_STATUS_LABELS = {
   started: { title: "Iniciada", description: "El alumno comenzó el proceso de inscripción.", tone: "secondary", Icon: CircleDashed },
@@ -49,6 +56,16 @@ export function resolveEmploymentStatusMeta(value) {
   return EMPLOYMENT_STATUS_LABELS[key] || {
     title: key || "Sin definir",
     description: "Etapa de la postulación dentro del proceso.",
+    tone: "secondary",
+    Icon: CircleDashed,
+  };
+}
+
+export function resolveCourseCompletionStatusMeta(value) {
+  const key = String(value || "").trim() || "in_progress";
+  return COURSE_COMPLETION_STATUS_LABELS[key] || {
+    title: key || "Sin definir",
+    description: "Estado de la cursada.",
     tone: "secondary",
     Icon: CircleDashed,
   };

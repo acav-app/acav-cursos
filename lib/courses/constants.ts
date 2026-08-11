@@ -49,6 +49,24 @@ export const PAYMENT_STATUSES = [
   "rejected",
 ] as const;
 
+export const COURSE_COMPLETION_STATUSES = [
+  "in_progress",
+  "approved",
+  "reproved",
+  "suspended",
+] as const;
+
+export const ALLOWED_SCORE_ATTACHMENT_MIME_TYPES = [
+  "application/pdf",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "image/png",
+  "image/jpeg",
+  "image/jpg",
+] as const;
+
+export const MAX_SCORE_ATTACHMENT_SIZE_BYTES = 12 * 1024 * 1024;
+
 export const PAYMENT_METHODS = [
   "transferencia",
   "manual",

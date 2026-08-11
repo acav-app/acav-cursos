@@ -1,8 +1,10 @@
 import { z } from "zod";
 import {
+  ALLOWED_SCORE_ATTACHMENT_MIME_TYPES,
   COURSE_AREAS,
   COURSE_CATEGORIES,
   COURSE_CLOSE_REASONS,
+  COURSE_COMPLETION_STATUSES,
   COURSE_LANGUAGES,
   COURSE_LEVELS,
   COURSE_MODALITIES,
@@ -15,6 +17,7 @@ import {
   COURSE_VIDEO_MAX_SIZE_BYTES,
   ENROLLMENT_STATUSES,
   INSTITUTION_STATUSES,
+  MAX_SCORE_ATTACHMENT_SIZE_BYTES,
   PAYMENT_METHODS,
   PAYMENT_STATUSES,
   PORTAL_ROLES,
@@ -204,6 +207,18 @@ export const CourseStatusSchema = z.enum(COURSE_STATUSES);
 export const EnrollmentStatusSchema = z.enum(ENROLLMENT_STATUSES);
 export const PaymentStatusSchema = z.enum(PAYMENT_STATUSES);
 export const PaymentMethodSchema = z.enum(PAYMENT_METHODS);
+export const CourseCompletionStatusSchema = z.enum(COURSE_COMPLETION_STATUSES);
+
+export const ScoreAttachmentSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  url: OptionalUrl.optional(),
+  storagePath: OptionalString.optional(),
+  mimeType: z.enum(ALLOWED_SCORE_ATTACHMENT_MIME_TYPES),
+  sizeBytes: z.number().nonnegative().max(MAX_SCORE_ATTACHMENT_SIZE_BYTES),
+  uploadedByUid: OptionalString.optional(),
+  uploadedAt: CourseIsoDateString.optional(),
+});
 
 export const PortalUserProfileSchema = z.object({
   uid: z.string().min(1),
@@ -211,7 +226,13 @@ export const PortalUserProfileSchema = z.object({
   displayName: OptionalString.optional(),
   firstName: OptionalString.optional(),
   lastName: OptionalString.optional(),
+  fullName: OptionalString.optional(),
+  documentNumber: OptionalString.optional(),
+  agency: OptionalString.optional(),
+  employeeFileNumber: OptionalString.optional(),
   phone: OptionalString.optional(),
+  contactEmail: OptionalEmail.optional(),
+  isMember: z.boolean().optional().default(false),
   city: OptionalString.optional(),
   province: OptionalString.optional(),
   avatar: OptionalUrl.optional(),
@@ -406,6 +427,12 @@ const EnrollmentBaseSchema = z.object({
   paymentReceiptUrl: OptionalUrl.optional(),
   paymentAmount: OptionalNumber.optional(),
   paymentCurrency: OptionalString.optional(),
+  courseStatus: CourseCompletionStatusSchema.optional(),
+  manualScore: z.number().min(0).max(100).optional(),
+  scoreAttachments: z.array(ScoreAttachmentSchema).optional(),
+  courseStatusReason: OptionalString.optional(),
+  courseStatusUpdatedAt: CourseIsoDateString.optional(),
+  courseStatusUpdatedBy: OptionalString.optional(),
   progress: z.number().min(0).max(100).optional(),
   lessonProgress: z
     .array(
@@ -466,6 +493,12 @@ export const EnrollmentUpdateSchema = z.object({
   status: EnrollmentStatusSchema.optional(),
   paymentStatus: PaymentStatusSchema.optional(),
   message: OptionalString.optional(),
+  courseStatus: CourseCompletionStatusSchema.optional(),
+  manualScore: z.number().min(0).max(100).optional(),
+  scoreAttachments: z.array(ScoreAttachmentSchema).optional(),
+  courseStatusReason: OptionalString.optional(),
+  courseStatusUpdatedAt: CourseIsoDateString.optional(),
+  courseStatusUpdatedBy: OptionalString.optional(),
   progress: z.number().min(0).max(100).optional(),
   lessonProgress: z
     .array(

@@ -13,6 +13,13 @@ const PortalUserCreateSchema = z.object({
   displayName: z.string().min(1).optional(),
   firstName: z.string().min(1).optional(),
   lastName: z.string().min(1).optional(),
+  fullName: z.string().min(1).optional(),
+  documentNumber: z.string().min(1).optional(),
+  agency: z.string().min(1).optional(),
+  employeeFileNumber: z.string().min(1).optional(),
+  phone: z.string().min(1).optional(),
+  contactEmail: z.string().email().optional(),
+  isMember: z.boolean().optional(),
   password: z.string().min(6).optional(),
   role: PortalRoleSchema,
   companyId: z.string().min(1).optional(),
@@ -24,11 +31,18 @@ const PortalUserUpdateSchema = z.object({
   displayName: z.string().min(1).optional(),
   firstName: z.string().min(1).optional(),
   lastName: z.string().min(1).optional(),
+  fullName: z.string().min(1).optional(),
+  documentNumber: z.string().min(1).optional(),
+  agency: z.string().min(1).optional(),
+  employeeFileNumber: z.string().min(1).optional(),
   phone: z.string().min(1).optional(),
+  contactEmail: z.string().email().optional(),
+  isMember: z.boolean().optional(),
   city: z.string().min(1).optional(),
   province: z.string().min(1).optional(),
   avatar: z.string().url().optional(),
   role: PortalRoleSchema.optional(),
+  password: z.string().min(6).optional(),
   companyId: z.string().min(1).optional(),
   institutionId: z.string().min(1).optional(),
   isActive: z.boolean().optional(),
@@ -108,6 +122,13 @@ export async function createPortalUserProfile(input: unknown) {
   const fullName = buildDisplayName(parsed);
   const firstName = String(parsed.firstName || "").trim();
   const lastName = String(parsed.lastName || "").trim();
+  const documentNumber = String(parsed.documentNumber || "").trim() || undefined;
+  const agency = String(parsed.agency || "").trim() || undefined;
+  const employeeFileNumber = String(parsed.employeeFileNumber || "").trim() || undefined;
+  const phone = String(parsed.phone || "").trim() || undefined;
+  const contactEmailRaw = String(parsed.contactEmail || "").trim() || undefined;
+  const contactEmail = contactEmailRaw || email;
+  const isMember = typeof parsed.isMember === "boolean" ? parsed.isMember : false;
   let resolved: { uid: string; displayName?: string; firstName?: string; lastName?: string } | undefined;
 
   if (parsed.uid) {
@@ -183,6 +204,15 @@ export async function createPortalUserProfile(input: unknown) {
       }) || undefined,
     firstName: firstName || resolved?.firstName || undefined,
     lastName: lastName || resolved?.lastName || undefined,
+    fullName:
+      [firstName || resolved?.firstName || "", lastName || resolved?.lastName || ""].filter(Boolean).join(" ").trim() ||
+      undefined,
+    documentNumber,
+    agency,
+    employeeFileNumber,
+    phone,
+    contactEmail,
+    isMember,
     role,
     institutionId: institutionId || undefined,
     institutionName: institutionName || undefined,
@@ -231,6 +261,9 @@ export async function updatePortalUserProfile(uid: string, input: unknown) {
 
   const nextFirstName = parsed.firstName ? String(parsed.firstName).trim() : String(current.firstName || "").trim();
   const nextLastName = parsed.lastName ? String(parsed.lastName).trim() : String(current.lastName || "").trim();
+  const nextFullName = parsed.fullName
+    ? String(parsed.fullName).trim()
+    : [nextFirstName, nextLastName].filter(Boolean).join(" ").trim() || String(current.fullName || "").trim();
   const nextDisplayName = buildDisplayName({
     displayName: parsed.displayName ? String(parsed.displayName).trim() : String(current.displayName || "").trim(),
     firstName: nextFirstName,
@@ -248,7 +281,13 @@ export async function updatePortalUserProfile(uid: string, input: unknown) {
     displayName: nextDisplayName || undefined,
     firstName: nextFirstName || undefined,
     lastName: nextLastName || undefined,
+    fullName: nextFullName || undefined,
+    documentNumber: parsed.documentNumber ? String(parsed.documentNumber).trim() : undefined,
+    agency: parsed.agency ? String(parsed.agency).trim() : undefined,
+    employeeFileNumber: parsed.employeeFileNumber ? String(parsed.employeeFileNumber).trim() : undefined,
     phone: parsed.phone ? String(parsed.phone).trim() : undefined,
+    contactEmail: parsed.contactEmail ? String(parsed.contactEmail).trim() : undefined,
+    isMember: typeof parsed.isMember === "boolean" ? parsed.isMember : undefined,
     city: parsed.city ? String(parsed.city).trim() : undefined,
     province: parsed.province ? String(parsed.province).trim() : undefined,
     avatar: parsed.avatar ? String(parsed.avatar).trim() : undefined,
@@ -262,13 +301,17 @@ export async function updatePortalUserProfile(uid: string, input: unknown) {
   });
 
   await ref.set(payload, { merge: true });
-  await getAdminAuth().updateUser(
-    String(uid),
-    removeUndefined({
-      displayName: nextDisplayName || undefined,
-      disabled: typeof parsed.isActive === "boolean" ? !parsed.isActive : undefined,
-    })
-  );
+
+  const authPatch: Record<string, any> = removeUndefined({
+    displayName: nextDisplayName || undefined,
+    disabled: typeof parsed.isActive === "boolean" ? !parsed.isActive : undefined,
+  });
+  if (typeof parsed.password === "string" && parsed.password.length >= 6) {
+    authPatch.password = parsed.password;
+  }
+  if (Object.keys(authPatch).length) {
+    await getAdminAuth().updateUser(String(uid), authPatch);
+  }
   const updated = await ref.get();
   return PortalUserProfileSchema.parse({ uid: updated.id, ...(updated.data() as any), role: normalizePortalRole(updated.data()?.role) });
 }

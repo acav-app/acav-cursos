@@ -60,6 +60,13 @@ export default function DashboardUsuariosPage() {
     firstName: "",
     lastName: "",
     displayName: "",
+    fullName: "",
+    documentNumber: "",
+    agency: "",
+    employeeFileNumber: "",
+    phone: "",
+    contactEmail: "",
+    isMember: false,
     password: "",
     role: "admin",
     companyId: "",
@@ -117,6 +124,13 @@ export default function DashboardUsuariosPage() {
       firstName: "",
       lastName: "",
       displayName: "",
+      fullName: "",
+      documentNumber: "",
+      agency: "",
+      employeeFileNumber: "",
+      phone: "",
+      contactEmail: "",
+      isMember: false,
       password: "",
       role: "admin",
       companyId: "",
@@ -133,6 +147,13 @@ export default function DashboardUsuariosPage() {
       firstName: u.firstName || "",
       lastName: u.lastName || "",
       displayName: u.displayName || "",
+      fullName: u.fullName || "",
+      documentNumber: u.documentNumber || "",
+      agency: u.agency || "",
+      employeeFileNumber: u.employeeFileNumber || "",
+      phone: u.phone || "",
+      contactEmail: u.contactEmail || "",
+      isMember: Boolean(u.isMember),
       password: "",
       role: u.role || "admin",
       companyId: u.companyId || "",
@@ -146,6 +167,8 @@ export default function DashboardUsuariosPage() {
     if (mode === "create" && !normalizeString(form.email)) return "Email es obligatorio";
     if (mode === "create" && !normalizeString(form.firstName)) return "Nombre es obligatorio";
     if (mode === "create" && !normalizeString(form.lastName)) return "Apellido es obligatorio";
+    if (mode === "create" && !normalizeString(form.documentNumber)) return "DNI es obligatorio";
+    if (mode === "create" && !normalizeString(form.password)) return "Contraseña es obligatoria";
     if (!PORTAL_ROLES.includes(role)) return "Rol inválido";
     return "";
   };
@@ -167,6 +190,13 @@ export default function DashboardUsuariosPage() {
           firstName: normalizeString(form.firstName) || undefined,
           lastName: normalizeString(form.lastName) || undefined,
           displayName: normalizeString(form.displayName) || undefined,
+          fullName: normalizeString(form.fullName) || undefined,
+          documentNumber: normalizeString(form.documentNumber) || undefined,
+          agency: normalizeString(form.agency) || undefined,
+          employeeFileNumber: normalizeString(form.employeeFileNumber) || undefined,
+          phone: normalizeString(form.phone) || undefined,
+          contactEmail: normalizeString(form.contactEmail) || undefined,
+          isMember: Boolean(form.isMember),
           password: normalizeString(form.password) || undefined,
           role: normalizeString(form.role),
           companyId: normalizeString(form.companyId) || undefined,
@@ -192,15 +222,24 @@ export default function DashboardUsuariosPage() {
     }
     try {
       setSaving(true);
+      const passwordValue = normalizeString(form.password);
       await authedFetch(user, `/api/courses/users/${editing.uid}`, {
         method: "PATCH",
         body: JSON.stringify({
           displayName: normalizeString(form.displayName) || undefined,
           firstName: normalizeString(form.firstName) || undefined,
           lastName: normalizeString(form.lastName) || undefined,
+          fullName: normalizeString(form.fullName) || undefined,
+          documentNumber: normalizeString(form.documentNumber) || undefined,
+          agency: normalizeString(form.agency) || undefined,
+          employeeFileNumber: normalizeString(form.employeeFileNumber) || undefined,
+          phone: normalizeString(form.phone) || undefined,
+          contactEmail: normalizeString(form.contactEmail) || undefined,
+          isMember: typeof form.isMember === "boolean" ? form.isMember : undefined,
           role: normalizeString(form.role),
           companyId: normalizeString(form.companyId) || undefined,
           isActive: Boolean(form.isActive),
+          ...(passwordValue.length >= 6 ? { password: passwordValue } : {}),
         }),
       });
       toast.success("Usuario actualizado", { position: "top-right" });
@@ -303,34 +342,70 @@ export default function DashboardUsuariosPage() {
 
           <div className="grid gap-6">
             <div className="grid gap-2">
-              <Label>Email</Label>
+              <Label>Email <span className="text-destructive">*</span></Label>
               <Input value={form.email} onChange={(e) => setForm((s) => ({ ...s, email: e.target.value }))} />
             </div>
             <div className="grid gap-6 md:grid-cols-2">
               <div className="grid gap-2">
-                <Label>Nombre</Label>
+                <Label>Nombre <span className="text-destructive">*</span></Label>
                 <Input value={form.firstName} onChange={(e) => setForm((s) => ({ ...s, firstName: e.target.value }))} />
               </div>
               <div className="grid gap-2">
-                <Label>Apellido</Label>
+                <Label>Apellido <span className="text-destructive">*</span></Label>
                 <Input value={form.lastName} onChange={(e) => setForm((s) => ({ ...s, lastName: e.target.value }))} />
               </div>
+            </div>
+            <div className="grid gap-2">
+              <Label>DNI <span className="text-destructive">*</span></Label>
+              <Input
+                value={form.documentNumber}
+                inputMode="numeric"
+                placeholder="Ej: 12345678"
+                onChange={(e) => setForm((s) => ({ ...s, documentNumber: e.target.value }))}
+              />
             </div>
             <div className="grid gap-2">
               <Label>Nombre visible (opcional)</Label>
               <Input value={form.displayName} onChange={(e) => setForm((s) => ({ ...s, displayName: e.target.value }))} />
             </div>
+            <div className="grid gap-6 md:grid-cols-2">
+              <div className="grid gap-2">
+                <Label>Teléfono</Label>
+                <Input value={form.phone} onChange={(e) => setForm((s) => ({ ...s, phone: e.target.value }))} placeholder="Opcional" />
+              </div>
+              <div className="grid gap-2">
+                <Label>Email de contacto</Label>
+                <Input value={form.contactEmail} onChange={(e) => setForm((s) => ({ ...s, contactEmail: e.target.value }))} placeholder="Opcional" type="email" />
+              </div>
+            </div>
+            <div className="grid gap-6 md:grid-cols-2">
+              <div className="grid gap-2">
+                <Label>Agencia</Label>
+                <Input value={form.agency} onChange={(e) => setForm((s) => ({ ...s, agency: e.target.value }))} placeholder="Opcional" />
+              </div>
+              <div className="grid gap-2">
+                <Label>Legajo</Label>
+                <Input value={form.employeeFileNumber} onChange={(e) => setForm((s) => ({ ...s, employeeFileNumber: e.target.value }))} placeholder="Opcional" />
+              </div>
+            </div>
             <div className="grid gap-2">
-              <Label>Contraseña inicial</Label>
+              <Label>Contraseña <span className="text-destructive">*</span></Label>
               <Input
                 type="password"
                 value={form.password}
                 onChange={(e) => setForm((s) => ({ ...s, password: e.target.value }))}
-                placeholder="Mínimo 6 caracteres"
+                placeholder="Mínimo 6 caracteres. Esta es la contraseña definitiva."
               />
-              <p className="text-xs text-muted-foreground">
-                Contraseña temporal, luego puede recuperarla desde “¿Olvidaste tu contraseña?”.
-              </p>
+            </div>
+            <div className="flex items-start gap-3 rounded-3xl border border-border/60 bg-background p-5">
+              <Checkbox
+                checked={Boolean(form.isMember)}
+                onCheckedChange={(v) => setForm((s) => ({ ...s, isMember: Boolean(v) }))}
+              />
+              <div className="grid gap-1">
+                <Label>Socio ACAV</Label>
+                <p className="text-xs leading-6 text-muted-foreground">Marcar si el usuario es socio registrado.</p>
+              </div>
             </div>
 
             <div className="grid gap-6 md:grid-cols-2">
@@ -417,8 +492,55 @@ export default function DashboardUsuariosPage() {
               </div>
             </div>
             <div className="grid gap-2">
+              <Label>DNI</Label>
+              <Input
+                value={form.documentNumber}
+                inputMode="numeric"
+                onChange={(e) => setForm((s) => ({ ...s, documentNumber: e.target.value }))}
+              />
+            </div>
+            <div className="grid gap-2">
               <Label>Nombre visible</Label>
               <Input value={form.displayName} onChange={(e) => setForm((s) => ({ ...s, displayName: e.target.value }))} />
+            </div>
+            <div className="grid gap-6 md:grid-cols-2">
+              <div className="grid gap-2">
+                <Label>Teléfono</Label>
+                <Input value={form.phone} onChange={(e) => setForm((s) => ({ ...s, phone: e.target.value }))} placeholder="Opcional" />
+              </div>
+              <div className="grid gap-2">
+                <Label>Email de contacto</Label>
+                <Input value={form.contactEmail} onChange={(e) => setForm((s) => ({ ...s, contactEmail: e.target.value }))} placeholder="Opcional" type="email" />
+              </div>
+            </div>
+            <div className="grid gap-6 md:grid-cols-2">
+              <div className="grid gap-2">
+                <Label>Agencia</Label>
+                <Input value={form.agency} onChange={(e) => setForm((s) => ({ ...s, agency: e.target.value }))} placeholder="Opcional" />
+              </div>
+              <div className="grid gap-2">
+                <Label>Legajo</Label>
+                <Input value={form.employeeFileNumber} onChange={(e) => setForm((s) => ({ ...s, employeeFileNumber: e.target.value }))} placeholder="Opcional" />
+              </div>
+            </div>
+            <div className="grid gap-2">
+              <Label>Cambiar contraseña</Label>
+              <Input
+                type="password"
+                value={form.password}
+                onChange={(e) => setForm((s) => ({ ...s, password: e.target.value }))}
+                placeholder="Dejar en blanco para no cambiar. Mínimo 6 caracteres."
+              />
+            </div>
+            <div className="flex items-start gap-3 rounded-3xl border border-border/60 bg-background p-5">
+              <Checkbox
+                checked={Boolean(form.isMember)}
+                onCheckedChange={(v) => setForm((s) => ({ ...s, isMember: Boolean(v) }))}
+              />
+              <div className="grid gap-1">
+                <Label>Socio ACAV</Label>
+                <p className="text-xs leading-6 text-muted-foreground">Marcar si el usuario es socio registrado.</p>
+              </div>
             </div>
 
             <div className="grid gap-6 md:grid-cols-2">

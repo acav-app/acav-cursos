@@ -88,17 +88,8 @@ export default function DashboardInscripcionesPage() {
     if (!user || !application?.id) return;
 
     const payloadByAction = {
-      approve: {
-        status: "active",
-        paymentStatus: "approved",
-        approvedBy: user?.email || user?.uid || "admin",
-      },
       request_receipt: {
         status: "waiting_payment",
-        paymentStatus: "rejected",
-      },
-      reject: {
-        status: "rejected",
         paymentStatus: "rejected",
       },
     };
@@ -116,14 +107,7 @@ export default function DashboardInscripcionesPage() {
         }),
       });
       syncEnrollment(data?.enrollment);
-      toast.success(
-        action === "approve"
-          ? "Pago aprobado y curso activado."
-          : action === "request_receipt"
-            ? "Se solicitó un nuevo comprobante."
-            : "Inscripción rechazada.",
-        { position: "top-right" }
-      );
+      toast.success("Se solicitó un nuevo comprobante.", { position: "top-right" });
     } catch (error) {
       toast.error(error?.message || "No pudimos actualizar la inscripción.", {
         position: "top-right",
@@ -330,50 +314,20 @@ export default function DashboardInscripcionesPage() {
                       </div>
                       <div className="flex flex-wrap items-center gap-2 md:justify-end">
                         {actor?.role === "admin" ? (
-                          <>
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="outline"
-                              onClick={(event) => {
-                                event.preventDefault();
-                                handleQuickAction(application, "approve");
-                              }}
-                              disabled={actionLoadingId === String(application.id)}
-                              className="border-emerald-200 text-emerald-700 hover:bg-emerald-50"
-                            >
-                              {actionLoadingId === String(application.id) ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}
-                              Aprobar
-                            </Button>
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="outline"
-                              onClick={(event) => {
-                                event.preventDefault();
-                                handleQuickAction(application, "request_receipt");
-                              }}
-                              disabled={actionLoadingId === String(application.id)}
-                              className="border-amber-200 text-amber-700 hover:bg-amber-50"
-                            >
-                              <RotateCcw className="mr-2 h-4 w-4" />
-                              Nuevo comprobante
-                            </Button>
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="outline"
-                              onClick={(event) => {
-                                event.preventDefault();
-                                handleQuickAction(application, "reject");
-                              }}
-                              disabled={actionLoadingId === String(application.id)}
-                              className="border-rose-200 text-rose-700 hover:bg-rose-50"
-                            >
-                              <XCircle className="mr-2 h-4 w-4" />
-                              Rechazar
-                            </Button>
-                          </>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={(event) => {
+                              event.preventDefault();
+                              handleQuickAction(application, "request_receipt");
+                            }}
+                            disabled={actionLoadingId === String(application.id)}
+                            className="border-amber-200 text-amber-700 hover:bg-amber-50"
+                          >
+                            <RotateCcw className="mr-2 h-4 w-4" />
+                            Nuevo comprobante
+                          </Button>
                         ) : null}
                         <Button type="button" variant="ghost" size="sm" className="md:ml-2">
                           Abrir ficha

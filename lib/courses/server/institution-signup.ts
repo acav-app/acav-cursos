@@ -105,6 +105,7 @@ export async function registerInstitution(
       lastName: parsed.lastName,
       displayName: `${parsed.firstName} ${parsed.lastName}`.trim(),
       role: "admin" as const,
+      isMember: Boolean(parsed.isAcavMember),
       isActive: true,
       accountStatus: "active" as const,
       createdAt: new Date().toISOString(),

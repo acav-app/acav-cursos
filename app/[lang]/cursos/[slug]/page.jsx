@@ -7,6 +7,7 @@ import {
   Briefcase,
   Building2,
   CheckCircle2,
+  Check,
   Clock3,
   FileText,
   Film,
@@ -55,6 +56,110 @@ function MetaBlock({ icon: Icon, label, value }) {
   );
 }
 
+function formatCurrency(value) {
+  if (value === null || value === undefined || value === "") return "";
+  const amount = Number(value);
+  if (!Number.isFinite(amount) || amount < 0) return "";
+  return new Intl.NumberFormat("es-AR", {
+    style: "currency",
+    currency: "ARS",
+    maximumFractionDigits: 0,
+  }).format(amount);
+}
+
+function PriceTier({
+  label,
+  subtitle,
+  value,
+  highlight = false,
+  badge,
+  benefits,
+  titleId,
+  priceId,
+}) {
+  return (
+    <article
+      role="group"
+      aria-labelledby={titleId}
+      aria-describedby={`${titleId}-desc`}
+      className={[
+        "relative w-full rounded-[18px] p-4 md:p-5 transition-all duration-300 outline-none",
+        "focus-visible:ring-2 focus-visible:ring-[#2356B8]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-white",
+        highlight
+          ? "border-2 border-[#2356B8]/70 bg-gradient-to-br from-[#EEF4FF] via-white to-white shadow-[0_10px_24px_rgba(35,86,184,0.10)]"
+          : "border border-slate-200/90 bg-white",
+      ].join(" ")}
+    >
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex flex-col gap-1">
+          {badge ? (
+            <span
+              className={[
+                "inline-flex w-max items-center rounded-full px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-[0.16em]",
+                highlight
+                  ? "bg-[#2356B8] text-white"
+                  : "bg-slate-100 text-slate-500",
+              ].join(" ")}
+            >
+              {badge}
+            </span>
+          ) : null}
+          <h3 id={titleId} className="text-[13px] font-bold tracking-[-0.01em] text-[#1B2B50]">
+            {label}
+          </h3>
+          <p id={`${titleId}-desc`} className="text-[11px] leading-5 text-slate-500">
+            {subtitle}
+          </p>
+        </div>
+        {highlight ? (
+          <span
+            aria-hidden="true"
+            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#2356B8] text-white shadow-[0_8px_16px_rgba(35,86,184,0.28)]"
+          >
+            <Check className="h-4 w-4" strokeWidth={3} />
+          </span>
+        ) : null}
+      </div>
+
+      <div className="mt-4 flex items-end justify-between gap-3">
+        <div className="min-w-0">
+          <div
+            id={priceId}
+            className={[
+              "text-[28px] font-semibold tracking-[-0.03em] leading-none",
+              highlight ? "text-[#133778]" : "text-[#1B2B50]",
+            ].join(" ")}
+          >
+            {value}
+          </div>
+          <div className="mt-1 text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">
+            Por persona
+          </div>
+        </div>
+      </div>
+
+      {benefits.length ? (
+        <ul className="mt-4 grid gap-2" aria-label={`Beneficios de ${label}`}>
+          {benefits.map((text, idx) => (
+            <li key={`${titleId}-benefit-${idx}`} className="flex items-start gap-2">
+              <span
+                aria-hidden="true"
+                className={[
+                  "mt-[3px] inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full",
+                  highlight ? "bg-[#2356B8]/10 text-[#2356B8]" : "bg-slate-100 text-slate-500",
+                ].join(" ")}
+              >
+                <Check className="h-3 w-3" strokeWidth={3} />
+              </span>
+              <span className="text-[12px] leading-5 text-slate-600">{text}</span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </article>
+  );
+}
+
 function parseLines(text) {
   return String(text || "")
     .split(/\n+/)
@@ -89,17 +194,6 @@ function deriveBenefits(course) {
   return parseLines(course?.benefits);
 }
 
-function formatCurrency(value) {
-  if (value === null || value === undefined || value === "") return "";
-  const amount = Number(value);
-  if (!Number.isFinite(amount) || amount < 0) return "";
-  return new Intl.NumberFormat("es-AR", {
-    style: "currency",
-    currency: "ARS",
-    maximumFractionDigits: 0,
-  }).format(amount);
-}
-
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 export const fetchCache = "force-no-store";
@@ -131,8 +225,15 @@ export default async function CursoDetailPage({ params: { lang, slug } }) {
   const institutionDescription =
     institution?.description ||
     "La institucion forma parte del ecosistema ACAV Cursos y publica propuestas para fortalecer la formacion del sector turistico.";
-  const pricingLabel = course?.freeCourse ? "Gratuito" : `Precio socios ${formatCurrency(course?.price) || "Consultar valor"}`;
-  const oldPricingLabel = course?.oldPrice ? formatCurrency(course.oldPrice) : "";
+  const memberPriceText = course?.freeCourse
+    ? "Gratuito"
+    : formatCurrency(course?.price) || "Consultar valor";
+  const publicPriceText = course?.freeCourse
+    ? "Gratuito"
+    : course?.oldPrice
+      ? formatCurrency(course.oldPrice)
+      : "";
+  const showPublicTier = Boolean(course?.freeCourse || course?.oldPrice);
   const learningObjectives = Array.isArray(course?.learningObjectives) ? course.learningObjectives.filter(Boolean) : [];
   const targetAudience = Array.isArray(course?.targetAudience) ? course.targetAudience.filter(Boolean) : [];
   const curriculum = Array.isArray(course?.curriculum)
@@ -341,25 +442,63 @@ export default async function CursoDetailPage({ params: { lang, slug } }) {
 
             <MotionStagger className="space-y-4 lg:sticky lg:top-24" delayChildren={0.12}>
               <MotionStaggerItem>
-                <section className="rounded-[24px] border border-slate-200/80 bg-white p-6 shadow-[0_8px_30px_rgba(15,23,42,.04)]">
+                <section
+                  aria-labelledby="sidebar-inscripcion-title"
+                  className="rounded-[24px] border border-slate-200/80 bg-white p-6 shadow-[0_8px_30px_rgba(15,23,42,.04)]"
+                >
                   <div className="inline-flex items-center gap-2 rounded-full bg-[#EEF4FF] px-3 py-1 text-[11px] font-extrabold uppercase tracking-[0.18em] text-[#2356B8]">
                     <span className="h-1.5 w-1.5 rounded-full bg-[#2356B8]" />
                     Inscripción
                   </div>
-                  <h2 className="mt-4 text-[22px] font-semibold tracking-[-0.03em] text-[#1B2B50] md:text-[24px]">Inscribite al curso</h2>
-                  <p className="mt-3 text-sm leading-7 text-slate-600">
-                    Tu inscripcion es rapida, clara y cuidada para que puedas confirmar tu cursada.
+                  <h2
+                    id="sidebar-inscripcion-title"
+                    className="mt-4 text-[22px] font-semibold tracking-[-0.03em] text-[#1B2B50] md:text-[24px]"
+                  >
+                    Elegí tu tarifa
+                  </h2>
+                  <p className="mt-2 text-sm leading-7 text-slate-600">
+                    Valor por alumno. Los socios ACAV acceden al beneficio preferente.
                   </p>
 
-                  <div className="mt-6 rounded-[20px] border border-slate-200 bg-[#FBFCFE] p-5">
+                  <section
+                    aria-label="Tarifas del curso"
+                    className={[
+                      "mt-6 grid gap-3",
+                      showPublicTier ? "" : "grid-cols-1",
+                    ].join(" ")}
+                  >
+                    <PriceTier
+                      highlight
+                      badge="Recomendado"
+                      label="Socio ACAV"
+                      subtitle="Tarifa preferente para asociados activos"
+                      value={memberPriceText}
+                      titleId="price-tier-member"
+                      priceId="price-tier-member-value"
+                      benefits={[
+                        "Acceso inmediato al campus",
+                        "Certificado oficial al finalizar",
+                        "Materiales y clases disponibles 24/7",
+                      ]}
+                    />
+                    {showPublicTier ? (
+                      <PriceTier
+                        label="Público general"
+                        subtitle="Para personas no asociadas a ACAV"
+                        value={publicPriceText || "Consultar valor"}
+                        titleId="price-tier-public"
+                        priceId="price-tier-public-value"
+                        benefits={[
+                          "Acceso inmediato al campus",
+                          "Certificado oficial al finalizar",
+                          "Materiales y clases disponibles 24/7",
+                        ]}
+                      />
+                    ) : null}
+                  </section>
+
+                  <div className="mt-5 rounded-[18px] border border-slate-200 bg-[#FBFCFE] p-4">
                     <div className="grid gap-3 text-sm text-slate-600">
-                      <div className="flex items-start gap-3">
-                        <Wallet className="mt-0.5 h-4 w-4 shrink-0 text-[#1B2B50]" />
-                        <span>
-                          {pricingLabel}
-                          {oldPricingLabel ? ` · No socios ${oldPricingLabel}` : ""}
-                        </span>
-                      </div>
                       <div className="flex items-start gap-3">
                         <PlayCircle className="mt-0.5 h-4 w-4 shrink-0 text-[#2356B8]" />
                         <span>{durationLabel}</span>
@@ -376,7 +515,7 @@ export default async function CursoDetailPage({ params: { lang, slug } }) {
                     jobId={course.id}
                     slug={course.slug}
                     scroll={false}
-                    className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-[16px] bg-[#1B2B50] px-5 py-3.5 text-sm font-extrabold text-white shadow-[0_12px_28px_rgba(13,43,100,.14)] transition duration-500 hover:-translate-y-1 hover:bg-[#133778]"
+                    className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-[16px] bg-[#1B2B50] px-5 py-3.5 text-sm font-extrabold text-white shadow-[0_12px_28px_rgba(13,43,100,.14)] transition duration-500 hover:-translate-y-1 hover:bg-[#133778] focus-visible:ring-2 focus-visible:ring-[#2356B8]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-white outline-none"
                     appliedClassName="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-[16px] border border-slate-300 bg-slate-200 px-5 py-3.5 text-sm font-extrabold text-slate-600"
                     loadingClassName="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-[16px] border border-slate-200 bg-slate-100 px-5 py-3.5 text-sm font-extrabold text-slate-500"
                   />
