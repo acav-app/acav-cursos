@@ -23,6 +23,7 @@ import { MotionHoverCard, MotionReveal, MotionStagger, MotionStaggerItem } from 
 import PublicCoursesShell from "@/components/courses/public-shell";
 import { getPublicCourseBySlug, getPublicCourseSettings, getPublicCourses, getPublicInstitutions, mapCourseForCard } from "@/lib/courses/public";
 import { normalizePublicR2Url } from "@/lib/r2/normalize-public-url";
+import { toEmbedUrl, isYoutubeUrl, isVimeoUrl, isVideoEmbedUrl } from "@/lib/courses/video-url";
 
 function CardSection({ icon: Icon, title, children }) {
   return (
@@ -301,12 +302,23 @@ export default async function CursoDetailPage({ params: { lang, slug } }) {
                 <MotionStaggerItem>
                   <CardSection icon={Film} title="Video de presentación">
                     <div className="overflow-hidden rounded-[22px] border border-slate-200 bg-[#0F172A]">
-                      <video
-                        controls
-                        preload="metadata"
-                        className="aspect-video w-full bg-black"
-                        src={course.videoUrl}
-                      />
+                      {isYoutubeUrl(course.videoUrl) || isVimeoUrl(course.videoUrl) || isVideoEmbedUrl(course.videoUrl) ? (
+                        <iframe
+                          src={toEmbedUrl(course.videoUrl)}
+                          title="Video de presentación"
+                          className="aspect-video w-full border-0 bg-black"
+                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                          allowFullScreen
+                        />
+                      ) : (
+                        <video
+                          controls
+                          preload="metadata"
+                          playsInline
+                          className="aspect-video w-full bg-black"
+                          src={course.videoUrl}
+                        />
+                      )}
                     </div>
                   </CardSection>
                 </MotionStaggerItem>
