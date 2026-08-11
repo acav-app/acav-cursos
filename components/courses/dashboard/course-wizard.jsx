@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -3214,11 +3214,17 @@ export default function CourseWizard({ jobId }) {
   const [categoryOptions, setCategoryOptions] = useState([]);
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
   const [newCategoryTitle, setNewCategoryTitle] = useState("");
+  const [preventSubmitUntil, setPreventSubmitUntil] = useState(0);
+  const activeTabRef = useRef(activeTab);
+  useEffect(() => {
+    activeTabRef.current = activeTab;
+  }, [activeTab]);
 
   const activeTabIndex = TAB_ITEMS.findIndex((tab) => tab.id === activeTab);
   const isLastTab = activeTabIndex === TAB_ITEMS.length - 1;
   const isFirstTab = activeTabIndex <= 0;
   const busy = submitting || uploading;
+  const submitBlocked = typeof window !== "undefined" && Date.now() < preventSubmitUntil;
   const primarySubmitLabel = actor?.role === "empresa" ? "Enviar a revisión" : "Guardar curso";
   const savingSubmitLabel = actor?.role === "empresa" ? "Enviando curso..." : "Guardando curso...";
 
@@ -3557,6 +3563,10 @@ export default function CourseWizard({ jobId }) {
     }
     const valid = await trigger(TAB_FIELD_MAP[activeTab] || []);
     if (!valid) return;
+    const becomingLast = nextIndex === TAB_ITEMS.length - 1;
+    if (becomingLast) {
+      setPreventSubmitUntil(Date.now() + 650);
+    }
     setActiveTab(nextTab);
   };
 
@@ -3569,7 +3579,12 @@ export default function CourseWizard({ jobId }) {
     if (isLastTab) return;
     const valid = await trigger(TAB_FIELD_MAP[activeTab] || []);
     if (!valid) return;
-    setActiveTab(TAB_ITEMS[activeTabIndex + 1].id);
+    const nextIndex = activeTabIndex + 1;
+    const becomingLast = nextIndex === TAB_ITEMS.length - 1;
+    if (becomingLast) {
+      setPreventSubmitUntil(Date.now() + 650);
+    }
+    setActiveTab(TAB_ITEMS[nextIndex].id);
   };
 
   const handleCreateCategory = async () => {
@@ -3756,6 +3771,7 @@ export default function CourseWizard({ jobId }) {
   };
 
   const onSubmit = async (formValues) => {
+    if (typeof window !== "undefined" && Date.now() < preventSubmitUntil) return;
     try {
       const mode = actor?.role === "admin" && formValues.status === "activa" ? "publish" : actor?.role === "admin" ? "draft" : "review";
       await submit(formValues, mode);
@@ -3891,7 +3907,7 @@ export default function CourseWizard({ jobId }) {
                 <ChevronRight className="ml-1 h-3.5 w-3.5" />
               </Button>
             ) : (
-              <Button type="submit" size="sm" disabled={busy} className="h-8 text-[11px] min-w-[160px]">
+              <Button type="submit" size="sm" disabled={busy || submitBlocked} className="h-8 text-[11px] min-w-[160px]">
                 {submitting ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Save className="mr-1.5 h-3.5 w-3.5" />}
                 {submitting ? savingSubmitLabel : primarySubmitLabel}
               </Button>
@@ -4471,7 +4487,7 @@ export default function CourseWizard({ jobId }) {
                       <ChevronRight className="ml-1 h-3.5 w-3.5" />
                     </Button>
                   ) : (
-                    <Button type="submit" size="sm" disabled={busy} className="h-8 text-[11px] min-w-[160px]">
+                    <Button type="submit" size="sm" disabled={busy || submitBlocked} className="h-8 text-[11px] min-w-[160px]">
                       {submitting ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Save className="mr-1.5 h-3.5 w-3.5" />}
                       {submitting ? savingSubmitLabel : primarySubmitLabel}
                     </Button>
