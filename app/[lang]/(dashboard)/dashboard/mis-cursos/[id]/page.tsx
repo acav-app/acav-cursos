@@ -1,6 +1,5 @@
 // @ts-nocheck
 "use client";
-import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
@@ -68,7 +67,7 @@ import { authedFetch } from "@/lib/auth/authed-fetch";
 import { cn, useLocalizedPath } from "@/lib/utils";
 import PaymentReceiptUploader from "@/components/courses/dashboard/payment-receipt-uploader";
 import { resolveEducationalStatusMeta, resolvePaymentStatusMeta } from "@/lib/courses/status-meta";
-const VideoPlayer = dynamic(() => import("@/components/courses/video-player"), { ssr: false });
+import { toEmbedUrl, isYoutubeUrl, isVimeoUrl, isVideoEmbedUrl } from "@/lib/courses/video-url";
 import DocumentPreviewCard from "@/components/courses/document-preview";
 import EvaluationRenderer from "@/components/courses/evaluation-renderer";
 import CourseCertificate from "@/components/courses/course-certificate";
@@ -2133,18 +2132,26 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
                     {effectiveVideo ? (
                       <>
                         {effectiveInlineVideo ? (
-                          <VideoPlayer
-                            key={effectivePlayerKey}
-                            src={effectivePlayerSrc}
-                            kind={effectiveVideoKind === "file" ? "file" : "embed"}
-                            title={effectiveVideo.title}
-                            poster={effectiveVideo.posterUrl || undefined}
-                            qualities={effectiveVideo.qualities || undefined}
-                            subtitles={effectiveVideo.subtitles || undefined}
-                            className="absolute inset-0 h-full w-full !rounded-none border-0 shadow-none"
-                            fallbackLabel="Contenido no disponible temporalmente"
-                            autoPlay={Boolean(activeVideoSource)}
-                          />
+                          isYoutubeUrl(effectiveVideo.url) || isVimeoUrl(effectiveVideo.url) || isVideoEmbedUrl(effectiveVideo.url) ? (
+                            <iframe
+                              key={effectivePlayerKey}
+                              src={toEmbedUrl(effectiveVideo.url)}
+                              title={effectiveVideo.title || "Video"}
+                              className="absolute inset-0 h-full w-full border-0"
+                              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                              allowFullScreen
+                            />
+                          ) : (
+                            <video
+                              key={effectivePlayerKey}
+                              controls
+                              preload="metadata"
+                              playsInline
+                              src={effectivePlayerSrc}
+                              poster={effectiveVideo.posterUrl || undefined}
+                              className="absolute inset-0 h-full w-full object-contain bg-black"
+                            />
+                          )
                         ) : effectiveVideo.posterUrl ? (
                           <div
                             className="absolute inset-0 transition duration-500"

@@ -1156,23 +1156,11 @@ function resolveWorkspaceItemState(error) {
   return "ready";
 }
 
-function WorkspaceSidebar({ activeTab, onSelect, values, errors, draftSavedAt }) {
+function WorkspaceSidebar({ activeTab, onSelect, values, errors }) {
   return (
     <aside className="rounded-[28px] border border-border/60 bg-card p-4 shadow-[0_18px_50px_rgba(15,23,42,0.04)]">
       <div className="mb-4 flex items-center justify-between px-1">
         <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Navegación</div>
-        {draftSavedAt ? (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <div className="cursor-help text-[11px] text-muted-foreground">
-                {new Date(draftSavedAt).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })}
-              </div>
-            </TooltipTrigger>
-            <TooltipContent side="bottom">
-              <div className="max-w-xs text-[11px] leading-5">Última copia de seguridad local en este dispositivo.</div>
-            </TooltipContent>
-          </Tooltip>
-        ) : null}
       </div>
 
       <div className="grid gap-2">
@@ -1232,17 +1220,11 @@ function WorkspaceSidebar({ activeTab, onSelect, values, errors, draftSavedAt })
           );
         })}
       </div>
-
-      {draftSavedAt ? (
-        <div className="mt-4 rounded-[22px] border border-border/60 bg-background px-4 py-3 text-xs text-muted-foreground">
-          Guardado {new Date(draftSavedAt).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })}
-        </div>
-      ) : null}
     </aside>
   );
 }
 
-function WorkspaceSummary({ values, course, draftSavedAt, publicHref }) {
+function WorkspaceSummary({ values, course, publicHref }) {
   const sectionsCount = Array.isArray(values.curriculum) ? values.curriculum.length : 0;
   const lessonsCount = countCurriculumLessons(values.curriculum);
   const resourcesCount = (Array.isArray(values.attachments) ? values.attachments.length : 0)
@@ -1654,7 +1636,7 @@ function isExternalVideoOnly(video) {
   return isEmbedUrl(url);
 }
 
-function LessonVideoSection({ videoUrl, videoAsset, onVideoUrlChange, onVideoAssetChange }) {
+function LessonVideoSection({ videoUrl, videoAsset, onVideoUrlChange, onVideoAssetChange, onVideoChangeCombined }) {
   const hasAsset = videoAsset && typeof videoAsset === "object" && (videoAsset.url || videoAsset.storageKey);
   const rawUrl = String(videoUrl || "").trim();
   const hasUrl = Boolean(rawUrl);
@@ -1667,35 +1649,48 @@ function LessonVideoSection({ videoUrl, videoAsset, onVideoUrlChange, onVideoAss
       ? { tone: resourceStatusBadge("pending").tone, label: isExternalOnly ? "URL externa" : "URL activa" }
       : null;
 
+  const applyPatch = (patch) => {
+    if (typeof onVideoChangeCombined === "function") {
+      onVideoChangeCombined(patch);
+      return;
+    }
+    if (Object.prototype.hasOwnProperty.call(patch, "videoUrl")) onVideoUrlChange(patch.videoUrl);
+    if (Object.prototype.hasOwnProperty.call(patch, "videoAsset")) onVideoAssetChange(patch.videoAsset);
+  };
+
   const handleCombinedChange = (nextUrl, assetData, extras) => {
     const urlRaw = String(nextUrl || "").trim();
     const url = urlRaw ? toEmbedUrl(urlRaw) : "";
     const clearing = !url;
-
-    const isReplacingWithExternalOnly = Boolean(url) && !assetData && isExternalVideoOnly({ url, mimeType: undefined });
-    const forcedClearingAsset = clearing || isReplacingWithExternalOnly || extras === null;
+    const hasAssetParam = Boolean(assetData && typeof assetData === "object" && (assetData.url || assetData.storageKey));
+    const externalNoAsset = extras === null && url;
 
     if (clearing) {
-      onVideoUrlChange("");
-      onVideoAssetChange(undefined);
+      applyPatch({ videoUrl: "", videoAsset: undefined });
       return;
     }
 
-    if (assetData && !forcedClearingAsset && typeof assetData === "object") {
-      onVideoUrlChange(url);
-      onVideoAssetChange({
-        url: assetData.url || url || videoAsset?.url || "",
-        storageKey: assetData.storageKey || videoAsset?.storageKey || undefined,
-        mimeType: assetData.mimeType || videoAsset?.mimeType || undefined,
-        fileSize: assetData.fileSize ?? videoAsset?.fileSize ?? undefined,
-        status: assetData.status || videoAsset?.status || "ready",
-        checksum: assetData.checksum || videoAsset?.checksum || undefined,
-        uploadedAt: assetData.uploadedAt || videoAsset?.uploadedAt || new Date().toISOString(),
-        originalName: assetData.originalName || videoAsset?.originalName || undefined,
+    if (externalNoAsset) {
+      applyPatch({ videoUrl: url, videoAsset: undefined });
+      return;
+    }
+
+    if (hasAssetParam) {
+      applyPatch({
+        videoUrl: url,
+        videoAsset: {
+          url: assetData.url || url || videoAsset?.url || "",
+          storageKey: assetData.storageKey || videoAsset?.storageKey || undefined,
+          mimeType: assetData.mimeType || videoAsset?.mimeType || undefined,
+          fileSize: assetData.fileSize ?? videoAsset?.fileSize ?? undefined,
+          status: assetData.status || videoAsset?.status || "ready",
+          checksum: assetData.checksum || videoAsset?.checksum || undefined,
+          uploadedAt: assetData.uploadedAt || videoAsset?.uploadedAt || new Date().toISOString(),
+          originalName: assetData.originalName || videoAsset?.originalName || undefined,
+        },
       });
     } else {
-      onVideoUrlChange(url);
-      onVideoAssetChange(undefined);
+      applyPatch({ videoUrl: url, videoAsset: undefined });
     }
   };
 
@@ -2146,13 +2141,27 @@ function CoursePromoVideoSection({
     const clearing = !url;
     const file = extras && extras.file ? extras.file : null;
     const isReplacingWithExternalOnly = Boolean(url) && !assetData && isExternalVideoOnly({ url, mimeType: undefined });
-    const forcedClearingAsset = clearing || isReplacingWithExternalOnly || extras === null;
+    const externalNoAsset = extras === null && url;
+    const forcedClearingAsset = clearing || (extras === null && !url);
 
     if (clearing) {
       onVideoAssetChange(undefined);
       onVideoUrlChange("");
       onPromoMetadataChange?.({
         promoVideoFileName: undefined,
+        promoVideoMimeType: undefined,
+        promoVideoSizeBytes: undefined,
+        promoVideoDurationSeconds: undefined,
+        sourceFile: null,
+      });
+      return;
+    }
+
+    if (externalNoAsset) {
+      onVideoAssetChange(undefined);
+      onVideoUrlChange(url);
+      onPromoMetadataChange?.({
+        promoVideoFileName: promoVideoFileName || undefined,
         promoVideoMimeType: undefined,
         promoVideoSizeBytes: undefined,
         promoVideoDurationSeconds: undefined,
@@ -2508,35 +2517,18 @@ function CurriculumField({ curriculum, onChange, error }) {
     const prev = lessons[lessonIndex] || { id: createEntityId("lesson") };
     const isNew = !lessons[lessonIndex];
 
-    const prevAssetIsObject = prev?.videoAsset && typeof prev.videoAsset === "object" && (prev.videoAsset.url || prev.videoAsset.storageKey);
+    const nextAssetRaw = Object.prototype.hasOwnProperty.call(patch, "videoAsset") ? patch.videoAsset : prev.videoAsset;
     const incomingAssetObject =
-      patch &&
-      Object.prototype.hasOwnProperty.call(patch, "videoAsset") &&
-      patch.videoAsset &&
-      typeof patch.videoAsset === "object" &&
-      (patch.videoAsset.url || patch.videoAsset.storageKey);
+      nextAssetRaw && typeof nextAssetRaw === "object" && (nextAssetRaw.url || nextAssetRaw.storageKey);
     const clearingAsset =
-      patch && Object.prototype.hasOwnProperty.call(patch, "videoAsset") && (patch.videoAsset === null || patch.videoAsset === undefined);
-
-    let next = { ...prev, ...patch };
-    if (incomingAssetObject) {
-      next.videoAsset = { ...(prevAssetIsObject ? prev.videoAsset : {}), ...patch.videoAsset };
-    } else if (clearingAsset) {
-      next.videoAsset = undefined;
-    }
-    const clearingVideoUrl =
-      Object.prototype.hasOwnProperty.call(patch, "videoUrl") && !String(patch.videoUrl || "").trim();
-    const clearingVideoAsset =
       Object.prototype.hasOwnProperty.call(patch, "videoAsset") &&
       (patch.videoAsset === undefined || patch.videoAsset === null);
-    if (clearingVideoUrl && !Object.prototype.hasOwnProperty.call(patch, "videoAsset")) {
-      next.videoAsset = undefined;
-    }
-    if (clearingVideoAsset && !Object.prototype.hasOwnProperty.call(patch, "videoUrl")) {
-      next.videoUrl = "";
-    }
+    const nextUrlRaw = Object.prototype.hasOwnProperty.call(patch, "videoUrl") ? String(patch.videoUrl || "").trim() : String(prev.videoUrl || "").trim();
+    const clearingVideoUrl =
+      Object.prototype.hasOwnProperty.call(patch, "videoUrl") && !nextUrlRaw;
 
     const defaults = {
+      id: prev.id || createEntityId("lesson"),
       title: "",
       description: "",
       lessonType: "video",
@@ -2547,20 +2539,32 @@ function CurriculumField({ curriculum, onChange, error }) {
       isPreview: false,
       resources: [],
     };
-    const safeNext = { ...defaults, ...next };
+    const baseNext = { ...defaults, ...prev, ...patch };
+    const finalAssetIncoming = incomingAssetObject && !clearingAsset ? { ...(prev.videoAsset || {}), ...nextAssetRaw } : undefined;
+    baseNext.videoAsset = finalAssetIncoming;
+    baseNext.videoUrl = String(baseNext.videoUrl || "").trim();
+
+    if (clearingAsset && baseNext.videoAsset) {
+      baseNext.videoAsset = undefined;
+    }
+    if (clearingVideoUrl) {
+      baseNext.videoUrl = "";
+      baseNext.videoAsset = undefined;
+    }
+    if (baseNext.videoUrl && !baseNext.videoAsset) {
+      baseNext.videoAsset = undefined;
+    }
+
+    const safeNext = baseNext;
     safeNext.title = String(safeNext.title || "").trim() || prev.title || "";
     safeNext.description = safeNext.description ? String(safeNext.description || "").trim() : undefined;
     safeNext.lessonType = String(safeNext.lessonType || "video").trim() || "video";
-    safeNext.videoUrl = String(safeNext.videoUrl || "").trim();
     safeNext.thumbnailUrl = safeNext.thumbnailUrl ? String(safeNext.thumbnailUrl || "").trim() : undefined;
     safeNext.content = safeNext.content ? String(safeNext.content || "").trim() : undefined;
     safeNext.isPreview = Boolean(safeNext.isPreview);
     safeNext.resources = Array.isArray(safeNext.resources) ? safeNext.resources : [];
     if (!Number.isFinite(Number(safeNext.durationMinutes)) || Number(safeNext.durationMinutes) <= 0) {
       safeNext.durationMinutes = undefined;
-    }
-    if (!safeNext.videoUrl) {
-      safeNext.videoAsset = undefined;
     }
 
     if (isNew) {
@@ -2803,6 +2807,12 @@ function CurriculumField({ curriculum, onChange, error }) {
                   onVideoAssetChange={(nextVideoAsset) =>
                     updateLesson(selectedSectionIndex, selectedLessonIndex, {
                       videoAsset: nextVideoAsset || undefined,
+                    })
+                  }
+                  onVideoChangeCombined={(patch) =>
+                    updateLesson(selectedSectionIndex, selectedLessonIndex, {
+                      ...(Object.prototype.hasOwnProperty.call(patch, "videoUrl") ? { videoUrl: patch.videoUrl || "" } : {}),
+                      ...(Object.prototype.hasOwnProperty.call(patch, "videoAsset") ? { videoAsset: patch.videoAsset || undefined } : {}),
                     })
                   }
                 />
@@ -3199,15 +3209,12 @@ export default function CourseWizard({ jobId }) {
   const [submitting, setSubmitting] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [activeTab, setActiveTab] = useState("general");
-  const [draftSavedAt, setDraftSavedAt] = useState("");
-  const [draftRestored, setDraftRestored] = useState(false);
   const [courseLoadAttempt, setCourseLoadAttempt] = useState(0);
   const [slugTouchedManually, setSlugTouchedManually] = useState(Boolean(jobId));
   const [categoryOptions, setCategoryOptions] = useState([]);
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
   const [newCategoryTitle, setNewCategoryTitle] = useState("");
 
-  const draftStorageKey = useMemo(() => buildDraftStorageKey(actor, jobId), [actor, jobId]);
   const activeTabIndex = TAB_ITEMS.findIndex((tab) => tab.id === activeTab);
   const isLastTab = activeTabIndex === TAB_ITEMS.length - 1;
   const isFirstTab = activeTabIndex <= 0;
@@ -3337,41 +3344,19 @@ export default function CourseWizard({ jobId }) {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    if (actorLoading || !actor || loadingCourse) return;
-    if (jobId && !course) return;
-    const raw = window.localStorage.getItem(draftStorageKey);
-    if (!raw) return;
     try {
-      const parsed = JSON.parse(raw);
-      if (!parsed?.values || !hasMeaningfulDraftContent(parsed.values)) return;
-      const baseValues = jobId && course ? mapCourseToFormValues(course, defaultValues) : defaultValues;
-      reset(normalizeFormValues(parsed.values, baseValues));
-      setActiveTab(parsed.activeTab || "general");
-      setDraftSavedAt(String(parsed.updatedAt || ""));
-      setDraftRestored(true);
-      setSlugTouchedManually(isCustomSlugForTitle(parsed?.values?.title || "", parsed?.values?.slug || ""));
-      toast.success("Se recuperó un borrador del curso", { position: "top-right" });
+      const prefix = `${COURSE_DRAFT_STORAGE_KEY}:`;
+      for (let i = window.localStorage.length - 1; i >= 0; i -= 1) {
+        const key = window.localStorage.key(i);
+        if (!key) continue;
+        if (key.startsWith(prefix)) {
+          window.localStorage.removeItem(key);
+        }
+      }
     } catch {
-      window.localStorage.removeItem(draftStorageKey);
+      /* ignore */
     }
-  }, [actor, actorLoading, course, defaultValues, draftStorageKey, jobId, loadingCourse, reset]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (actorLoading || !actor || loadingCourse) return;
-    if (jobId && !course) return;
-    if (!hasMeaningfulDraftContent(values)) {
-      window.localStorage.removeItem(draftStorageKey);
-      setDraftSavedAt("");
-      return;
-    }
-    const timeoutId = window.setTimeout(() => {
-      const payload = { values, activeTab, updatedAt: new Date().toISOString() };
-      window.localStorage.setItem(draftStorageKey, JSON.stringify(payload));
-      setDraftSavedAt(payload.updatedAt);
-    }, 400);
-    return () => window.clearTimeout(timeoutId);
-  }, [activeTab, actor, actorLoading, course, draftStorageKey, jobId, loadingCourse, values]);
+  }, []);
 
   useEffect(() => {
     const nextClassesCount = countCurriculumLessons(values.curriculum);
@@ -3393,12 +3378,29 @@ export default function CourseWizard({ jobId }) {
       setLoadingCourse(true);
       setCourseLoadError("");
       setCourseLoadedAt("");
+      let curriculumSnapshot = null;
+      try {
+        if (typeof window !== "undefined") {
+          const rawSnapshot = window.sessionStorage.getItem(`acav:courses:curriculum:${String(jobId).trim()}`);
+          if (rawSnapshot) {
+            curriculumSnapshot = JSON.parse(rawSnapshot);
+          }
+        }
+      } catch {
+        curriculumSnapshot = null;
+      }
       try {
         const data = await authedFetch(user, `/api/courses/${jobId}`, { method: "GET" });
         if (!alive) return;
         const current = data?.course || {};
         setCourse(current);
-        reset(mapCourseToFormValues(current, defaultValues));
+        const baseFormValues = mapCourseToFormValues(current, defaultValues);
+        if (curriculumSnapshot && Array.isArray(curriculumSnapshot) && curriculumSnapshot.length) {
+          baseFormValues.curriculum = sanitizeCurriculum(curriculumSnapshot);
+          baseFormValues.modules = buildLegacyModulesFromCurriculum(baseFormValues.curriculum);
+          baseFormValues.classesCount = countCurriculumLessons(baseFormValues.curriculum) || baseFormValues.classesCount;
+        }
+        reset(baseFormValues);
         setSlugTouchedManually(isCustomSlugForTitle(current?.title, current?.slug));
         setCourseLoadError("");
         setCourseLoadedAt(new Date().toISOString());
@@ -3429,9 +3431,22 @@ export default function CourseWizard({ jobId }) {
 
   const updateCurriculum = (nextCurriculum) => {
     const next = Array.isArray(nextCurriculum) ? nextCurriculum : [];
-    setValue("curriculum", next, { shouldValidate: true, shouldDirty: true });
+    setValue("curriculum", next, { shouldValidate: true, shouldDirty: true, shouldTouch: true });
     const nextClassesCount = countCurriculumLessons(next);
-    setValue("classesCount", nextClassesCount || 1, { shouldValidate: true, shouldDirty: true });
+    setValue("classesCount", nextClassesCount || 1, { shouldValidate: true, shouldDirty: true, shouldTouch: true });
+    try {
+      const id = jobId && String(jobId).trim();
+      if (!id || typeof window === "undefined") return;
+      const key = `acav:courses:curriculum:${id}`;
+      const snapshot = JSON.stringify(next);
+      if (snapshot.length < 400_000) {
+        window.sessionStorage.setItem(key, snapshot);
+      } else {
+        window.sessionStorage.removeItem(key);
+      }
+    } catch {
+      /* ignore */
+    }
   };
 
   const updateFinalEvaluation = (nextEvaluation) => {
@@ -3512,9 +3527,7 @@ export default function CourseWizard({ jobId }) {
     }
   };
 
-  const clearLocalDraft = ({ resetForm = true, showToast = true } = {}) => {
-    if (typeof window === "undefined") return;
-    window.localStorage.removeItem(draftStorageKey);
+  const clearForm = ({ resetForm = true, showToast = true } = {}) => {
     if (resetForm) {
       const baseValues = jobId && course ? mapCourseToFormValues(course, defaultValues) : defaultValues;
       reset(baseValues);
@@ -3522,10 +3535,8 @@ export default function CourseWizard({ jobId }) {
       clearErrors();
       setActiveTab("general");
     }
-    setDraftSavedAt("");
-    setDraftRestored(false);
     if (showToast) {
-      toast.success("Borrador limpiado", { position: "top-right" });
+      toast.success("Formulario reiniciado", { position: "top-right" });
     }
   };
 
@@ -3748,7 +3759,7 @@ export default function CourseWizard({ jobId }) {
     try {
       const mode = actor?.role === "admin" && formValues.status === "activa" ? "publish" : actor?.role === "admin" ? "draft" : "review";
       await submit(formValues, mode);
-      clearLocalDraft({ resetForm: false, showToast: false });
+      clearForm({ resetForm: false, showToast: false });
       router.push(buildLocalizedPath("/dashboard/cursos"));
     } catch (error) {
       toast.error(error?.message || "No se pudo guardar el curso.", { position: "top-right" });
@@ -3851,12 +3862,6 @@ export default function CourseWizard({ jobId }) {
                 <span className="inline-flex h-5 items-center gap-1 rounded-full border border-border/60 bg-background px-2 text-[10px] font-medium text-muted-foreground shrink-0">
                   {values.classesCount || 0} clases · {Array.isArray(values.curriculum) ? values.curriculum.length : 0} secciones
                 </span>
-                {draftSavedAt ? (
-                  <span className="inline-flex h-5 items-center gap-1 rounded-full border border-emerald-100 bg-emerald-50 px-2 text-[10px] font-medium text-emerald-700 shrink-0">
-                    <Clock3 className="h-3 w-3" />
-                    Guardado {new Date(draftSavedAt).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })}
-                  </span>
-                ) : null}
               </div>
             </div>
           </div>
@@ -3870,18 +3875,16 @@ export default function CourseWizard({ jobId }) {
                 </Link>
               </Button>
             ) : null}
-            {draftSavedAt ? (
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => clearLocalDraft()}
-                disabled={busy}
-                className="h-8 text-[11px] text-muted-foreground hover:text-foreground"
-              >
-                Limpiar borrador
-              </Button>
-            ) : null}
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => clearForm()}
+              disabled={busy}
+              className="h-8 text-[11px] text-muted-foreground hover:text-foreground"
+            >
+              Reiniciar formulario
+            </Button>
             {!isLastTab ? (
               <Button type="button" size="sm" onClick={goToNextTab} disabled={busy} className="h-8 text-[11px]">
                 Siguiente
@@ -3899,7 +3902,7 @@ export default function CourseWizard({ jobId }) {
 
         <div className="grid gap-6 xl:grid-cols-[280px_minmax(0,1fr)]">
           <div className="sticky top-4 self-start z-20 w-full max-w-[320px]">
-            <WorkspaceSidebar activeTab={activeTab} onSelect={handleTabChange} values={values} errors={errors} draftSavedAt={draftSavedAt} />
+            <WorkspaceSidebar activeTab={activeTab} onSelect={handleTabChange} values={values} errors={errors} />
           </div>
 
           <div className="grid gap-6">
@@ -4478,7 +4481,7 @@ export default function CourseWizard({ jobId }) {
             </div>
           </div>
 
-          <WorkspaceSummary values={values} course={course} draftSavedAt={draftSavedAt} publicHref={publicCourseHref} />
+          <WorkspaceSummary values={values} course={course} publicHref={publicCourseHref} />
         </div>
       </form>
 

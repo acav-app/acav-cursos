@@ -244,7 +244,7 @@ export default function LessonVideoUploader({
       toast.error("La URL no es válida.");
       return;
     }
-    const url = isEmbedUrl(raw) ? toEmbedUrl(raw) : raw;
+    const url = toEmbedUrl(raw);
     setPreview(null);
     onChange(url, null, null);
     setManualUrl("");
