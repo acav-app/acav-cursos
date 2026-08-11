@@ -118,8 +118,8 @@ export function mapCourseForCard(course: any) {
   const imageUrl = normalizePublicR2Url(course?.imageUrl || course?.flyerUrl || "");
   const thumbnailUrl = normalizePublicR2Url(course?.thumbnailUrl || imageUrl);
   const videoUrl = normalizePublicR2Url(course?.videoUrl || "");
-  const formattedPrice = course?.freeCourse ? "Gratuito" : formatCurrency(course?.price);
-  const formattedOldPrice = course?.oldPrice ? formatCurrency(course?.oldPrice) : "";
+  const formattedPrice = course?.freeCourse ? "Gratuito" : `Precio socios ${formatCurrency(course?.price)}`;
+  const formattedOldPrice = course?.oldPrice ? `No socios ${formatCurrency(course?.oldPrice)}` : "";
 
   return {
     ...course,

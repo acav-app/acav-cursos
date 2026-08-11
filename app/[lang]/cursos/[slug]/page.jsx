@@ -130,7 +130,7 @@ export default async function CursoDetailPage({ params: { lang, slug } }) {
   const institutionDescription =
     institution?.description ||
     "La institucion forma parte del ecosistema ACAV Cursos y publica propuestas para fortalecer la formacion del sector turistico.";
-  const pricingLabel = course?.freeCourse ? "Gratuito" : formatCurrency(course?.price) || "Consultar valor";
+  const pricingLabel = course?.freeCourse ? "Gratuito" : `Precio socios ${formatCurrency(course?.price) || "Consultar valor"}`;
   const oldPricingLabel = course?.oldPrice ? formatCurrency(course.oldPrice) : "";
   const learningObjectives = Array.isArray(course?.learningObjectives) ? course.learningObjectives.filter(Boolean) : [];
   const targetAudience = Array.isArray(course?.targetAudience) ? course.targetAudience.filter(Boolean) : [];
@@ -345,7 +345,7 @@ export default async function CursoDetailPage({ params: { lang, slug } }) {
                         <Wallet className="mt-0.5 h-4 w-4 shrink-0 text-[#1B2B50]" />
                         <span>
                           {pricingLabel}
-                          {oldPricingLabel ? ` · Antes ${oldPricingLabel}` : ""}
+                          {oldPricingLabel ? ` · No socios ${oldPricingLabel}` : ""}
                         </span>
                       </div>
                       <div className="flex items-start gap-3">

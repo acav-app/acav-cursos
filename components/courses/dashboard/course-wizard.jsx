@@ -317,7 +317,7 @@ const schema = z
       })
     ),
     price: z.number().min(0, "El precio no puede ser negativo"),
-    oldPrice: z.number().min(0, "El precio anterior no puede ser negativo").optional(),
+    oldPrice: z.number().min(0, "El precio no socios no puede ser negativo").optional(),
     freeCourse: z.boolean(),
     certificate: z.boolean(),
     lifetimeAccess: z.boolean(),
@@ -376,7 +376,7 @@ const schema = z
       ctx.addIssue({ code: "custom", message: "Indica un precio o marca el curso como gratuito", path: ["price"] });
     }
     if (Number.isFinite(Number(values.oldPrice || 0)) && Number(values.oldPrice || 0) < Number(values.price || 0)) {
-      ctx.addIssue({ code: "custom", message: "El precio anterior debe ser mayor o igual al precio actual", path: ["oldPrice"] });
+      ctx.addIssue({ code: "custom", message: "El precio no socios debe ser mayor o igual al precio socios", path: ["oldPrice"] });
     }
     if (values.promoVideo) {
       const external = isExternalVideoOnly({ url: String(values.promoVideo || ""), mimeType: undefined });
@@ -4209,7 +4209,7 @@ export default function CourseWizard({ jobId }) {
                 <div className="grid gap-6 md:grid-cols-3">
                   <div className="grid gap-2">
                     <Label className="flex items-center gap-1.5">
-                      Precio
+                      Precio socios
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <button type="button" className="inline-flex h-4 w-4 items-center justify-center text-slate-400 hover:text-slate-700">
@@ -4218,7 +4218,7 @@ export default function CourseWizard({ jobId }) {
                         </TooltipTrigger>
                         <TooltipContent side="right">
                           <div className="max-w-xs text-[11px] leading-5">
-                            Valor en pesos argentinos (ARS). El precio se muestra al alumno en la ficha del curso.
+                            Valor en pesos argentinos (ARS) para socios de la institución. Es el precio vigente que se muestra al alumno.
                           </div>
                         </TooltipContent>
                       </Tooltip>
@@ -4228,7 +4228,7 @@ export default function CourseWizard({ jobId }) {
                   </div>
                   <div className="grid gap-2">
                     <Label className="flex items-center gap-1.5">
-                      Precio anterior
+                      Precio no socios
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <button type="button" className="inline-flex h-4 w-4 items-center justify-center text-slate-400 hover:text-slate-700">
@@ -4237,7 +4237,7 @@ export default function CourseWizard({ jobId }) {
                         </TooltipTrigger>
                         <TooltipContent side="right">
                           <div className="max-w-xs text-[11px] leading-5">
-                            Mostrar precio tachado con una oferta. Debe ser mayor o igual al precio actual.
+                            Valor de lista para personas que no son socios. Se muestra tachado como oferta cuando coincida con el precio socios.
                           </div>
                         </TooltipContent>
                       </Tooltip>

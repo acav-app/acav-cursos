@@ -1,9 +1,9 @@
 "use client";
 import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
-import PlyrCSS from "plyr/dist/plyr.css?raw";
 import { AlertTriangle, PlayCircle, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import PlyrCssInline from "@/components/courses/vendor/plyr.css?raw";
 
 const DEFAULT_CONTROLS = [
   "play-large",
@@ -29,7 +29,7 @@ async function ensurePlyr() {
     try {
       const style = document.createElement("style");
       style.setAttribute("data-plyr-css", "1");
-      style.textContent = PlyrCSS || "";
+      style.textContent = PlyrCssInline || "";
       document.head.appendChild(style);
     } catch {
       /* ignore */

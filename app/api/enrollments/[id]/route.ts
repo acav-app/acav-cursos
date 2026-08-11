@@ -32,6 +32,99 @@ function filterProgressAgainstCurriculum(progress: unknown, allowedLessonIds: Se
   });
 }
 
+function mergeLessonProgress(oldArr: unknown, newArr: unknown, allowedLessonIds: Set<string>) {
+  const old = Array.isArray(oldArr) ? oldArr : [];
+  const incoming = filterProgressAgainstCurriculum(Array.isArray(newArr) ? newArr : [], allowedLessonIds);
+  const byId = new Map<string, any>();
+  for (const entry of old) {
+    if (!entry || typeof entry !== "object") continue;
+    const lessonId = String((entry as Record<string, any>).lessonId || "").trim();
+    if (!lessonId) continue;
+    if (!allowedLessonIds.has(lessonId)) continue;
+    byId.set(lessonId, entry);
+  }
+  for (const entry of incoming) {
+    const lessonId = String((entry as Record<string, any>).lessonId || "").trim();
+    if (!lessonId) continue;
+    byId.set(lessonId, entry);
+  }
+  return Array.from(byId.values());
+}
+
+function mergeActivitySubmissions(oldArr: unknown, newArr: unknown, allowedLessonIds: Set<string>) {
+  const old = Array.isArray(oldArr) ? oldArr : [];
+  const incoming = filterActivitySubmissionsAgainstCurriculum(Array.isArray(newArr) ? newArr : [], allowedLessonIds);
+  const keyOf = (e: any) => `${String(e?.lessonId || "")}:${String(e?.title || "submission")}`;
+  const byKey = new Map<string, any>();
+  for (const entry of old) {
+    if (!entry || typeof entry !== "object") continue;
+    const lessonId = String((entry as Record<string, any>).lessonId || "").trim();
+    if (!lessonId) continue;
+    if (!allowedLessonIds.has(lessonId)) continue;
+    byKey.set(keyOf(entry), entry);
+  }
+  for (const entry of incoming) {
+    const key = keyOf(entry);
+    byKey.set(key, entry);
+  }
+  return Array.from(byKey.values());
+}
+
+function mergeGradebook(oldArr: unknown, newArr: unknown, allowedLessonIds: Set<string>, finalEvaluationEnabled: boolean) {
+  const old = Array.isArray(oldArr) ? oldArr : [];
+  const incoming = Array.isArray(newArr) ? newArr : [];
+  const normalizeEntry = (raw: any) => {
+    if (!raw || typeof raw !== "object") return null;
+    const r = raw as Record<string, any>;
+    const sourceTypeRaw = String(r.sourceType || "lesson").trim().toLowerCase();
+    const normalizedSourceType =
+      sourceTypeRaw === "final_evaluation" ||
+      sourceTypeRaw === "final" ||
+      String(r.sourceId || "") === "final_evaluation"
+        ? "final_evaluation"
+        : "lesson";
+    const sourceId = String(r.sourceId || "").trim();
+    if (!sourceId) return null;
+    const isFinal = normalizedSourceType === "final_evaluation" || sourceId === "final_evaluation" || sourceId === "final";
+    if (isFinal) {
+      if (!finalEvaluationEnabled) return null;
+    } else {
+      if (!allowedLessonIds.has(sourceId)) return null;
+    }
+    const allowedSourceTypes = new Set(["lesson", "final_evaluation", "lesson_evaluation", "quiz", "class_evaluation"]);
+    if (sourceTypeRaw && !allowedSourceTypes.has(sourceTypeRaw)) return null;
+    const scoreRaw = Number(r.score);
+    const maxScoreRaw = Number(r.maxScore);
+    const weightRaw = Number(r.weight);
+    return {
+      sourceType: normalizedSourceType,
+      sourceId,
+      title: String(r.title || "Evaluación").trim(),
+      score: Number.isFinite(scoreRaw) && scoreRaw >= 0 ? scoreRaw : undefined,
+      maxScore: Number.isFinite(maxScoreRaw) && maxScoreRaw > 0 ? maxScoreRaw : undefined,
+      weight: Number.isFinite(weightRaw) && weightRaw >= 0 && weightRaw <= 1 ? weightRaw : undefined,
+      status: ["pending", "graded", "passed", "failed"].includes(String(r.status || "").trim())
+        ? String(r.status).trim()
+        : "graded",
+      reviewedAt: String(r.reviewedAt || new Date().toISOString()).trim(),
+      feedback: typeof r.feedback === "string" && r.feedback.trim() ? r.feedback.trim() : undefined,
+    };
+  };
+  const keyOf = (e: any) => `${String(e?.sourceType || "")}:${String(e?.sourceId || "")}`;
+  const byKey = new Map<string, any>();
+  for (const entry of old) {
+    const norm = normalizeEntry(entry);
+    if (!norm) continue;
+    byKey.set(keyOf(norm), norm);
+  }
+  for (const entry of incoming) {
+    const norm = normalizeEntry(entry);
+    if (!norm) continue;
+    byKey.set(keyOf(norm), norm);
+  }
+  return Array.from(byKey.values());
+}
+
 function filterActivitySubmissionsAgainstCurriculum(entries: unknown, allowedLessonIds: Set<string>) {
   if (!Array.isArray(entries)) return [];
   return entries.filter((entry) => {
@@ -86,64 +179,27 @@ export async function PATCH(request: Request, ctx: { params: { id: string } }) {
       }
 
       const incomingLessonProgress = Array.isArray(body?.lessonProgress)
-        ? filterProgressAgainstCurriculum(body?.lessonProgress, allowedLessonIds || new Set())
+        ? mergeLessonProgress(enrollment.lessonProgress, body?.lessonProgress, allowedLessonIds || new Set())
+        : Array.isArray(enrollment.lessonProgress)
+        ? mergeLessonProgress(enrollment.lessonProgress, [], allowedLessonIds || new Set())
         : undefined;
       const incomingProgressNumber = Number.isFinite(Number(body?.progress)) && Number(body?.progress) >= 0 && Number(body?.progress) <= 100
         ? Number(body?.progress)
-        : undefined;
+        : (Number.isFinite(Number(enrollment.progress)) ? Number(enrollment.progress) : undefined);
       const incomingSubmissions = Array.isArray(body?.activitySubmissions)
-        ? filterActivitySubmissionsAgainstCurriculum(body?.activitySubmissions, allowedLessonIds || new Set())
+        ? mergeActivitySubmissions(enrollment.activitySubmissions || [], body?.activitySubmissions, allowedLessonIds || new Set())
         : undefined;
 
-      const allowedSourceTypes = new Set(["lesson", "final_evaluation", "lesson_evaluation", "quiz", "class_evaluation"]);
-      const rawGradebook = Array.isArray(body?.gradebook) ? body.gradebook : [];
-      const evaluatedLessonIds = allowedLessonIds || new Set();
       const finalEvaluationEnabled = Boolean(course?.finalEvaluation?.enabled);
-      const filteredGradebook = rawGradebook
-        .filter((entry) => {
-          if (!entry || typeof entry !== "object") return false;
-          const sourceType = String((entry as Record<string, any>).sourceType || "").trim().toLowerCase();
-          if (!allowedSourceTypes.has(sourceType) && sourceType !== "") return false;
-          const sourceId = String((entry as Record<string, any>).sourceId || "").trim();
-          if (!sourceId) return false;
-          if (sourceType === "final_evaluation" || sourceId === "final_evaluation" || sourceId === "final") {
-            return finalEvaluationEnabled;
-          }
-          return evaluatedLessonIds.has(sourceId);
-        })
-        .map((entry) => {
-          const raw = entry as Record<string, any>;
-          const sourceTypeRaw = String(raw.sourceType || "lesson").trim().toLowerCase();
-          const normalizedSourceType =
-            sourceTypeRaw === "final_evaluation" ||
-            sourceTypeRaw === "final" ||
-            String(raw.sourceId || "") === "final_evaluation"
-              ? "final_evaluation"
-              : "lesson";
-          const scoreRaw = Number(raw.score);
-          const maxScoreRaw = Number(raw.maxScore);
-          const weightRaw = Number(raw.weight);
-          return {
-            sourceType: normalizedSourceType,
-            sourceId: String(raw.sourceId || "").trim(),
-            title: String(raw.title || "Evaluación").trim(),
-            score: Number.isFinite(scoreRaw) && scoreRaw >= 0 ? scoreRaw : undefined,
-            maxScore: Number.isFinite(maxScoreRaw) && maxScoreRaw > 0 ? maxScoreRaw : undefined,
-            weight: Number.isFinite(weightRaw) && weightRaw >= 0 && weightRaw <= 1 ? weightRaw : undefined,
-            status: ["pending", "graded", "passed", "failed"].includes(String(raw.status || "").trim())
-              ? String(raw.status).trim()
-              : "graded",
-            reviewedAt: String(raw.reviewedAt || new Date().toISOString()).trim(),
-            feedback: typeof raw.feedback === "string" && raw.feedback.trim() ? raw.feedback.trim() : undefined,
-          };
-        })
-        .filter((entry) => Boolean(entry.sourceId));
+      const mergedGradebook = Array.isArray(body?.gradebook)
+        ? mergeGradebook(enrollment.gradebook || [], body.gradebook, allowedLessonIds || new Set(), finalEvaluationEnabled)
+        : undefined;
 
       safeBody = {
         progress: incomingProgressNumber,
         lessonProgress: incomingLessonProgress,
         activitySubmissions: incomingSubmissions,
-        gradebook: filteredGradebook,
+        gradebook: mergedGradebook,
       };
     }
 
