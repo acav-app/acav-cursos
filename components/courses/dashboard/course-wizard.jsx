@@ -60,6 +60,7 @@ import { useAuth } from "@/provider/auth.provider";
 import { authedFetch } from "@/lib/auth/authed-fetch";
 import { cn, useLocalizedPath } from "@/lib/utils";
 import {
+  COURSE_CATEGORIES,
   COURSE_LANGUAGES,
   COURSE_LEVELS,
   COURSE_PUBLICATION_VISIBILITY,
@@ -3339,14 +3340,48 @@ export default function CourseWizard({ jobId }) {
   }, [setValue, slugTouchedManually, values.slug, values.title]);
 
   useEffect(() => {
-    setCategoryOptions((current) =>
-      normalizeCategoryOptions([
-        ...current,
-        values.category,
-        course?.subRubro,
-      ])
-    );
-  }, [course?.subRubro, values.category]);
+    let alive = true;
+    async function fetchExistingCategories() {
+      try {
+        const res = await fetch("/api/courses?scope=history&limit=500", {
+          credentials: "include",
+          headers: { Accept: "application/json" },
+        });
+        if (!res.ok) return;
+        const payload = await res.json();
+        const allCourses = Array.isArray(payload?.courses) ? payload.courses : [];
+        const existingSubRubros = allCourses
+          .map((course) => String(course?.subRubro || course?.categoryLabel || "").trim())
+          .filter(Boolean);
+        if (!alive) return;
+        setCategoryOptions((current) =>
+          normalizeCategoryOptions([
+            ...COURSE_CATEGORIES,
+            ...existingSubRubros,
+            ...current,
+            values.category,
+            course?.subRubro,
+          ])
+        );
+      } catch {
+        // fallback: solo COURSE_CATEGORIES + current + curso actual
+        if (!alive) return;
+        setCategoryOptions((current) =>
+          normalizeCategoryOptions([
+            ...COURSE_CATEGORIES,
+            ...current,
+            values.category,
+            course?.subRubro,
+          ])
+        );
+      }
+    }
+    fetchExistingCategories();
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [course?.id, course?.subRubro]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -3987,6 +4022,7 @@ export default function CourseWizard({ jobId }) {
                     </Label>
                     <div className="flex gap-2">
                       <Select
+                        key={`category-select-${categoryOptions.length}-${values.category || ""}`}
                         value={values.category || ""}
                         onValueChange={(value) => {
                           clearErrors("category");
