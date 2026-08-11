@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
-import { FileText, Globe2, Save } from "lucide-react";
+import { FileText, Globe, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -296,7 +296,7 @@ export default function DashboardContenidoPage() {
           <div className="rounded-3xl border border-border/60 bg-card p-6">
             <div className="flex items-center gap-3">
               <span className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-                <Globe2 className="h-5 w-5" />
+                <Globe className="h-5 w-5" />
               </span>
               <div>
                 <div className="text-sm font-semibold uppercase tracking-[0.18em] text-muted-foreground">Preview rápido</div>

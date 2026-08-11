@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import * as pdfjsLib from "pdfjs-dist";
 import mammoth from "mammoth/mammoth.browser";
 import {
@@ -35,20 +35,86 @@ function formatBytes(bytes) {
   return `${n.toFixed(n < 10 && i > 0 ? 1 : 0)} ${units[i]}`;
 }
 
+function getExtension(value) {
+  const clean = String(value || "").split("?")[0].split("#")[0];
+  const lastDot = clean.lastIndexOf(".");
+  if (lastDot === -1) return "";
+  return clean.slice(lastDot + 1).toLowerCase();
+}
+
+function inferResourceMeta(resource) {
+  const url = String(resource?.url || resource?.previewUrl || "");
+  const mime = String(resource?.mimeType || "").toLowerCase();
+  const fileName =
+    resource?.name ||
+    resource?.label ||
+    resource?.fileName ||
+    (url ? url.split("/").pop() || "" : "");
+  const ext = getExtension(fileName || url);
+
+  let kind = resource?.kind;
+  let subKind = resource?.subKind;
+
+  if (!kind || kind === "document" || kind === "file") {
+    if (mime.startsWith("image/") || ["png", "jpg", "jpeg", "gif", "webp", "bmp", "svg"].includes(ext)) {
+      kind = "image";
+    } else if (mime.startsWith("video/") || ["mp4", "webm", "ogg", "mov", "m4v", "mkv"].includes(ext)) {
+      kind = "video";
+    } else if (["zip", "rar", "7z"].includes(ext) || mime.includes("zip") || mime.includes("rar") || mime.includes("compressed")) {
+      kind = "archive";
+    } else {
+      kind = "document";
+    }
+  }
+
+  if (!subKind || subKind === "other") {
+    if (ext === "pdf" || mime === "application/pdf") {
+      subKind = "pdf";
+    } else if (["docx", "doc"].includes(ext)) {
+      subKind = ext;
+    } else if (["jpg", "jpeg", "png", "webp"].includes(ext)) {
+      subKind = ext;
+    } else if (["zip", "rar"].includes(ext)) {
+      subKind = ext;
+    } else if (ext) {
+      subKind = ext;
+    }
+  }
+
+  return { kind, subKind, ext, mime, fileName };
+}
+
 export default function DocumentPreviewCard({ resource, compact = false }) {
   const [open, setOpen] = useState(false);
-  const kind = resource?.kind || "document";
-  const subKind = resource?.subKind || "other";
+
+  const meta = useMemo(() => inferResourceMeta(resource), [resource]);
+  const kind = meta.kind || "document";
+  const subKind = meta.subKind || "other";
   const url = resource?.url || resource?.previewUrl;
+  const label = resource?.label || resource?.name || meta.fileName || "Recurso";
+  const fileSize =
+    typeof resource?.fileSize === "number"
+      ? resource.fileSize
+      : typeof resource?.sizeBytes === "number"
+        ? resource.sizeBytes
+        : undefined;
+
+  const normalizedResource = {
+    ...resource,
+    label,
+    fileSize,
+    kind,
+    subKind,
+  };
 
   if (!url) {
-    return <ResourceMissingCard resource={resource} />;
+    return <ResourceMissingCard resource={normalizedResource} />;
   }
 
   if (kind === "image" || ["jpg", "jpeg", "png", "webp"].includes(subKind)) {
     return (
       <ImagePreviewCard
-        resource={resource}
+        resource={normalizedResource}
         compact={compact}
         open={open}
         setOpen={setOpen}
@@ -57,17 +123,17 @@ export default function DocumentPreviewCard({ resource, compact = false }) {
   }
 
   if (kind === "archive" || ["zip", "rar"].includes(subKind)) {
-    return <ArchivePreviewCard resource={resource} compact={compact} />;
+    return <ArchivePreviewCard resource={normalizedResource} compact={compact} />;
   }
 
   if (kind === "video") {
-    return <VideoLinkCard resource={resource} compact={compact} />;
+    return <VideoLinkCard resource={normalizedResource} compact={compact} />;
   }
 
   if (subKind === "pdf") {
     return (
       <PdfPreviewCard
-        resource={resource}
+        resource={normalizedResource}
         compact={compact}
         open={open}
         setOpen={setOpen}
@@ -78,7 +144,7 @@ export default function DocumentPreviewCard({ resource, compact = false }) {
   if (["docx", "doc"].includes(subKind)) {
     return (
       <DocxPreviewCard
-        resource={resource}
+        resource={normalizedResource}
         compact={compact}
         open={open}
         setOpen={setOpen}
@@ -86,7 +152,7 @@ export default function DocumentPreviewCard({ resource, compact = false }) {
     );
   }
 
-  return <GenericDocCard resource={resource} compact={compact} />;
+  return <GenericDocCard resource={normalizedResource} compact={compact} />;
 }
 
 function CardShell({ resource, icon, children, compact, className, actions, footer }) {

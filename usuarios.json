@@ -1,0 +1,492 @@
+[
+  {
+    "nombre_y_apellido": "Elías Daniel Hadid",
+    "dni": 20006129,
+    "contrasena": "20006129",
+    "agencia": "Particular",
+    "legajo": "No",
+    "telefono_contacto": "1124637926",
+    "email_contacto": "eliahuhadid@gmail.com",
+    "es_socio": "No"
+  },
+  {
+    "nombre_y_apellido": "Cecilia Ayduh",
+    "dni": 30660180,
+    "contrasena": "30660180",
+    "agencia": "élan travels",
+    "legajo": "No",
+    "telefono_contacto": "3512290807",
+    "email_contacto": "ceciayduh@elantravels.com",
+    "es_socio": "No"
+  },
+  {
+    "nombre_y_apellido": "Micaela Czerniak",
+    "dni": 42367629,
+    "contrasena": "42367629",
+    "agencia": "particular",
+    "legajo": "No",
+    "telefono_contacto": "1164381181",
+    "email_contacto": "micaelaczerniak@hotmail.com",
+    "es_socio": "No"
+  },
+  {
+    "nombre_y_apellido": "Sandra Di Paola",
+    "dni": 20783545,
+    "contrasena": "20783545",
+    "agencia": "Particular",
+    "legajo": "No",
+    "telefono_contacto": "3515935377",
+    "email_contacto": "sandipaola1@gmail.com",
+    "es_socio": "No"
+  },
+  {
+    "nombre_y_apellido": "Juan Cruz Seifer",
+    "dni": 45086411,
+    "contrasena": "45086411",
+    "agencia": "No trabajo actualmente en agencia de viajes",
+    "legajo": "Ninguna",
+    "telefono_contacto": "3516218294",
+    "email_contacto": "seiferalexis@gmail.com",
+    "es_socio": "No"
+  },
+  {
+    "nombre_y_apellido": "María Verónica Correa",
+    "dni": 31047760,
+    "contrasena": "31047760",
+    "agencia": "GF Travel",
+    "legajo": "17169",
+    "telefono_contacto": "2664748396",
+    "email_contacto": "Veronica.correa@gftravel.com.ar",
+    "es_socio": "Si"
+  },
+  {
+    "nombre_y_apellido": "María Agustina Ocampo Paladini",
+    "dni": 35089736,
+    "contrasena": "35089736",
+    "agencia": "Himalaya Viajes",
+    "legajo": "1744",
+    "telefono_contacto": "3516165549",
+    "email_contacto": "areacbp@gmail.com",
+    "es_socio": "Si"
+  },
+  {
+    "nombre_y_apellido": "Alvaro Laureano Alvarez Zanatta",
+    "dni": 45103754,
+    "contrasena": "45103754",
+    "agencia": "RZ TRAVEL by Oceanica",
+    "legajo": "17782",
+    "telefono_contacto": "3517049928",
+    "email_contacto": "Rz.magicaltravel@gmail.com",
+    "es_socio": "No"
+  },
+  {
+    "nombre_y_apellido": "Diego irueste",
+    "dni": 30168327,
+    "contrasena": "30168327",
+    "agencia": "Particular",
+    "legajo": "No",
+    "telefono_contacto": "3516794986",
+    "email_contacto": "iruestediego@gmail.com",
+    "es_socio": "NO"
+  },
+  {
+    "nombre_y_apellido": "Amelie Bentancourt",
+    "dni": 47576531,
+    "contrasena": "47576531",
+    "agencia": "Bentancourt Operador Turístico",
+    "legajo": "10850",
+    "telefono_contacto": "3512620032",
+    "email_contacto": "bentancourtamelie@gmail.com",
+    "es_socio": "Si"
+  },
+  {
+    "nombre_y_apellido": "Guadalupe Avalos",
+    "dni": 36147007,
+    "contrasena": "36147007",
+    "agencia": "BENTANCOURT OPERADOR TURISTICO",
+    "legajo": "10850",
+    "telefono_contacto": "3513467658",
+    "email_contacto": "Guadi_2204@hotmail.com",
+    "es_socio": "Si"
+  },
+  {
+    "nombre_y_apellido": "Agustina Lagranda",
+    "dni": 42856165,
+    "contrasena": "42856165",
+    "agencia": "BENTANCOURT OPERADOR TURISTICO",
+    "legajo": "10850",
+    "telefono_contacto": "3516613203",
+    "email_contacto": "Operacionesbentan1@gmail.com",
+    "es_socio": "Si"
+  },
+  {
+    "nombre_y_apellido": "FLORENCIA LONDERO",
+    "dni": 36725594,
+    "contrasena": "36725594",
+    "agencia": "HIMALAYA VIAJES JESUS MARIA",
+    "legajo": "17440",
+    "telefono_contacto": "3525433550",
+    "email_contacto": "himalayaviajes.jesusmaria@gmail.com",
+    "es_socio": "No"
+  },
+  {
+    "nombre_y_apellido": "Catalina Colmenares",
+    "dni": 45082322,
+    "contrasena": "45082322",
+    "agencia": "Particular - Estudiante de Turismo",
+    "legajo": "No",
+    "telefono_contacto": "3512670505",
+    "email_contacto": "miacatalinacolmenares@gmail.com",
+    "es_socio": "No"
+  },
+  {
+    "nombre_y_apellido": "Pamela Mercol",
+    "dni": 41378040,
+    "contrasena": "41378040",
+    "agencia": "UPC",
+    "legajo": "No",
+    "telefono_contacto": "3532498926",
+    "email_contacto": "pamelamercol@gmail.com",
+    "es_socio": "No"
+  },
+  {
+    "nombre_y_apellido": "Aldana Carrizo",
+    "dni": 43997839,
+    "contrasena": "43997839",
+    "agencia": "Particular",
+    "legajo": "No",
+    "telefono_contacto": "3516231198",
+    "email_contacto": "Alourdescarrizo@gmail.com",
+    "es_socio": "No"
+  },
+  {
+    "nombre_y_apellido": "Florencia Maidana",
+    "dni": 36886469,
+    "contrasena": "36886469",
+    "agencia": "Florencia Viajes",
+    "legajo": "19121",
+    "telefono_contacto": "2645750868",
+    "email_contacto": "Ventas@florenciaviajes.com",
+    "es_socio": "No"
+  },
+  {
+    "nombre_y_apellido": "María Agustina Ocampo Paladini",
+    "dni": 35089736,
+    "contrasena": "35089736",
+    "agencia": "Himalaya Viajes",
+    "legajo": "17.44",
+    "telefono_contacto": "3516165549",
+    "email_contacto": "areacbp@gmail.com",
+    "es_socio": "No"
+  },
+  {
+    "nombre_y_apellido": "Maria Jimena Torriglia",
+    "dni": 27670071,
+    "contrasena": "27670071",
+    "agencia": "Himalaya",
+    "legajo": "17440",
+    "telefono_contacto": "351 633-7054",
+    "email_contacto": "jimetorriglia@gmail.com",
+    "es_socio": "No"
+  },
+  {
+    "nombre_y_apellido": "Paula Martinez",
+    "dni": 36143669,
+    "contrasena": "36143669",
+    "agencia": "HIMALAYA VIAJES",
+    "legajo": "17.44",
+    "telefono_contacto": "3515195067",
+    "email_contacto": "himalayaviajes.villasol@gmail.com",
+    "es_socio": "No"
+  },
+  {
+    "nombre_y_apellido": "Juan Cruz Seifer",
+    "dni": 45086411,
+    "contrasena": "45086411",
+    "agencia": "No trabajo actualmente en agencia de viajes",
+    "legajo": "Ninguna",
+    "telefono_contacto": "3516218294",
+    "email_contacto": "seiferalexis@gmail.com",
+    "es_socio": "No"
+  },
+  {
+    "nombre_y_apellido": "FLORENCIA LONDERO",
+    "dni": 36725594,
+    "contrasena": "36725594",
+    "agencia": "HIMALAYA VIAJES JESUS MARIA",
+    "legajo": "17440",
+    "telefono_contacto": "3525433550",
+    "email_contacto": "himalayaviajes.jesusmaria@gmail.com",
+    "es_socio": "No"
+  },
+  {
+    "nombre_y_apellido": "Florencia Londero",
+    "dni": 36725594,
+    "contrasena": "36725594",
+    "agencia": "Himalaya Viajes Jesús Maria (localidad Jesús María CBA)",
+    "legajo": "17440",
+    "telefono_contacto": "3525433550",
+    "email_contacto": "himalayaviajes.jesusmaria@gmail.com",
+    "es_socio": "No"
+  },
+  {
+    "nombre_y_apellido": "María Verónica Correa",
+    "dni": 31047760,
+    "contrasena": "31047760",
+    "agencia": "GF Travel",
+    "legajo": "17169",
+    "telefono_contacto": "2664748396",
+    "email_contacto": "Veronica.correa@gftravel.com.ar",
+    "es_socio": "No"
+  },
+  {
+    "nombre_y_apellido": "María Marchesi",
+    "dni": 45265129,
+    "contrasena": "45265129",
+    "agencia": "particular",
+    "legajo": "No",
+    "telefono_contacto": "3546452594",
+    "email_contacto": "marchesimari@gmail.com",
+    "es_socio": "No"
+  },
+  {
+    "nombre_y_apellido": "Agustina Delgado",
+    "dni": 44913668,
+    "contrasena": "44913668",
+    "agencia": "Particular",
+    "legajo": "No",
+    "telefono_contacto": "3435097152",
+    "email_contacto": "agustina.delgado020@gmail.com",
+    "es_socio": "No"
+  },
+  {
+    "nombre_y_apellido": "Micaela Czerniak",
+    "dni": 42367629,
+    "contrasena": "42367629",
+    "agencia": "particular",
+    "legajo": "No",
+    "telefono_contacto": "1164381181",
+    "email_contacto": "micaelaczerniak@hotmail.com",
+    "es_socio": "No"
+  },
+  {
+    "nombre_y_apellido": "Elías Daniel Hadid",
+    "dni": 20006129,
+    "contrasena": "20006129",
+    "agencia": "Particular",
+    "legajo": "No",
+    "telefono_contacto": "1124637926",
+    "email_contacto": "eliahuhadid@gmail.com",
+    "es_socio": "No"
+  },
+  {
+    "nombre_y_apellido": "CECILIA AYDUH",
+    "dni": 30660180,
+    "contrasena": "30660180",
+    "agencia": "élan travels",
+    "legajo": "No",
+    "telefono_contacto": "3512290807",
+    "email_contacto": "ceciayduh@elantravels.com",
+    "es_socio": "No"
+  },
+  {
+    "nombre_y_apellido": "Ximena Magalí Jerés",
+    "dni": 39739548,
+    "contrasena": "39739548",
+    "agencia": ".",
+    "legajo": "No",
+    "telefono_contacto": "3883291963",
+    "email_contacto": "magalijeres@gmail.com",
+    "es_socio": "No"
+  },
+  {
+    "nombre_y_apellido": "Joaquin Scandogliero Di Rienzo",
+    "dni": 44192573,
+    "contrasena": "44192573",
+    "agencia": "Particular",
+    "legajo": "No",
+    "telefono_contacto": "3513500136",
+    "email_contacto": "joaquinscando@gmail.com",
+    "es_socio": "No"
+  },
+  {
+    "nombre_y_apellido": "Diego irueste",
+    "dni": 30168327,
+    "contrasena": "30168327",
+    "agencia": "Particular",
+    "legajo": "No",
+    "telefono_contacto": "3516794986",
+    "email_contacto": "iruestediego@gmail.com",
+    "es_socio": "No"
+  },
+  {
+    "nombre_y_apellido": "Cynthia Guadalupe Rodriguez",
+    "dni": 37108318,
+    "contrasena": "37108318",
+    "agencia": "Almundo Microcentro Córdoba",
+    "legajo": "8362",
+    "telefono_contacto": "3516315775",
+    "email_contacto": "Cynn.turismo@gmail.com",
+    "es_socio": "No"
+  },
+  {
+    "nombre_y_apellido": "Zoe Lucia Alonso Garcia",
+    "dni": 44321350,
+    "contrasena": "44321350",
+    "agencia": "AMV TRAVEL DMC",
+    "legajo": "12745",
+    "telefono_contacto": "1133726029",
+    "email_contacto": "zoalogar@gmail.com",
+    "es_socio": "No"
+  },
+  {
+    "nombre_y_apellido": "Alvaro Laureano Alvarez Zanatta",
+    "dni": 45103754,
+    "contrasena": "45103754",
+    "agencia": "RZ TRAVEL by Oceanica",
+    "legajo": "17782",
+    "telefono_contacto": "3517049928",
+    "email_contacto": "Rz.magicaltravel@gmail.com",
+    "es_socio": "No"
+  },
+  {
+    "nombre_y_apellido": "Sandra Di Paola",
+    "dni": 20783545,
+    "contrasena": "20783545",
+    "agencia": "Particular",
+    "legajo": "No",
+    "telefono_contacto": "3515935377",
+    "email_contacto": "sandipaola1@gmail.com",
+    "es_socio": "No"
+  },
+  {
+    "nombre_y_apellido": "soto paula",
+    "dni": 43110762,
+    "contrasena": "43110762",
+    "agencia": "fta montes pacheco",
+    "legajo": "No",
+    "telefono_contacto": "3516378095",
+    "email_contacto": "paulajulietasoto@gmail.com",
+    "es_socio": "No"
+  },
+  {
+    "nombre_y_apellido": "julieta torasso",
+    "dni": 39933732,
+    "contrasena": "39933732",
+    "agencia": "southbound",
+    "legajo": "No",
+    "telefono_contacto": "3515479391",
+    "email_contacto": "torassomariajulieta@gmail.com",
+    "es_socio": "No"
+  },
+  {
+    "nombre_y_apellido": "Nicolás Alejandro Gianinetto Melián",
+    "dni": 39729621,
+    "contrasena": "39729621",
+    "agencia": "Particular",
+    "legajo": "No",
+    "telefono_contacto": "#ERROR!",
+    "email_contacto": "nicogianinetto1208@gmail.com",
+    "es_socio": "No"
+  },
+  {
+    "nombre_y_apellido": "Carolina Piccinini",
+    "dni": 30345692,
+    "contrasena": "30345692",
+    "agencia": "Almundo",
+    "legajo": "8362",
+    "telefono_contacto": "2664555585",
+    "email_contacto": "Carolinapiccinini83@gmail.com",
+    "es_socio": "No"
+  },
+  {
+    "nombre_y_apellido": "Amelie Bentancourt",
+    "dni": 47576531,
+    "contrasena": "47576531",
+    "agencia": "Bentancourt Operador Turístico",
+    "legajo": "10850",
+    "telefono_contacto": "3512620032",
+    "email_contacto": "bentancourtamelie@gmail.com",
+    "es_socio": "No"
+  },
+  {
+    "nombre_y_apellido": "Agustina Lagranda",
+    "dni": 42856165,
+    "contrasena": "42856165",
+    "agencia": "BENTANCOURT OPERADOR TURISTICO",
+    "legajo": "10850",
+    "telefono_contacto": "3516613203",
+    "email_contacto": "Operacionesbentan1@gmail.com",
+    "es_socio": "No"
+  },
+  {
+    "nombre_y_apellido": "Diego irueste",
+    "dni": 30168327,
+    "contrasena": "30168327",
+    "agencia": "Particular",
+    "legajo": "No",
+    "telefono_contacto": "3516794986",
+    "email_contacto": "iruestediego@gmail.com",
+    "es_socio": "No"
+  },
+  {
+    "nombre_y_apellido": "Guadalupe Avalos",
+    "dni": 36147007,
+    "contrasena": "36147007",
+    "agencia": "BENTANCOURT OPERADOR TURISTICO",
+    "legajo": "10850",
+    "telefono_contacto": "3513467658",
+    "email_contacto": "Guadi_2204@hotmail.com",
+    "es_socio": "No"
+  },
+  {
+    "nombre_y_apellido": "Fabrizio Calvo",
+    "dni": 45462526,
+    "contrasena": "45462526",
+    "agencia": "I.S.F.T N°179 Carlos Pellegrini",
+    "legajo": "No",
+    "telefono_contacto": "011 3603 9199",
+    "email_contacto": "fabriziocalvo.isft@gmail.com",
+    "es_socio": "No"
+  },
+  {
+    "nombre_y_apellido": "Rosayanetorellanacruz7@gmail.com",
+    "dni": 45684312,
+    "contrasena": "45684312",
+    "agencia": ".",
+    "legajo": "No",
+    "telefono_contacto": "1139439057",
+    "email_contacto": "Rosayanetorellanacruz7@gmail.com",
+    "es_socio": "No"
+  },
+  {
+    "nombre_y_apellido": "Camila rossi",
+    "dni": 40018856,
+    "contrasena": "40018856",
+    "agencia": "Particular",
+    "legajo": "No",
+    "telefono_contacto": "2216382487",
+    "email_contacto": "Cami.rossi@hotmail.com",
+    "es_socio": "No"
+  },
+  {
+    "nombre_y_apellido": "Daniel Creche",
+    "dni": 20898692,
+    "contrasena": "20898692",
+    "agencia": "Particular",
+    "legajo": "No",
+    "telefono_contacto": "2942503493",
+    "email_contacto": "dancre26@outlook.com.ar",
+    "es_socio": "No"
+  },
+  {
+    "nombre_y_apellido": "Catalina Colmenares",
+    "dni": 45082322,
+    "contrasena": "45082322",
+    "agencia": "Particular - Estudiante de Turismo",
+    "legajo": "No",
+    "telefono_contacto": "3512670505",
+    "email_contacto": "miacatalinacolmenares@gmail.com",
+    "es_socio": "No"
+  }
+]

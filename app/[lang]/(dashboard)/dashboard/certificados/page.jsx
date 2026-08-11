@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
-import { Award, FileBadge2, GraduationCap } from "lucide-react";
+import { Award, FileText, GraduationCap } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -228,7 +228,7 @@ export default function DashboardCertificadosPage() {
         <div className="mt-6 grid gap-4 md:grid-cols-4">
           <MetricCard icon={GraduationCap} label="Registros" value={String(summary.total)} helper="Inscripciones con seguimiento de certificación" />
           <MetricCard icon={Award} label="Emitidos" value={String(summary.emitted)} helper="Constancias disponibles para descarga" />
-          <MetricCard icon={FileBadge2} label="Pendientes" value={String(summary.pending)} helper="Inscripciones sin archivo emitido" />
+          <MetricCard icon={FileText} label="Pendientes" value={String(summary.pending)} helper="Inscripciones sin archivo emitido" />
           <MetricCard icon={Award} label="Sin emisión" value={String(summary.unavailable)} helper="Procesos cerrados sin certificado" />
         </div>
 

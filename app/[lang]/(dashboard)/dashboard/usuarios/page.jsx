@@ -2,11 +2,12 @@
 
 import { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
-import { Loader2, Plus, Save } from "lucide-react";
+import { Loader2, Plus, Save, Award, Building2, Users2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
@@ -21,6 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { DataTableEnhanced } from "@/components/ui/data-table-enhanced";
 import { useAuth } from "@/provider/auth.provider";
 import { authedFetch, asArray } from "@/lib/auth/authed-fetch";
 import { useCourseActor } from "@/components/courses/dashboard/use-course-actor";
@@ -103,15 +105,179 @@ export default function DashboardUsuariosPage() {
     };
   }, [user]);
 
-  const filtered = useMemo(() => {
-    const q = normalizeString(query).toLowerCase();
-    if (!q) return users;
-    return users.filter((u) =>
-      [u.email, u.displayName, u.firstName, u.lastName, u.role, u.companyName].some((v) =>
-        String(v || "").toLowerCase().includes(q)
-      )
-    );
-  }, [users, query]);
+  const filtered = useMemo(() => users, [users]);
+
+  const roleBadge = (roleValue) => {
+    const role = normalizeString(roleValue).toLowerCase();
+    if (role === "admin") {
+      return <Badge variant="soft" color="default">Administrador</Badge>;
+    }
+    if (role === "alumno" || role === "student") {
+      return <Badge variant="soft" color="info">Alumno</Badge>;
+    }
+    if (role === "institution") {
+      return <Badge variant="soft" color="warning">Institucional</Badge>;
+    }
+    return <Badge variant="soft" color="secondary">{roleValue || "Sin rol"}</Badge>;
+  };
+
+  const columns = useMemo(() => {
+    return [
+      {
+        id: "user",
+        header: "Usuario",
+        accessorKey: "email",
+        enableSorting: true,
+        meta: { enableColumnFilter: true },
+        cell: ({ row }) => {
+          const u = row.original;
+          const fullName =
+            [u.firstName, u.lastName].filter(Boolean).join(" ").trim() ||
+            u.displayName ||
+            u.fullName ||
+            "Sin nombre";
+          return (
+            <div className="flex min-w-0 items-center gap-3">
+              <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#EEF2FF] text-[#4338CA] ring-1 ring-[#E0E7FF]">
+                <Users2 className="h-5 w-5" />
+              </span>
+              <div className="min-w-0">
+                <div className="truncate text-sm font-semibold text-[#0F172A]">{fullName}</div>
+                <div className="truncate text-xs text-[#64748B]">{u.email || "-"}</div>
+                {(u.documentNumber || u.agency || u.employeeFileNumber) ? (
+                  <div className="mt-0.5 truncate text-[11px] text-[#94A3B8]">
+                    {[
+                      u.documentNumber ? `DNI ${u.documentNumber}` : "",
+                      u.agency ? `Agencia ${u.agency}` : "",
+                      u.employeeFileNumber ? `Legajo ${u.employeeFileNumber}` : "",
+                    ].filter(Boolean).join(" · ")}
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          );
+        },
+      },
+      {
+        id: "role",
+        header: "Rol",
+        accessorKey: "role",
+        enableSorting: true,
+        meta: { enableColumnFilter: true },
+        size: 180,
+        cell: ({ row }) => (
+          <div className="flex items-center gap-2">
+            {roleBadge(row.original.role)}
+          </div>
+        ),
+      },
+      {
+        id: "company",
+        header: "Institucion",
+        accessorKey: "companyName",
+        enableSorting: true,
+        meta: { enableColumnFilter: true },
+        size: 220,
+        cell: ({ row }) => {
+          const name = row.original.companyName || row.original.institutionName || null;
+          return (
+            <div className="flex items-start gap-2 text-sm">
+              {name ? (
+                <>
+                  <Building2 className="mt-0.5 h-4 w-4 shrink-0 text-[#94A3B8]" />
+                  <span className="text-[#0F172A]">{name}</span>
+                </>
+              ) : (
+                <span className="text-[#94A3B8]">Sin institucion</span>
+              )}
+            </div>
+          );
+        },
+      },
+      {
+        id: "contact",
+        header: "Contacto",
+        accessorKey: "phone",
+        enableSorting: true,
+        meta: { enableColumnFilter: true },
+        size: 240,
+        cell: ({ row }) => {
+          const u = row.original;
+          const contactEmail = u.contactEmail || u.email;
+          return (
+            <div className="grid gap-1 text-xs text-[#475569]">
+              {u.phone ? (
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[#64748B]">Tel.</span>
+                  <span className="text-[#0F172A]">{u.phone}</span>
+                </div>
+              ) : null}
+              {contactEmail ? (
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[#64748B]">Email</span>
+                  <span className="truncate text-[#0F172A]">{contactEmail}</span>
+                </div>
+              ) : null}
+            </div>
+          );
+        },
+      },
+      {
+        id: "flags",
+        header: "Estado",
+        accessorKey: "isActive",
+        enableSorting: true,
+        meta: { enableColumnFilter: false },
+        size: 260,
+        cell: ({ row }) => {
+          const u = row.original;
+          const isMember = Boolean(u.isMember);
+          const isActive = u.isActive !== false;
+          return (
+            <div className="flex flex-wrap items-center gap-1.5">
+              <Badge
+                variant="soft"
+                color={isActive ? "success" : "destructive"}
+              >
+                {isActive ? "Activo" : "Inactivo"}
+              </Badge>
+              {isMember ? (
+                <Badge variant="soft" color="warning" className="inline-flex items-center gap-1">
+                  <Award className="h-3 w-3" />
+                  Socio ACAV
+                </Badge>
+              ) : (
+                <Badge variant="soft" color="secondary">No socio</Badge>
+              )}
+            </div>
+          );
+        },
+      },
+      {
+        id: "actions",
+        header: "Acciones",
+        enableSorting: false,
+        meta: { enableColumnFilter: false },
+        size: 140,
+        cell: ({ row }) => {
+          const u = row.original;
+          return (
+            <div className="flex justify-end" onClick={(e) => e.stopPropagation()}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => openEdit(u)}
+                className="h-9 rounded-2xl border-[#E5E7EB] bg-white text-sm text-[#0F172A] hover:bg-[#F8FAFC]"
+              >
+                Editar
+              </Button>
+            </div>
+          );
+        },
+      },
+    ];
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const companyOptions = useMemo(() => {
     return companies.map((c) => ({ id: c.id, name: c.name }));
@@ -281,7 +447,7 @@ export default function DashboardUsuariosPage() {
   }
 
   return (
-    <div className="py-8 px-2 mx-auto">
+    <div className="py-8 px-2 mx-auto space-y-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
           <div className="text-sm font-semibold uppercase tracking-[0.2em] text-primary">Usuarios</div>
@@ -297,42 +463,50 @@ export default function DashboardUsuariosPage() {
         </Button>
       </div>
 
-      <div className="mt-8 rounded-3xl border border-border/60 bg-card p-6">
-        <div className="grid gap-3 md:grid-cols-2">
-          <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar por email, nombre, rol o institucion" />
-          <div className="text-sm text-muted-foreground md:text-right self-center">{filtered.length} usuario(s)</div>
-        </div>
-
-        <div className="mt-6 grid gap-3">
-          {filtered.map((u) => (
-            <div key={u.uid} className="rounded-3xl border border-border/60 bg-background p-5">
-              <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                <div className="min-w-0">
-                  <div className="text-lg font-semibold text-foreground truncate">{u.email}</div>
-                  <div className="text-sm text-muted-foreground">
-                    {[u.firstName, u.lastName].filter(Boolean).join(" ").trim() || u.displayName || "Sin nombre"} · {u.role} · {u.isActive === false ? "inactivo" : "activo"}
-                  </div>
-                  <div className="mt-1 text-xs text-muted-foreground">
-                    Institucion: {u.companyName || "Sin institucion vinculada"}
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  <Button variant="outline" onClick={() => openEdit(u)}>
-                    Editar
-                  </Button>
-                </div>
-              </div>
-            </div>
-          ))}
-
-          {!filtered.length ? (
-            <div className="rounded-3xl border border-border/60 bg-background p-8 text-center">
-              <div className="text-lg font-semibold text-foreground">No hay usuarios para mostrar.</div>
-              <p className="mt-2 text-sm text-muted-foreground">Crea el primer perfil del portal para una institucion o admin.</p>
-            </div>
-          ) : null}
-        </div>
-      </div>
+      <DataTableEnhanced
+        data={filtered}
+        columns={columns}
+        searchPlaceholder="Buscar por nombre, email, DNI, rol, institucion o contacto"
+        searchableColumnKeys={[
+          "email",
+          "firstName",
+          "lastName",
+          "displayName",
+          "fullName",
+          "role",
+          "documentNumber",
+          "agency",
+          "employeeFileNumber",
+          "companyName",
+          "institutionName",
+          "phone",
+          "contactEmail",
+        ]}
+        defaultPageSize={20}
+        defaultSorting={[{ id: "user", desc: false }]}
+        showFiltersRow
+        showColumnVisibility
+        emptyTitle="No hay usuarios para mostrar"
+        emptySubtitle="Crea el primer perfil del portal para una institucion o administrador, o ajusta los filtros actuales."
+        onRowClick={(row) => openEdit(row)}
+        toolbarLeft={
+          <div className="hidden items-center gap-2 md:flex">
+            <Badge variant="soft" color="secondary">
+              Total {users.length}
+            </Badge>
+            {users.filter((u) => u.role === "admin").length ? (
+              <Badge variant="soft" color="default">
+                Admin {users.filter((u) => u.role === "admin").length}
+              </Badge>
+            ) : null}
+            {users.filter((u) => String(u.role || "").toLowerCase() === "alumno").length ? (
+              <Badge variant="soft" color="info">
+                Alumnos {users.filter((u) => String(u.role || "").toLowerCase() === "alumno").length}
+              </Badge>
+            ) : null}
+          </div>
+        }
+      />
 
       <Dialog open={createOpen} onOpenChange={(open) => setCreateOpen(open)}>
         <DialogContent className="w-[95vw] max-w-[720px]">

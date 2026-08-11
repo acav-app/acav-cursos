@@ -1,0 +1,502 @@
+{
+  "dryRun": false,
+  "projectId": "acav-cursos",
+  "usersJson": "C:\\Users\\Lauti\\Documents\\GitHub\\acav_cursos\\usuarios.json",
+  "totalRowsInJson": 49,
+  "dedupedUniqueEmails": 33,
+  "skippedBecauseDuplicateEmail": 16,
+  "createdAt": "2026-08-11T16:31:23.604Z",
+  "results": [
+    {
+      "idx": 0,
+      "warnings": [
+        "DUPLICADO x email"
+      ],
+      "email": "eliahuhadid@gmail.com",
+      "uid": "YMJiHy2ZJVOU0WPn0MFToB79HzI3",
+      "authCreated": true,
+      "authUpdated": false,
+      "profileCreated": true,
+      "profileUpdated": false,
+      "alreadyExistedInAuth": false,
+      "alreadyHadProfile": false,
+      "assignedPassword": "20006129",
+      "role": "alumno"
+    },
+    {
+      "idx": 1,
+      "warnings": [
+        "DUPLICADO x email"
+      ],
+      "email": "ceciayduh@elantravels.com",
+      "uid": "WkNru8wLFnSVuE0y4n8c6i56S6n2",
+      "authCreated": true,
+      "authUpdated": false,
+      "profileCreated": true,
+      "profileUpdated": false,
+      "alreadyExistedInAuth": false,
+      "alreadyHadProfile": false,
+      "assignedPassword": "30660180",
+      "role": "alumno"
+    },
+    {
+      "idx": 2,
+      "warnings": [
+        "DUPLICADO x email"
+      ],
+      "email": "micaelaczerniak@hotmail.com",
+      "uid": "E4eJJPVnXmhHncWOpuz7HtTUlfM2",
+      "authCreated": true,
+      "authUpdated": false,
+      "profileCreated": true,
+      "profileUpdated": false,
+      "alreadyExistedInAuth": false,
+      "alreadyHadProfile": false,
+      "assignedPassword": "42367629",
+      "role": "alumno"
+    },
+    {
+      "idx": 3,
+      "warnings": [
+        "DUPLICADO x email"
+      ],
+      "email": "sandipaola1@gmail.com",
+      "uid": "KDQWkZtXrNcHAn8p1AIjwFp4gNi2",
+      "authCreated": true,
+      "authUpdated": false,
+      "profileCreated": true,
+      "profileUpdated": false,
+      "alreadyExistedInAuth": false,
+      "alreadyHadProfile": false,
+      "assignedPassword": "20783545",
+      "role": "alumno"
+    },
+    {
+      "idx": 4,
+      "warnings": [
+        "DUPLICADO x email"
+      ],
+      "email": "seiferalexis@gmail.com",
+      "uid": "5WPjIa3WHnQOdnLGSqFVPYXOhSM2",
+      "authCreated": true,
+      "authUpdated": false,
+      "profileCreated": true,
+      "profileUpdated": false,
+      "alreadyExistedInAuth": false,
+      "alreadyHadProfile": false,
+      "assignedPassword": "45086411",
+      "role": "alumno"
+    },
+    {
+      "idx": 5,
+      "warnings": [
+        "DUPLICADO x email"
+      ],
+      "email": "veronica.correa@gftravel.com.ar",
+      "uid": "Kc45ffiarVO3CoBVmcWWER0ETF82",
+      "authCreated": true,
+      "authUpdated": false,
+      "profileCreated": true,
+      "profileUpdated": false,
+      "alreadyExistedInAuth": false,
+      "alreadyHadProfile": false,
+      "assignedPassword": "31047760",
+      "role": "alumno"
+    },
+    {
+      "idx": 6,
+      "warnings": [
+        "DUPLICADO x email"
+      ],
+      "email": "areacbp@gmail.com",
+      "uid": "HVQ3w2lVH9hzXlv7J4UL2DMKhrr2",
+      "authCreated": true,
+      "authUpdated": false,
+      "profileCreated": true,
+      "profileUpdated": false,
+      "alreadyExistedInAuth": false,
+      "alreadyHadProfile": false,
+      "assignedPassword": "35089736",
+      "role": "alumno"
+    },
+    {
+      "idx": 7,
+      "warnings": [
+        "DUPLICADO x email"
+      ],
+      "email": "rz.magicaltravel@gmail.com",
+      "uid": "bCxW9UXzHeRiD3Bx6aQdkY0kGTt2",
+      "authCreated": true,
+      "authUpdated": false,
+      "profileCreated": true,
+      "profileUpdated": false,
+      "alreadyExistedInAuth": false,
+      "alreadyHadProfile": false,
+      "assignedPassword": "45103754",
+      "role": "alumno"
+    },
+    {
+      "idx": 8,
+      "warnings": [
+        "DUPLICADO x email"
+      ],
+      "email": "iruestediego@gmail.com",
+      "uid": "O9iHCECQVIXYQIZUpbG0LsYq7vz2",
+      "authCreated": true,
+      "authUpdated": false,
+      "profileCreated": true,
+      "profileUpdated": false,
+      "alreadyExistedInAuth": false,
+      "alreadyHadProfile": false,
+      "assignedPassword": "30168327",
+      "role": "alumno"
+    },
+    {
+      "idx": 9,
+      "warnings": [
+        "DUPLICADO x email"
+      ],
+      "email": "bentancourtamelie@gmail.com",
+      "uid": "lMIJaqgZ53MWK1B3A7xFsGKGgpr2",
+      "authCreated": true,
+      "authUpdated": false,
+      "profileCreated": true,
+      "profileUpdated": false,
+      "alreadyExistedInAuth": false,
+      "alreadyHadProfile": false,
+      "assignedPassword": "47576531",
+      "role": "alumno"
+    },
+    {
+      "idx": 10,
+      "warnings": [
+        "DUPLICADO x email"
+      ],
+      "email": "guadi_2204@hotmail.com",
+      "uid": "FBYFQ9walSZ8Ccb32KoDMclpoXc2",
+      "authCreated": true,
+      "authUpdated": false,
+      "profileCreated": true,
+      "profileUpdated": false,
+      "alreadyExistedInAuth": false,
+      "alreadyHadProfile": false,
+      "assignedPassword": "36147007",
+      "role": "alumno"
+    },
+    {
+      "idx": 11,
+      "warnings": [
+        "DUPLICADO x email"
+      ],
+      "email": "operacionesbentan1@gmail.com",
+      "uid": "F2K7l8JJWIe4S3FBrREAFUpMKSU2",
+      "authCreated": true,
+      "authUpdated": false,
+      "profileCreated": true,
+      "profileUpdated": false,
+      "alreadyExistedInAuth": false,
+      "alreadyHadProfile": false,
+      "assignedPassword": "42856165",
+      "role": "alumno"
+    },
+    {
+      "idx": 12,
+      "warnings": [
+        "DUPLICADO x email"
+      ],
+      "email": "himalayaviajes.jesusmaria@gmail.com",
+      "uid": "TohZFC9ZU3YV8FfYQk8BGMkTy6X2",
+      "authCreated": true,
+      "authUpdated": false,
+      "profileCreated": true,
+      "profileUpdated": false,
+      "alreadyExistedInAuth": false,
+      "alreadyHadProfile": false,
+      "assignedPassword": "36725594",
+      "role": "alumno"
+    },
+    {
+      "idx": 13,
+      "warnings": [
+        "DUPLICADO x email"
+      ],
+      "email": "miacatalinacolmenares@gmail.com",
+      "uid": "tG0ibASlsZh2Fv0TEUi0pGp5Nsi2",
+      "authCreated": true,
+      "authUpdated": false,
+      "profileCreated": true,
+      "profileUpdated": false,
+      "alreadyExistedInAuth": false,
+      "alreadyHadProfile": false,
+      "assignedPassword": "45082322",
+      "role": "alumno"
+    },
+    {
+      "idx": 14,
+      "warnings": [],
+      "email": "pamelamercol@gmail.com",
+      "uid": "0pOHxk70oVTiVhKfCKZjEnMovcy2",
+      "authCreated": true,
+      "authUpdated": false,
+      "profileCreated": true,
+      "profileUpdated": false,
+      "alreadyExistedInAuth": false,
+      "alreadyHadProfile": false,
+      "assignedPassword": "41378040",
+      "role": "alumno"
+    },
+    {
+      "idx": 15,
+      "warnings": [],
+      "email": "alourdescarrizo@gmail.com",
+      "uid": "TCWs3lntqHfta15ZzwoaEpa83Vv2",
+      "authCreated": true,
+      "authUpdated": false,
+      "profileCreated": true,
+      "profileUpdated": false,
+      "alreadyExistedInAuth": false,
+      "alreadyHadProfile": false,
+      "assignedPassword": "43997839",
+      "role": "alumno"
+    },
+    {
+      "idx": 16,
+      "warnings": [],
+      "email": "ventas@florenciaviajes.com",
+      "uid": "GUdPhKzUVhWwJ1NukmqQ5gnChki1",
+      "authCreated": true,
+      "authUpdated": false,
+      "profileCreated": true,
+      "profileUpdated": false,
+      "alreadyExistedInAuth": false,
+      "alreadyHadProfile": false,
+      "assignedPassword": "36886469",
+      "role": "alumno"
+    },
+    {
+      "idx": 18,
+      "warnings": [],
+      "email": "jimetorriglia@gmail.com",
+      "uid": "LL1YLIIfbmdB5e6GUB6DneRUjLF2",
+      "authCreated": true,
+      "authUpdated": false,
+      "profileCreated": true,
+      "profileUpdated": false,
+      "alreadyExistedInAuth": false,
+      "alreadyHadProfile": false,
+      "assignedPassword": "27670071",
+      "role": "alumno"
+    },
+    {
+      "idx": 19,
+      "warnings": [],
+      "email": "himalayaviajes.villasol@gmail.com",
+      "uid": "35UotQrhT4TkSpoDLmFJ5dqBWTA3",
+      "authCreated": true,
+      "authUpdated": false,
+      "profileCreated": true,
+      "profileUpdated": false,
+      "alreadyExistedInAuth": false,
+      "alreadyHadProfile": false,
+      "assignedPassword": "36143669",
+      "role": "alumno"
+    },
+    {
+      "idx": 24,
+      "warnings": [],
+      "email": "marchesimari@gmail.com",
+      "uid": "4UA6bcsFrpczshFp4gwXOpHeagS2",
+      "authCreated": true,
+      "authUpdated": false,
+      "profileCreated": true,
+      "profileUpdated": false,
+      "alreadyExistedInAuth": false,
+      "alreadyHadProfile": false,
+      "assignedPassword": "45265129",
+      "role": "alumno"
+    },
+    {
+      "idx": 25,
+      "warnings": [],
+      "email": "agustina.delgado020@gmail.com",
+      "uid": "rGzA3mWM7TZ1HFXCZi4aHiNNSEW2",
+      "authCreated": true,
+      "authUpdated": false,
+      "profileCreated": true,
+      "profileUpdated": false,
+      "alreadyExistedInAuth": false,
+      "alreadyHadProfile": false,
+      "assignedPassword": "44913668",
+      "role": "alumno"
+    },
+    {
+      "idx": 29,
+      "warnings": [],
+      "email": "magalijeres@gmail.com",
+      "uid": "0GCvMxOxBCRFvyqtFzCERRwibfp2",
+      "authCreated": true,
+      "authUpdated": false,
+      "profileCreated": true,
+      "profileUpdated": false,
+      "alreadyExistedInAuth": false,
+      "alreadyHadProfile": false,
+      "assignedPassword": "39739548",
+      "role": "alumno"
+    },
+    {
+      "idx": 30,
+      "warnings": [],
+      "email": "joaquinscando@gmail.com",
+      "uid": "FavsWpKnSjZcCBS3REBeurt3hAi2",
+      "authCreated": true,
+      "authUpdated": false,
+      "profileCreated": true,
+      "profileUpdated": false,
+      "alreadyExistedInAuth": false,
+      "alreadyHadProfile": false,
+      "assignedPassword": "44192573",
+      "role": "alumno"
+    },
+    {
+      "idx": 32,
+      "warnings": [],
+      "email": "cynn.turismo@gmail.com",
+      "uid": "4QIJlYp7iCVXbXeZgw5n3FfikC13",
+      "authCreated": true,
+      "authUpdated": false,
+      "profileCreated": true,
+      "profileUpdated": false,
+      "alreadyExistedInAuth": false,
+      "alreadyHadProfile": false,
+      "assignedPassword": "37108318",
+      "role": "alumno"
+    },
+    {
+      "idx": 33,
+      "warnings": [],
+      "email": "zoalogar@gmail.com",
+      "uid": "oE5XfQnNJNXMddICDDUynKWGjQo1",
+      "authCreated": true,
+      "authUpdated": false,
+      "profileCreated": true,
+      "profileUpdated": false,
+      "alreadyExistedInAuth": false,
+      "alreadyHadProfile": false,
+      "assignedPassword": "44321350",
+      "role": "alumno"
+    },
+    {
+      "idx": 36,
+      "warnings": [],
+      "email": "paulajulietasoto@gmail.com",
+      "uid": "NrM4TckznVQWzkNzXRc77F1arlC3",
+      "authCreated": true,
+      "authUpdated": false,
+      "profileCreated": true,
+      "profileUpdated": false,
+      "alreadyExistedInAuth": false,
+      "alreadyHadProfile": false,
+      "assignedPassword": "43110762",
+      "role": "alumno"
+    },
+    {
+      "idx": 37,
+      "warnings": [],
+      "email": "torassomariajulieta@gmail.com",
+      "uid": "kfFHHTzi3ZRIkpHvFxZTD4VfeTr2",
+      "authCreated": true,
+      "authUpdated": false,
+      "profileCreated": true,
+      "profileUpdated": false,
+      "alreadyExistedInAuth": false,
+      "alreadyHadProfile": false,
+      "assignedPassword": "39933732",
+      "role": "alumno"
+    },
+    {
+      "idx": 39,
+      "warnings": [],
+      "email": "carolinapiccinini83@gmail.com",
+      "uid": "PHU72cpDfvUidPt3503pGlow65K2",
+      "authCreated": true,
+      "authUpdated": false,
+      "profileCreated": true,
+      "profileUpdated": false,
+      "alreadyExistedInAuth": false,
+      "alreadyHadProfile": false,
+      "assignedPassword": "30345692",
+      "role": "alumno"
+    },
+    {
+      "idx": 44,
+      "warnings": [],
+      "email": "fabriziocalvo.isft@gmail.com",
+      "uid": "I6bEsfmEIxd2VTrOeqo0lQkn9W02",
+      "authCreated": true,
+      "authUpdated": false,
+      "profileCreated": true,
+      "profileUpdated": false,
+      "alreadyExistedInAuth": false,
+      "alreadyHadProfile": false,
+      "assignedPassword": "45462526",
+      "role": "alumno"
+    },
+    {
+      "idx": 46,
+      "warnings": [],
+      "email": "cami.rossi@hotmail.com",
+      "uid": "dJrtzhRnyRe10SvfrJoWssbojG82",
+      "authCreated": true,
+      "authUpdated": false,
+      "profileCreated": true,
+      "profileUpdated": false,
+      "alreadyExistedInAuth": false,
+      "alreadyHadProfile": false,
+      "assignedPassword": "40018856",
+      "role": "alumno"
+    },
+    {
+      "idx": 47,
+      "warnings": [],
+      "email": "dancre26@outlook.com.ar",
+      "uid": "FoSAq2XfBiSQqTItHPDJfr2K8Er1",
+      "authCreated": true,
+      "authUpdated": false,
+      "profileCreated": true,
+      "profileUpdated": false,
+      "alreadyExistedInAuth": false,
+      "alreadyHadProfile": false,
+      "assignedPassword": "20898692",
+      "role": "alumno"
+    }
+  ],
+  "summary": {
+    "success": 31,
+    "failed": 2,
+    "authCreated": 31,
+    "authUpdated": 0,
+    "profileCreated": 31,
+    "profileUpdated": 0,
+    "warnings": [
+      "rosayanetorellanacruz7@gmail.com: nombre/apellido incompletos"
+    ]
+  },
+  "failures": [
+    {
+      "idx": 38,
+      "email": "nicogianinetto1208@gmail.com",
+      "warnings": [],
+      "message": "Value for argument \"data\" is not a valid Firestore document. Cannot use \"undefined\" as a Firestore value (found in field \"phone\"). If you want to ignore undefined values, enable `ignoreUndefinedProperties`.",
+      "stack": "Error: Value for argument \"data\" is not a valid Firestore document. Cannot use \"undefined\" as a Firestore value (found in field \"phone\"). If you want to ignore undefined values, enable `ignoreUndefinedProperties`.\n    at validateUserInput (C:\\Users\\Lauti\\Documents\\GitHub\\acav_cursos\\node_modules\\@google-cloud\\firestore\\build\\src\\serializer.js:383:19)\n    at validateUserInput (C:\\Users\\Lauti\\Documents\\GitHub\\acav_cursos\\node_modules\\@google-cloud\\firestore\\build\\src\\serializer.js:375:13)\n    at validateDocumentData (C:\\Users\\Lauti\\Documents\\GitHub\\acav_cursos\\node_modules\\@google-cloud\\firestore\\build\\src\\write-batch.js:609:40)\n    at WriteBatch.set (C:\\Users\\Lauti\\Documents\\GitHub\\acav_cursos\\node_modules\\@google-cloud\\firestore\\build\\src\\write-batch.js:263:9)\n    at C:\\Users\\Lauti\\Documents\\GitHub\\acav_cursos\\node_modules\\@google-cloud\\firestore\\build\\src\\reference\\document-reference.js:345:41\n    at C:\\Users\\Lauti\\Documents\\GitHub\\acav_cursos\\node_modules\\@google-cloud\\firestore\\build\\src\\telemetry\\enabled-trace-util.js:110:30\n    at NoopContextManager.with (C:\\Users\\Lauti\\Documents\\GitHub\\acav_cursos\\node_modules\\@opentelemetry\\api\\build\\src\\context\\NoopContextManager.js:25:19)\n    at ContextAPI.with (C:\\Users\\Lauti\\Documents\\GitHub\\acav_cursos\\node_modules\\@opentelemetry\\api\\build\\src\\api\\context.js:60:46)\n    at NoopTracer.startActiveSpan (C:\\Users\\Lauti\\Documents\\GitHub\\acav_cursos\\node_modules\\@opentelemetry\\api\\build\\src\\trace\\NoopTracer.js:65:31)\n    at ProxyTracer.startActiveSpan (C:\\Users\\Lauti\\Documents\\GitHub\\acav_cursos\\node_modules\\@opentelemetry\\api\\build\\src\\trace\\ProxyTracer.js:36:24)"
+    },
+    {
+      "idx": 45,
+      "email": "rosayanetorellanacruz7@gmail.com",
+      "warnings": [
+        "nombre/apellido incompletos"
+      ],
+      "message": "Value for argument \"data\" is not a valid Firestore document. Cannot use \"undefined\" as a Firestore value (found in field \"lastName\"). If you want to ignore undefined values, enable `ignoreUndefinedProperties`.",
+      "stack": "Error: Value for argument \"data\" is not a valid Firestore document. Cannot use \"undefined\" as a Firestore value (found in field \"lastName\"). If you want to ignore undefined values, enable `ignoreUndefinedProperties`.\n    at validateUserInput (C:\\Users\\Lauti\\Documents\\GitHub\\acav_cursos\\node_modules\\@google-cloud\\firestore\\build\\src\\serializer.js:383:19)\n    at validateUserInput (C:\\Users\\Lauti\\Documents\\GitHub\\acav_cursos\\node_modules\\@google-cloud\\firestore\\build\\src\\serializer.js:375:13)\n    at validateDocumentData (C:\\Users\\Lauti\\Documents\\GitHub\\acav_cursos\\node_modules\\@google-cloud\\firestore\\build\\src\\write-batch.js:609:40)\n    at WriteBatch.set (C:\\Users\\Lauti\\Documents\\GitHub\\acav_cursos\\node_modules\\@google-cloud\\firestore\\build\\src\\write-batch.js:263:9)\n    at C:\\Users\\Lauti\\Documents\\GitHub\\acav_cursos\\node_modules\\@google-cloud\\firestore\\build\\src\\reference\\document-reference.js:345:41\n    at C:\\Users\\Lauti\\Documents\\GitHub\\acav_cursos\\node_modules\\@google-cloud\\firestore\\build\\src\\telemetry\\enabled-trace-util.js:110:30\n    at NoopContextManager.with (C:\\Users\\Lauti\\Documents\\GitHub\\acav_cursos\\node_modules\\@opentelemetry\\api\\build\\src\\context\\NoopContextManager.js:25:19)\n    at ContextAPI.with (C:\\Users\\Lauti\\Documents\\GitHub\\acav_cursos\\node_modules\\@opentelemetry\\api\\build\\src\\api\\context.js:60:46)\n    at NoopTracer.startActiveSpan (C:\\Users\\Lauti\\Documents\\GitHub\\acav_cursos\\node_modules\\@opentelemetry\\api\\build\\src\\trace\\NoopTracer.js:65:31)\n    at ProxyTracer.startActiveSpan (C:\\Users\\Lauti\\Documents\\GitHub\\acav_cursos\\node_modules\\@opentelemetry\\api\\build\\src\\trace\\ProxyTracer.js:36:24)"
+    }
+  ]
+}

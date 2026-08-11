@@ -17,11 +17,11 @@ const CLEANUP_INTERVAL = 60 * 60 * 1000; // 1 hora
 // Limpiar entradas expiradas periódicamente
 setInterval(() => {
   const now = Date.now();
-  for (const [key, entry] of rateLimitStore.entries()) {
+  rateLimitStore.forEach((entry, key) => {
     if (entry.resetAt < now) {
       rateLimitStore.delete(key);
     }
-  }
+  });
 }, CLEANUP_INTERVAL);
 
 export interface RateLimitResult {

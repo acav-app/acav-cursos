@@ -1,0 +1,515 @@
+{
+  "dryRun": false,
+  "projectId": "acav-cursos",
+  "usersJson": "C:\\Users\\Lauti\\Documents\\GitHub\\acav_cursos\\usuarios.json",
+  "totalRowsInJson": 49,
+  "dedupedUniqueEmails": 33,
+  "skippedBecauseDuplicateEmail": 16,
+  "createdAt": "2026-08-11T16:32:43.898Z",
+  "results": [
+    {
+      "idx": 0,
+      "warnings": [
+        "DUPLICADO x email"
+      ],
+      "email": "eliahuhadid@gmail.com",
+      "uid": "YMJiHy2ZJVOU0WPn0MFToB79HzI3",
+      "authCreated": false,
+      "authUpdated": false,
+      "profileCreated": false,
+      "profileUpdated": true,
+      "alreadyExistedInAuth": true,
+      "alreadyHadProfile": true,
+      "assignedPassword": null,
+      "role": "alumno"
+    },
+    {
+      "idx": 1,
+      "warnings": [
+        "DUPLICADO x email"
+      ],
+      "email": "ceciayduh@elantravels.com",
+      "uid": "WkNru8wLFnSVuE0y4n8c6i56S6n2",
+      "authCreated": false,
+      "authUpdated": false,
+      "profileCreated": false,
+      "profileUpdated": true,
+      "alreadyExistedInAuth": true,
+      "alreadyHadProfile": true,
+      "assignedPassword": null,
+      "role": "alumno"
+    },
+    {
+      "idx": 2,
+      "warnings": [
+        "DUPLICADO x email"
+      ],
+      "email": "micaelaczerniak@hotmail.com",
+      "uid": "E4eJJPVnXmhHncWOpuz7HtTUlfM2",
+      "authCreated": false,
+      "authUpdated": false,
+      "profileCreated": false,
+      "profileUpdated": true,
+      "alreadyExistedInAuth": true,
+      "alreadyHadProfile": true,
+      "assignedPassword": null,
+      "role": "alumno"
+    },
+    {
+      "idx": 3,
+      "warnings": [
+        "DUPLICADO x email"
+      ],
+      "email": "sandipaola1@gmail.com",
+      "uid": "KDQWkZtXrNcHAn8p1AIjwFp4gNi2",
+      "authCreated": false,
+      "authUpdated": false,
+      "profileCreated": false,
+      "profileUpdated": true,
+      "alreadyExistedInAuth": true,
+      "alreadyHadProfile": true,
+      "assignedPassword": null,
+      "role": "alumno"
+    },
+    {
+      "idx": 4,
+      "warnings": [
+        "DUPLICADO x email"
+      ],
+      "email": "seiferalexis@gmail.com",
+      "uid": "5WPjIa3WHnQOdnLGSqFVPYXOhSM2",
+      "authCreated": false,
+      "authUpdated": false,
+      "profileCreated": false,
+      "profileUpdated": true,
+      "alreadyExistedInAuth": true,
+      "alreadyHadProfile": true,
+      "assignedPassword": null,
+      "role": "alumno"
+    },
+    {
+      "idx": 5,
+      "warnings": [
+        "DUPLICADO x email"
+      ],
+      "email": "veronica.correa@gftravel.com.ar",
+      "uid": "Kc45ffiarVO3CoBVmcWWER0ETF82",
+      "authCreated": false,
+      "authUpdated": false,
+      "profileCreated": false,
+      "profileUpdated": true,
+      "alreadyExistedInAuth": true,
+      "alreadyHadProfile": true,
+      "assignedPassword": null,
+      "role": "alumno"
+    },
+    {
+      "idx": 6,
+      "warnings": [
+        "DUPLICADO x email"
+      ],
+      "email": "areacbp@gmail.com",
+      "uid": "HVQ3w2lVH9hzXlv7J4UL2DMKhrr2",
+      "authCreated": false,
+      "authUpdated": false,
+      "profileCreated": false,
+      "profileUpdated": true,
+      "alreadyExistedInAuth": true,
+      "alreadyHadProfile": true,
+      "assignedPassword": null,
+      "role": "alumno"
+    },
+    {
+      "idx": 7,
+      "warnings": [
+        "DUPLICADO x email"
+      ],
+      "email": "rz.magicaltravel@gmail.com",
+      "uid": "bCxW9UXzHeRiD3Bx6aQdkY0kGTt2",
+      "authCreated": false,
+      "authUpdated": false,
+      "profileCreated": false,
+      "profileUpdated": true,
+      "alreadyExistedInAuth": true,
+      "alreadyHadProfile": true,
+      "assignedPassword": null,
+      "role": "alumno"
+    },
+    {
+      "idx": 8,
+      "warnings": [
+        "DUPLICADO x email"
+      ],
+      "email": "iruestediego@gmail.com",
+      "uid": "O9iHCECQVIXYQIZUpbG0LsYq7vz2",
+      "authCreated": false,
+      "authUpdated": false,
+      "profileCreated": false,
+      "profileUpdated": true,
+      "alreadyExistedInAuth": true,
+      "alreadyHadProfile": true,
+      "assignedPassword": null,
+      "role": "alumno"
+    },
+    {
+      "idx": 9,
+      "warnings": [
+        "DUPLICADO x email"
+      ],
+      "email": "bentancourtamelie@gmail.com",
+      "uid": "lMIJaqgZ53MWK1B3A7xFsGKGgpr2",
+      "authCreated": false,
+      "authUpdated": false,
+      "profileCreated": false,
+      "profileUpdated": true,
+      "alreadyExistedInAuth": true,
+      "alreadyHadProfile": true,
+      "assignedPassword": null,
+      "role": "alumno"
+    },
+    {
+      "idx": 10,
+      "warnings": [
+        "DUPLICADO x email"
+      ],
+      "email": "guadi_2204@hotmail.com",
+      "uid": "FBYFQ9walSZ8Ccb32KoDMclpoXc2",
+      "authCreated": false,
+      "authUpdated": false,
+      "profileCreated": false,
+      "profileUpdated": true,
+      "alreadyExistedInAuth": true,
+      "alreadyHadProfile": true,
+      "assignedPassword": null,
+      "role": "alumno"
+    },
+    {
+      "idx": 11,
+      "warnings": [
+        "DUPLICADO x email"
+      ],
+      "email": "operacionesbentan1@gmail.com",
+      "uid": "F2K7l8JJWIe4S3FBrREAFUpMKSU2",
+      "authCreated": false,
+      "authUpdated": false,
+      "profileCreated": false,
+      "profileUpdated": true,
+      "alreadyExistedInAuth": true,
+      "alreadyHadProfile": true,
+      "assignedPassword": null,
+      "role": "alumno"
+    },
+    {
+      "idx": 12,
+      "warnings": [
+        "DUPLICADO x email"
+      ],
+      "email": "himalayaviajes.jesusmaria@gmail.com",
+      "uid": "TohZFC9ZU3YV8FfYQk8BGMkTy6X2",
+      "authCreated": false,
+      "authUpdated": false,
+      "profileCreated": false,
+      "profileUpdated": true,
+      "alreadyExistedInAuth": true,
+      "alreadyHadProfile": true,
+      "assignedPassword": null,
+      "role": "alumno"
+    },
+    {
+      "idx": 13,
+      "warnings": [
+        "DUPLICADO x email"
+      ],
+      "email": "miacatalinacolmenares@gmail.com",
+      "uid": "tG0ibASlsZh2Fv0TEUi0pGp5Nsi2",
+      "authCreated": false,
+      "authUpdated": false,
+      "profileCreated": false,
+      "profileUpdated": true,
+      "alreadyExistedInAuth": true,
+      "alreadyHadProfile": true,
+      "assignedPassword": null,
+      "role": "alumno"
+    },
+    {
+      "idx": 14,
+      "warnings": [],
+      "email": "pamelamercol@gmail.com",
+      "uid": "0pOHxk70oVTiVhKfCKZjEnMovcy2",
+      "authCreated": false,
+      "authUpdated": false,
+      "profileCreated": false,
+      "profileUpdated": true,
+      "alreadyExistedInAuth": true,
+      "alreadyHadProfile": true,
+      "assignedPassword": null,
+      "role": "alumno"
+    },
+    {
+      "idx": 15,
+      "warnings": [],
+      "email": "alourdescarrizo@gmail.com",
+      "uid": "TCWs3lntqHfta15ZzwoaEpa83Vv2",
+      "authCreated": false,
+      "authUpdated": false,
+      "profileCreated": false,
+      "profileUpdated": true,
+      "alreadyExistedInAuth": true,
+      "alreadyHadProfile": true,
+      "assignedPassword": null,
+      "role": "alumno"
+    },
+    {
+      "idx": 16,
+      "warnings": [],
+      "email": "ventas@florenciaviajes.com",
+      "uid": "GUdPhKzUVhWwJ1NukmqQ5gnChki1",
+      "authCreated": false,
+      "authUpdated": false,
+      "profileCreated": false,
+      "profileUpdated": true,
+      "alreadyExistedInAuth": true,
+      "alreadyHadProfile": true,
+      "assignedPassword": null,
+      "role": "alumno"
+    },
+    {
+      "idx": 18,
+      "warnings": [],
+      "email": "jimetorriglia@gmail.com",
+      "uid": "LL1YLIIfbmdB5e6GUB6DneRUjLF2",
+      "authCreated": false,
+      "authUpdated": false,
+      "profileCreated": false,
+      "profileUpdated": true,
+      "alreadyExistedInAuth": true,
+      "alreadyHadProfile": true,
+      "assignedPassword": null,
+      "role": "alumno"
+    },
+    {
+      "idx": 19,
+      "warnings": [],
+      "email": "himalayaviajes.villasol@gmail.com",
+      "uid": "35UotQrhT4TkSpoDLmFJ5dqBWTA3",
+      "authCreated": false,
+      "authUpdated": false,
+      "profileCreated": false,
+      "profileUpdated": true,
+      "alreadyExistedInAuth": true,
+      "alreadyHadProfile": true,
+      "assignedPassword": null,
+      "role": "alumno"
+    },
+    {
+      "idx": 24,
+      "warnings": [],
+      "email": "marchesimari@gmail.com",
+      "uid": "4UA6bcsFrpczshFp4gwXOpHeagS2",
+      "authCreated": false,
+      "authUpdated": false,
+      "profileCreated": false,
+      "profileUpdated": true,
+      "alreadyExistedInAuth": true,
+      "alreadyHadProfile": true,
+      "assignedPassword": null,
+      "role": "alumno"
+    },
+    {
+      "idx": 25,
+      "warnings": [],
+      "email": "agustina.delgado020@gmail.com",
+      "uid": "rGzA3mWM7TZ1HFXCZi4aHiNNSEW2",
+      "authCreated": false,
+      "authUpdated": false,
+      "profileCreated": false,
+      "profileUpdated": true,
+      "alreadyExistedInAuth": true,
+      "alreadyHadProfile": true,
+      "assignedPassword": null,
+      "role": "alumno"
+    },
+    {
+      "idx": 29,
+      "warnings": [],
+      "email": "magalijeres@gmail.com",
+      "uid": "0GCvMxOxBCRFvyqtFzCERRwibfp2",
+      "authCreated": false,
+      "authUpdated": false,
+      "profileCreated": false,
+      "profileUpdated": true,
+      "alreadyExistedInAuth": true,
+      "alreadyHadProfile": true,
+      "assignedPassword": null,
+      "role": "alumno"
+    },
+    {
+      "idx": 30,
+      "warnings": [],
+      "email": "joaquinscando@gmail.com",
+      "uid": "FavsWpKnSjZcCBS3REBeurt3hAi2",
+      "authCreated": false,
+      "authUpdated": false,
+      "profileCreated": false,
+      "profileUpdated": true,
+      "alreadyExistedInAuth": true,
+      "alreadyHadProfile": true,
+      "assignedPassword": null,
+      "role": "alumno"
+    },
+    {
+      "idx": 32,
+      "warnings": [],
+      "email": "cynn.turismo@gmail.com",
+      "uid": "4QIJlYp7iCVXbXeZgw5n3FfikC13",
+      "authCreated": false,
+      "authUpdated": false,
+      "profileCreated": false,
+      "profileUpdated": true,
+      "alreadyExistedInAuth": true,
+      "alreadyHadProfile": true,
+      "assignedPassword": null,
+      "role": "alumno"
+    },
+    {
+      "idx": 33,
+      "warnings": [],
+      "email": "zoalogar@gmail.com",
+      "uid": "oE5XfQnNJNXMddICDDUynKWGjQo1",
+      "authCreated": false,
+      "authUpdated": false,
+      "profileCreated": false,
+      "profileUpdated": true,
+      "alreadyExistedInAuth": true,
+      "alreadyHadProfile": true,
+      "assignedPassword": null,
+      "role": "alumno"
+    },
+    {
+      "idx": 36,
+      "warnings": [],
+      "email": "paulajulietasoto@gmail.com",
+      "uid": "NrM4TckznVQWzkNzXRc77F1arlC3",
+      "authCreated": false,
+      "authUpdated": false,
+      "profileCreated": false,
+      "profileUpdated": true,
+      "alreadyExistedInAuth": true,
+      "alreadyHadProfile": true,
+      "assignedPassword": null,
+      "role": "alumno"
+    },
+    {
+      "idx": 37,
+      "warnings": [],
+      "email": "torassomariajulieta@gmail.com",
+      "uid": "kfFHHTzi3ZRIkpHvFxZTD4VfeTr2",
+      "authCreated": false,
+      "authUpdated": false,
+      "profileCreated": false,
+      "profileUpdated": true,
+      "alreadyExistedInAuth": true,
+      "alreadyHadProfile": true,
+      "assignedPassword": null,
+      "role": "alumno"
+    },
+    {
+      "idx": 38,
+      "warnings": [],
+      "email": "nicogianinetto1208@gmail.com",
+      "uid": "lV5bHvpuJXUWh1AuxMp8O0nckLQ2",
+      "authCreated": false,
+      "authUpdated": false,
+      "profileCreated": true,
+      "profileUpdated": false,
+      "alreadyExistedInAuth": true,
+      "alreadyHadProfile": false,
+      "assignedPassword": null,
+      "role": "alumno"
+    },
+    {
+      "idx": 39,
+      "warnings": [],
+      "email": "carolinapiccinini83@gmail.com",
+      "uid": "PHU72cpDfvUidPt3503pGlow65K2",
+      "authCreated": false,
+      "authUpdated": false,
+      "profileCreated": false,
+      "profileUpdated": true,
+      "alreadyExistedInAuth": true,
+      "alreadyHadProfile": true,
+      "assignedPassword": null,
+      "role": "alumno"
+    },
+    {
+      "idx": 44,
+      "warnings": [],
+      "email": "fabriziocalvo.isft@gmail.com",
+      "uid": "I6bEsfmEIxd2VTrOeqo0lQkn9W02",
+      "authCreated": false,
+      "authUpdated": false,
+      "profileCreated": false,
+      "profileUpdated": true,
+      "alreadyExistedInAuth": true,
+      "alreadyHadProfile": true,
+      "assignedPassword": null,
+      "role": "alumno"
+    },
+    {
+      "idx": 45,
+      "warnings": [
+        "nombre/apellido incompletos"
+      ],
+      "email": "rosayanetorellanacruz7@gmail.com",
+      "uid": "mnKk7V50fOW2qpjMWHEd0iVpRNg2",
+      "authCreated": false,
+      "authUpdated": false,
+      "profileCreated": true,
+      "profileUpdated": false,
+      "alreadyExistedInAuth": true,
+      "alreadyHadProfile": false,
+      "assignedPassword": null,
+      "role": "alumno"
+    },
+    {
+      "idx": 46,
+      "warnings": [],
+      "email": "cami.rossi@hotmail.com",
+      "uid": "dJrtzhRnyRe10SvfrJoWssbojG82",
+      "authCreated": false,
+      "authUpdated": false,
+      "profileCreated": false,
+      "profileUpdated": true,
+      "alreadyExistedInAuth": true,
+      "alreadyHadProfile": true,
+      "assignedPassword": null,
+      "role": "alumno"
+    },
+    {
+      "idx": 47,
+      "warnings": [],
+      "email": "dancre26@outlook.com.ar",
+      "uid": "FoSAq2XfBiSQqTItHPDJfr2K8Er1",
+      "authCreated": false,
+      "authUpdated": false,
+      "profileCreated": false,
+      "profileUpdated": true,
+      "alreadyExistedInAuth": true,
+      "alreadyHadProfile": true,
+      "assignedPassword": null,
+      "role": "alumno"
+    }
+  ],
+  "summary": {
+    "success": 33,
+    "failed": 0,
+    "authCreated": 0,
+    "authUpdated": 0,
+    "profileCreated": 2,
+    "profileUpdated": 31,
+    "warnings": [
+      "rosayanetorellanacruz7@gmail.com: nombre/apellido incompletos"
+    ]
+  },
+  "failures": []
+}

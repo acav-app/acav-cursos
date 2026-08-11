@@ -1,9 +1,25 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
-import { CheckCircle2, CreditCard, Loader2, Receipt, RotateCcw, Wallet, XCircle } from "lucide-react";
+import {
+  ArrowUpRight,
+  CheckCircle2,
+  Clock3,
+  CreditCard,
+  Loader2,
+  Receipt,
+  RotateCcw,
+  DollarSign,
+  XCircle,
+  FileText,
+  HelpCircle,
+  FileDown,
+  Save,
+  Upload,
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,11 +30,30 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+  SheetClose,
+} from "@/components/ui/sheet";
+import { DataTableEnhanced } from "@/components/ui/data-table-enhanced";
 import { useAuth } from "@/provider/auth.provider";
 import { authedFetch, asArray } from "@/lib/auth/authed-fetch";
 import { useLocalizedPath } from "@/lib/utils";
 import { useCourseActor } from "@/components/courses/dashboard/use-course-actor";
 import { DashboardPageShellSkeleton } from "@/components/courses/dashboard/page-skeletons";
+import {
+  PAYMENT_STATUSES,
+  EDUCATIONAL_ENROLLMENT_STATUSES,
+  ENROLLMENT_STATUSES,
+} from "@/lib/courses/constants";
+import { uploadToR2 } from "@/components/courses/dashboard/upload";
+import { normalizePublicR2Url } from "@/lib/r2/normalize-public-url";
 
 function dateLabel(value) {
   const date = new Date(String(value || ""));
@@ -36,6 +71,14 @@ function formatCurrency(value) {
     currency: "ARS",
     maximumFractionDigits: 0,
   }).format(amount);
+}
+
+function titleCase(value, fallback = "-") {
+  const normalized = String(value || "")
+    .replaceAll("_", " ")
+    .trim();
+  if (!normalized) return fallback;
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
 }
 
 function resolvePaymentMeta(enrollment) {
@@ -101,6 +144,7 @@ function resolvePaymentMeta(enrollment) {
 }
 
 export default function DashboardPagosPage() {
+  const router = useRouter();
   const buildLocalizedPath = useLocalizedPath();
   const { user } = useAuth();
   const { actor, loading: actorLoading, error: actorError } = useCourseActor();
@@ -113,6 +157,14 @@ export default function DashboardPagosPage() {
   const [institutionId, setInstitutionId] = useState("");
   const [paymentState, setPaymentState] = useState("");
   const [actionLoadingId, setActionLoadingId] = useState("");
+  const [editingPaymentId, setEditingPaymentId] = useState("");
+  const [editStatus, setEditStatus] = useState("");
+  const [editPaymentStatus, setEditPaymentStatus] = useState("");
+  const [editReviewComment, setEditReviewComment] = useState("");
+  const [editReceiptUrl, setEditReceiptUrl] = useState("");
+  const [editReceiptUploading, setEditReceiptUploading] = useState(false);
+  const [savingEdit, setSavingEdit] = useState(false);
+  const editReceiptInputRef = useRef(null);
 
   useEffect(() => {
     let alive = true;
@@ -184,12 +236,339 @@ export default function DashboardPagosPage() {
     return { total, credited, pending, noCharge };
   }, [filtered]);
 
+  const columns = useMemo(() => {
+    return [
+      {
+        id: "payer",
+        header: "Alumno",
+        accessorKey: "email",
+        enableSorting: true,
+        meta: { enableColumnFilter: true },
+        size: 280,
+        cell: ({ row }) => {
+          const item = row.original;
+          const name =
+            [item.firstName, item.lastName].filter(Boolean).join(" ").trim() ||
+            item.candidateName ||
+            item.studentName ||
+            item.email ||
+            "Postulante";
+          return (
+            <div className="flex min-w-0 items-start gap-3">
+              <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#ECFDF5] text-[#047857] ring-1 ring-[#A7F3D0]">
+                <DollarSign className="h-5 w-5" />
+              </span>
+              <div className="min-w-0">
+                <div className="truncate text-sm font-semibold text-[#0F172A]">{name}</div>
+                <div className="truncate text-xs text-[#64748B]">{item.email || "-"}</div>
+                {item.documentNumber || item.phone ? (
+                  <div className="mt-0.5 truncate text-[11px] text-[#94A3B8]">
+                    {[
+                      item.documentNumber ? `DNI ${item.documentNumber}` : "",
+                      item.phone ? `Tel ${item.phone}` : "",
+                    ].filter(Boolean).join(" · ")}
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          );
+        },
+      },
+      {
+        id: "course",
+        header: "Curso / Institución",
+        accessorKey: "courseTitle",
+        enableSorting: true,
+        meta: { enableColumnFilter: true },
+        size: 240,
+        cell: ({ row }) => {
+          const item = row.original;
+          const title = item.courseTitle || item.jobTitle || "Curso";
+          const institution = item.institutionName || item.companyName || "ACAV";
+          return (
+            <div className="grid gap-0.5 text-sm">
+              <div className="truncate font-semibold text-[#0F172A]">{title}</div>
+              <div className="truncate text-xs text-[#64748B]">{institution}</div>
+            </div>
+          );
+        },
+      },
+      {
+        id: "amount",
+        header: "Importe",
+        accessorKey: "paymentAmount",
+        enableSorting: true,
+        meta: { enableColumnFilter: false },
+        size: 160,
+        cell: ({ row }) => (
+          <div className="text-sm font-semibold text-[#0F172A]">
+            {row.original.paymentMeta.amountLabel}
+          </div>
+        ),
+      },
+      {
+        id: "status",
+        header: "Estado",
+        accessorKey: "paymentStatus",
+        enableSorting: true,
+        meta: { enableColumnFilter: true },
+        size: 200,
+        cell: ({ row }) => {
+          const meta = row.original.paymentMeta;
+          let Icon = HelpCircle;
+          if (meta.label === "Acreditado") Icon = CheckCircle2;
+          else if (meta.label === "Pendiente" || meta.label === "Conciliación manual") Icon = Clock3;
+          else if (meta.label === "Sin acreditar") Icon = XCircle;
+          else if (meta.label === "Sin cargo") Icon = FileText;
+          return (
+            <div className="grid gap-1.5">
+              <Badge
+                color={meta.tone}
+                variant="soft"
+                className="inline-flex w-fit items-center gap-1.5 rounded-full px-3 py-1 text-[11px]"
+              >
+                <Icon className="h-3 w-3" />
+                {meta.label}
+              </Badge>
+              <span className="text-[11px] leading-5 text-[#64748B]">{meta.helper}</span>
+            </div>
+          );
+        },
+      },
+      {
+        id: "createdAt",
+        header: "Fecha",
+        accessorKey: "createdAt",
+        enableSorting: true,
+        meta: { enableColumnFilter: false },
+        size: 160,
+        cell: ({ row }) => (
+          <div className="text-sm text-[#475569]">{dateLabel(row.original.createdAt)}</div>
+        ),
+      },
+      {
+        id: "actions",
+        header: "Acciones",
+        enableSorting: false,
+        meta: { enableColumnFilter: false },
+        size: 420,
+        cell: ({ row }) => {
+          const item = row.original;
+          const loading = actionLoadingId === String(item.id);
+          const detailHref = buildLocalizedPath(`/dashboard/inscripciones/${item.id}`);
+          return (
+            <div
+              className="flex flex-wrap items-center justify-end gap-2"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {item.paymentMeta.receiptUrl ? (
+                <Button
+                  asChild
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="h-9 rounded-2xl border-[#E5E7EB] bg-white text-[#0F172A] hover:bg-[#F8FAFC]"
+                >
+                  <a href={item.paymentMeta.receiptUrl} target="_blank" rel="noreferrer">
+                    <Receipt className="mr-1.5 h-3.5 w-3.5" />
+                    Comprobante
+                  </a>
+                </Button>
+              ) : null}
+
+              {actor?.role === "admin" ? (
+                <>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleQuickAction(item, "approve")}
+                    disabled={loading}
+                    className="h-9 rounded-2xl border-[#A7F3D0] bg-white text-[#047857] hover:bg-[#ECFDF5]"
+                  >
+                    {loading ? (
+                      <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />
+                    )}
+                    Aprobar
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleQuickAction(item, "request_receipt")}
+                    disabled={loading}
+                    className="h-9 rounded-2xl border-[#FDE68A] bg-white text-[#B45309] hover:bg-[#FFFBEB]"
+                  >
+                    <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
+                    Nuevo comprobante
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleQuickAction(item, "reject")}
+                    disabled={loading}
+                    className="h-9 rounded-2xl border-[#FECDD3] bg-white text-[#B91C1C] hover:bg-[#FFF1F2]"
+                  >
+                    <XCircle className="mr-1.5 h-3.5 w-3.5" />
+                    Rechazar
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="default"
+                    onClick={() => handleOpenEditPayment(item)}
+                    className="h-9 rounded-2xl bg-[#111827] text-white hover:bg-[#0B1220]"
+                  >
+                    <CreditCard className="mr-1.5 h-3.5 w-3.5" />
+                    Editar pago
+                  </Button>
+                </>
+              ) : null}
+
+              <Link href={detailHref} onClick={(e) => e.stopPropagation()} passHref legacyBehavior>
+                <Button
+                  type="button"
+                  size="sm"
+                  className="h-9 rounded-2xl bg-[#2356B8] text-white hover:bg-[#1D4ED8]"
+                  onClick={() => router.push(detailHref)}
+                >
+                  Ver inscripción
+                  <ArrowUpRight className="ml-1.5 h-4 w-4" />
+                </Button>
+              </Link>
+            </div>
+          );
+        },
+      },
+    ];
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [actor?.role, actionLoadingId, buildLocalizedPath, router]);
+
+  const searchableColumnKeys = useMemo(
+    () => [
+      "email",
+      "firstName",
+      "lastName",
+      "candidateName",
+      "studentName",
+      "documentNumber",
+      "phone",
+      "courseId",
+      "courseTitle",
+      "jobId",
+      "jobTitle",
+      "institutionId",
+      "institutionName",
+      "companyId",
+      "companyName",
+      "paymentStatus",
+    ],
+    []
+  );
+
   const syncEnrollment = (updatedEnrollment) => {
     if (!updatedEnrollment?.id) return;
     setEnrollments((current) =>
       current.map((item) => (item.id === updatedEnrollment.id ? updatedEnrollment : item))
     );
   };
+
+  const editingRow = useMemo(
+    () => enrollments.find((r) => String(r.id) === String(editingPaymentId || "")) || null,
+    [enrollments, editingPaymentId]
+  );
+
+  const handleOpenEditPayment = (row) => {
+    if (!row?.id) return;
+    const status = String(row.status || "");
+    const paymentStatus = String(row.paymentStatus || "");
+    const reviewComment = String(row.payment?.reviewComment || "");
+    const receiptUrl = String(
+      row.paymentReceiptUrl || row.payment?.receiptUrl || ""
+    );
+    setEditingPaymentId(String(row.id));
+    setEditStatus(status);
+    setEditPaymentStatus(paymentStatus);
+    setEditReviewComment(reviewComment);
+    setEditReceiptUrl(receiptUrl);
+  };
+
+  const handleCloseEditPayment = () => {
+    setEditingPaymentId("");
+    setEditStatus("");
+    setEditPaymentStatus("");
+    setEditReviewComment("");
+    setEditReceiptUrl("");
+    setEditReceiptUploading(false);
+    setSavingEdit(false);
+  };
+
+  const handleEditReceiptUpload = async (e) => {
+    const file = e?.target?.files?.[0];
+    if (!file || !editingPaymentId || !user) return;
+    try {
+      setEditReceiptUploading(true);
+      const uploaded = await uploadToR2({
+        type: "enrollment-receipt",
+        scope: `enrollments/${editingPaymentId}`,
+        file,
+        user,
+      });
+      const publicUrl = normalizePublicR2Url(uploaded?.downloadUrl || uploaded?.url);
+      setEditReceiptUrl(publicUrl);
+      toast.success("Comprobante adjuntado correctamente.", { position: "top-right" });
+    } catch (error) {
+      toast.error(error?.message || "No se pudo subir el comprobante.", { position: "top-right" });
+    } finally {
+      setEditReceiptUploading(false);
+      if (editReceiptInputRef.current) editReceiptInputRef.current.value = "";
+    }
+  };
+
+  const handleSaveEditPayment = async () => {
+    if (!user || !editingPaymentId) return;
+    try {
+      setSavingEdit(true);
+      const payload = {
+        status: editStatus || undefined,
+        paymentStatus: editPaymentStatus || undefined,
+        reviewComment: editReviewComment?.trim() || undefined,
+        paymentReceiptUrl: editReceiptUrl?.trim() || undefined,
+        reviewedBy: user?.email || user?.uid || "admin",
+      };
+      const data = await authedFetch(user, `/api/enrollments/${editingPaymentId}`, {
+        method: "PATCH",
+        body: JSON.stringify(payload),
+      });
+      syncEnrollment(data?.enrollment);
+      toast.success("Cambios guardados correctamente.", { position: "top-right" });
+      handleCloseEditPayment();
+    } catch (error) {
+      toast.error(error?.message || "No se pudieron guardar los cambios.", { position: "top-right" });
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  const hasPaymentMetadataForRow = (row) =>
+    Boolean(
+      row?.paymentMethod ||
+        row?.payment?.method ||
+        row?.paymentReference ||
+        row?.payment?.reference ||
+        row?.paymentAmount != null ||
+        row?.payment?.amount != null ||
+        row?.amount != null ||
+        row?.paymentReceiptUrl ||
+        row?.payment?.receiptUrl
+    );
+
+  const editingAllowedStatuses = hasPaymentMetadataForRow(editingRow)
+    ? EDUCATIONAL_ENROLLMENT_STATUSES
+    : ENROLLMENT_STATUSES;
 
   const handleQuickAction = async (row, action) => {
     if (!user || !row?.id) return;
@@ -256,7 +635,7 @@ export default function DashboardPagosPage() {
   }
 
   return (
-    <div className="mx-auto px-2 py-8">
+    <div className="mx-auto px-2 py-8 space-y-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
           <div className="text-sm font-semibold uppercase tracking-[0.2em] text-primary">Pagos</div>
@@ -269,11 +648,16 @@ export default function DashboardPagosPage() {
         </div>
       </div>
 
-      <div className="mt-8 rounded-3xl border border-border/60 bg-card p-6">
+      <section className="rounded-[28px] border border-[#E5E7EB] bg-[#FFFFFF] p-5 shadow-[0_16px_40px_rgba(15,23,42,0.04)] md:p-7">
         <div className="grid gap-3 md:grid-cols-4">
-          <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Buscar por curso, email o alumno" />
+          <Input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Buscar por curso, email o alumno"
+            className="h-11 rounded-2xl bg-white"
+          />
           <Select value={courseId} onValueChange={(value) => setCourseId(value === "all" ? "" : value)}>
-            <SelectTrigger>
+            <SelectTrigger className="h-11 rounded-2xl bg-white">
               <SelectValue placeholder="Filtrar por curso" />
             </SelectTrigger>
             <SelectContent>
@@ -290,7 +674,7 @@ export default function DashboardPagosPage() {
             onValueChange={(value) => setInstitutionId(value === "all" ? "" : value)}
             disabled={actor?.role !== "admin"}
           >
-            <SelectTrigger>
+            <SelectTrigger className="h-11 rounded-2xl bg-white">
               <SelectValue placeholder="Filtrar por institución" />
             </SelectTrigger>
             <SelectContent>
@@ -303,7 +687,7 @@ export default function DashboardPagosPage() {
             </SelectContent>
           </Select>
           <Select value={paymentState} onValueChange={(value) => setPaymentState(value === "all" ? "" : value)}>
-            <SelectTrigger>
+            <SelectTrigger className="h-11 rounded-2xl bg-white">
               <SelectValue placeholder="Estado financiero" />
             </SelectTrigger>
             <SelectContent>
@@ -317,98 +701,245 @@ export default function DashboardPagosPage() {
           </Select>
         </div>
 
-        <div className="mt-6 grid gap-4 md:grid-cols-4">
-          <MetricCard icon={Wallet} label="Registros" value={String(summary.total)} helper="Total visible" />
+        <div className="mt-6 grid gap-3 md:grid-cols-4">
+          <MetricCard icon={DollarSign} label="Registros" value={String(summary.total)} helper="Total visible" />
           <MetricCard icon={CreditCard} label="Acreditados" value={String(summary.credited)} helper="Pagos confirmados" />
           <MetricCard icon={Receipt} label="Pendientes" value={String(summary.pending)} helper="En revisión" />
-          <MetricCard icon={Wallet} label="Sin cargo" value={String(summary.noCharge)} helper="Sin cobro" />
+          <MetricCard icon={DollarSign} label="Sin cargo" value={String(summary.noCharge)} helper="Sin cobro" />
         </div>
+      </section>
 
-        <div className="mt-2 text-sm text-muted-foreground">{filtered.length} resultado(s)</div>
+      <DataTableEnhanced
+        data={filtered}
+        columns={columns}
+        searchPlaceholder="Buscar pago por alumno, curso, email, DNI, teléfono o institución"
+        searchableColumnKeys={searchableColumnKeys}
+        defaultPageSize={20}
+        defaultSorting={[{ id: "createdAt", desc: true }]}
+        showFiltersRow
+        showColumnVisibility
+        emptyTitle="No hay registros financieros para mostrar"
+        emptySubtitle="Ajusta los filtros o espera nuevas inscripciones para revisar pagos."
+        onRowClick={(row) => router.push(buildLocalizedPath(`/dashboard/inscripciones/${row.id}`))}
+      />
 
-        <div className="mt-6 grid gap-4">
-          {filtered.length ? (
-            filtered.map((row) => (
-              <article key={row.id} className="rounded-3xl border border-border/60 bg-background p-5">
-                <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Badge color={row.paymentMeta.tone} variant="soft" className="rounded-full">
-                        {row.paymentMeta.label}
-                      </Badge>
-                      <span className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
-                        {row.paymentMeta.amountLabel}
-                      </span>
-                    </div>
-                    <h2 className="mt-3 text-lg font-semibold text-foreground">{row.jobTitle || "Curso"}</h2>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      {row.companyName || "Institución"} · {[row.firstName, row.lastName].filter(Boolean).join(" ").trim() || row.candidateName || row.email}
-                    </p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {dateLabel(row.createdAt)} · {row.email || "Sin email"}
-                    </p>
-                    <p className="mt-4 rounded-2xl border border-border/50 bg-card px-4 py-3 text-sm text-muted-foreground">
-                      {row.paymentMeta.helper}
-                    </p>
+      <Sheet open={Boolean(editingPaymentId && editingRow)} onOpenChange={(open) => !open && handleCloseEditPayment()}>
+        <SheetContent side="right" className="w-[92vw] sm:max-w-xl border-none shadow-2xl p-0 overflow-hidden">
+          <SheetHeader className="px-6 py-5 border-b border-border/60 sticky top-0 bg-card z-10">
+            <SheetTitle className="flex items-center gap-2 text-lg font-bold">
+              <CreditCard className="h-5 w-5 text-primary" />
+              Editar pago
+            </SheetTitle>
+            <SheetDescription className="text-xs text-muted-foreground">
+              Revisa comprobantes, ajusta estados y guarda la revisión administrativa.
+            </SheetDescription>
+          </SheetHeader>
+
+          <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+            <div className="rounded-2xl border border-border/60 bg-muted/30 p-4 space-y-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="text-sm font-semibold text-foreground truncate">
+                    {titleCase(editingRow?.firstName || editingRow?.studentName || "-")}{" "}
+                    {titleCase(editingRow?.lastName || "")}
                   </div>
-
-                  <div className="flex flex-wrap gap-3">
-                    {row.paymentMeta.receiptUrl ? (
-                      <Button asChild variant="outline">
-                        <a href={row.paymentMeta.receiptUrl} target="_blank" rel="noreferrer">
-                          Ver comprobante
-                        </a>
-                      </Button>
-                    ) : null}
-                    {actor?.role === "admin" ? (
-                      <>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => handleQuickAction(row, "approve")}
-                          disabled={actionLoadingId === String(row.id)}
-                          className="border-emerald-200 text-emerald-700 hover:bg-emerald-50"
-                        >
-                          {actionLoadingId === String(row.id) ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}
-                          Aprobar
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => handleQuickAction(row, "request_receipt")}
-                          disabled={actionLoadingId === String(row.id)}
-                          className="border-amber-200 text-amber-700 hover:bg-amber-50"
-                        >
-                          <RotateCcw className="mr-2 h-4 w-4" />
-                          Nuevo comprobante
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => handleQuickAction(row, "reject")}
-                          disabled={actionLoadingId === String(row.id)}
-                          className="border-rose-200 text-rose-700 hover:bg-rose-50"
-                        >
-                          <XCircle className="mr-2 h-4 w-4" />
-                          Rechazar
-                        </Button>
-                      </>
-                    ) : null}
-                    <Button asChild variant="ghost">
-                      <Link href={buildLocalizedPath(`/dashboard/inscripciones/${row.id}`)}>Ver inscripción</Link>
-                    </Button>
+                  <div className="mt-0.5 text-xs text-muted-foreground truncate">
+                    {editingRow?.email || "-"}
                   </div>
                 </div>
-              </article>
-            ))
-          ) : (
-            <div className="rounded-3xl border border-border/60 bg-background p-8 text-center">
-              <div className="text-lg font-semibold text-foreground">No hay registros financieros para mostrar.</div>
-              <p className="mt-2 text-sm text-muted-foreground">Ajusta los filtros o espera nuevas inscripciones para revisar pagos.</p>
+                <Badge className="h-7 rounded-full bg-primary/10 text-primary border border-primary/20 whitespace-nowrap">
+                  {editingRow?.paymentMeta?.amountLabel || "-"}
+                </Badge>
+              </div>
+              <div className="text-xs text-muted-foreground">
+                Curso: <span className="font-medium text-foreground">{editingRow?.course?.title || editingRow?.courseTitle || "-"}</span>
+              </div>
+              {editingRow?.institution?.name ? (
+                <div className="text-xs text-muted-foreground">
+                  Institución: <span className="font-medium text-foreground">{editingRow.institution.name}</span>
+                </div>
+              ) : null}
+              <div className="flex flex-wrap gap-2 pt-1">
+                <Badge variant="outline" className="rounded-full border-border/70 text-[11px]">
+                  Estado inscripción: {titleCase(editingRow?.status || "-")}
+                </Badge>
+                <Badge variant="outline" className="rounded-full border-border/70 text-[11px]">
+                  Estado pago: {titleCase(editingRow?.paymentStatus || "-")}
+                </Badge>
+              </div>
             </div>
-          )}
-        </div>
-      </div>
+
+            <div className="space-y-2">
+              <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Estado de la inscripción
+              </Label>
+              <Select
+                value={editStatus || ""}
+                onValueChange={(value) => setEditStatus(value)}
+              >
+                <SelectTrigger className="h-11 rounded-2xl bg-background">
+                  <SelectValue placeholder="Seleccionar estado" />
+                </SelectTrigger>
+                <SelectContent>
+                  {editingAllowedStatuses.map((s) => (
+                    <SelectItem key={s} value={s}>
+                      {titleCase(s)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Estado del pago
+              </Label>
+              <Select
+                value={editPaymentStatus || ""}
+                onValueChange={(value) => setEditPaymentStatus(value)}
+              >
+                <SelectTrigger className="h-11 rounded-2xl bg-background">
+                  <SelectValue placeholder="Seleccionar estado de pago" />
+                </SelectTrigger>
+                <SelectContent>
+                  {PAYMENT_STATUSES.map((s) => (
+                    <SelectItem key={s} value={s}>
+                      {titleCase(s)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Comprobante de pago
+              </Label>
+              <div className="rounded-2xl border border-dashed border-border/70 bg-background p-3 space-y-2">
+                {editReceiptUrl ? (
+                  <div className="flex items-center justify-between gap-3 rounded-xl bg-muted/30 px-3 py-2">
+                    <a
+                      href={editReceiptUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex items-center gap-2 text-xs font-medium text-foreground truncate"
+                    >
+                      <FileDown className="h-4 w-4 text-primary shrink-0" />
+                      <span className="truncate">Ver comprobante actual</span>
+                    </a>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setEditReceiptUrl("")}
+                      className="h-7 rounded-xl text-[11px] text-destructive hover:text-destructive"
+                    >
+                      Quitar
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 rounded-xl bg-muted/30 px-3 py-2">
+                    <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
+                    <span className="text-xs text-muted-foreground">Sin comprobante adjunto.</span>
+                  </div>
+                )}
+                <div className="flex items-center gap-2 pt-1">
+                  <input
+                    ref={editReceiptInputRef}
+                    type="file"
+                    accept="image/*,application/pdf"
+                    className="hidden"
+                    onChange={handleEditReceiptUpload}
+                  />
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={editReceiptUploading}
+                    onClick={() => editReceiptInputRef.current?.click()}
+                    className="h-9 rounded-xl"
+                  >
+                    {editReceiptUploading ? (
+                      <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Upload className="mr-1.5 h-3.5 w-3.5" />
+                    )}
+                    {editReceiptUploading ? "Subiendo..." : "Adjuntar comprobante"}
+                  </Button>
+                  <p className="text-[11px] text-muted-foreground leading-4">
+                    PDF, PNG o JPG. Se reemplaza el comprobante existente.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Comentario interno o motivo de revisión
+              </Label>
+              <Textarea
+                value={editReviewComment}
+                onChange={(e) => setEditReviewComment(e.target.value)}
+                placeholder="Ej: comprobante ilegible, solicitar reenvío; o monto acreditado OK."
+                className="min-h-[110px] rounded-2xl resize-y text-sm"
+              />
+              <p className="text-[11px] text-muted-foreground leading-4">
+                Solo visible para administración.
+              </p>
+            </div>
+          </div>
+
+          <SheetFooter className="px-6 py-4 border-t border-border/60 bg-card">
+            <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-2 w-full">
+              <SheetClose asChild>
+                <Button type="button" variant="outline" className="h-10 rounded-2xl">
+                  Cancelar
+                </Button>
+              </SheetClose>
+              <div className="flex items-center gap-2">
+                <SheetClose asChild>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-10 rounded-2xl border-[#FDE68A] text-[#B45309] hover:bg-[#FFFBEB]"
+                    onClick={() => handleQuickAction(editingRow, "request_receipt")}
+                  >
+                    <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
+                    Pedir nuevo comprobante
+                  </Button>
+                </SheetClose>
+                <SheetClose asChild>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-10 rounded-2xl border-[#A7F3D0] text-[#047857] hover:bg-[#ECFDF5]"
+                    onClick={() => handleQuickAction(editingRow, "approve")}
+                  >
+                    <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />
+                    Aprobar
+                  </Button>
+                </SheetClose>
+                <Button
+                  type="button"
+                  variant="default"
+                  onClick={handleSaveEditPayment}
+                  disabled={savingEdit}
+                  className="h-10 rounded-2xl bg-[#2356B8] text-white hover:bg-[#1D4ED8]"
+                >
+                  {savingEdit ? (
+                    <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Save className="mr-1.5 h-4 w-4" />
+                  )}
+                  Guardar cambios
+                </Button>
+              </div>
+            </div>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

@@ -80,7 +80,12 @@ export function toEmbedUrl(url: unknown): string {
     "portrait",
   ]);
   const keepParams = new URLSearchParams();
-  for (const [key, value] of params.entries()) {
+  const paramEntries: Array<[string, string]> = [];
+  params.forEach((value, key) => {
+    paramEntries.push([String(key), String(value)]);
+  });
+  for (let i = 0; i < paramEntries.length; i++) {
+    const [key, value] = paramEntries[i];
     if (copyParams.has(String(key).toLowerCase())) {
       keepParams.set(key, value);
     }

@@ -473,6 +473,8 @@ const EnrollmentBaseSchema = z.object({
     .optional(),
   approvedAt: CourseIsoDateString.optional(),
   approvedBy: OptionalString.optional(),
+  certificateId: OptionalString.optional(),
+  certificateIssuedAt: CourseIsoDateString.optional(),
   acceptedPrivacy: z.boolean().refine((value) => value === true, {
     message: "privacy_required",
   }),
@@ -541,7 +543,10 @@ export const EnrollmentUpdateSchema = z.object({
   reviewedBy: OptionalString.optional(),
   approvedBy: OptionalString.optional(),
   approvedAt: CourseIsoDateString.optional(),
+  certificateId: OptionalString.optional(),
+  certificateIssuedAt: CourseIsoDateString.optional(),
   paymentId: OptionalString.optional(),
+  paymentReceiptUrl: OptionalUrl.optional(),
 });
 
 export const EnrollmentSchema = EnrollmentBaseSchema.extend({

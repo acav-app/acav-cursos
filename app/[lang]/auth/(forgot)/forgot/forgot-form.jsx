@@ -6,7 +6,7 @@ import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, MailCheck, ShieldCheck } from "lucide-react";
+import { Loader2, Mail, ShieldCheck } from "lucide-react";
 import toast from "react-hot-toast";
 import { buildLocalizedPath, cn } from "@/lib/utils";
 import Link from "next/link";
@@ -65,7 +65,7 @@ const ForgotForm = () => {
     <div className="w-full">
       <div className="rounded-[28px] border border-[#D9E2F2] bg-[#F8FBFF] p-5 dark:border-slate-800/80 dark:bg-slate-900/30">
         <div className="inline-flex items-center gap-2 rounded-full bg-[#E8F0FF] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#1B2B50]">
-          <MailCheck className="h-3.5 w-3.5" />
+          <Mail className="h-3.5 w-3.5" />
           Recuperación segura
         </div>
         <div className="mt-4 text-3xl font-bold tracking-tight text-default-900">Restablecé tu contraseña</div>

@@ -3,9 +3,21 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
-import { Plus, CheckCircle2, PauseCircle, PlayCircle, Copy, Trash2, XCircle, StopCircle } from "lucide-react";
+import {
+  Plus,
+  CheckCircle2,
+  PauseCircle,
+  PlayCircle,
+  Copy,
+  Trash2,
+  XCircle,
+  Building2,
+  CalendarDays,
+  GraduationCap,
+  Clock3,
+  Award,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -13,6 +25,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { DataTableEnhanced } from "@/components/ui/data-table-enhanced";
 import { useAuth } from "@/provider/auth.provider";
 import { authedFetch, asArray } from "@/lib/auth/authed-fetch";
 import { useLocalizedPath } from "@/lib/utils";
@@ -28,6 +42,25 @@ function dateLabel(iso) {
   return date.toLocaleDateString("es-AR");
 }
 
+function statusBadge(status) {
+  const s = String(status || "");
+  const map = {
+    borrador: { color: "secondary", label: "Borrador" },
+    pendiente_revision: { color: "warning", label: "Pendiente" },
+    activa: { color: "success", label: "Activa" },
+    pausada: { color: "warning", label: "Pausada" },
+    cerrada: { color: "destructive", label: "Cerrada" },
+    vencida: { color: "destructive", label: "Vencida" },
+    rechazada: { color: "destructive", label: "Rechazada" },
+  };
+  const cfg = map[s] || { color: "secondary", label: s || "Sin estado" };
+  return (
+    <Badge variant="soft" color={cfg.color} className="rounded-full">
+      {cfg.label}
+    </Badge>
+  );
+}
+
 export default function DashboardCursosPage() {
   const buildLocalizedPath = useLocalizedPath();
   const { user } = useAuth();
@@ -35,9 +68,8 @@ export default function DashboardCursosPage() {
   const [courses, setCourses] = useState([]);
   const [institutions, setInstitutions] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [query, setQuery] = useState("");
-  const [status, setStatus] = useState("");
-  const [institutionId, setInstitutionId] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [institutionFilter, setInstitutionFilter] = useState("");
   const [rejectCourseId, setRejectCourseId] = useState("");
   const [closeCourseId, setCloseCourseId] = useState("");
   const [deleteCourseId, setDeleteCourseId] = useState("");
@@ -75,18 +107,10 @@ export default function DashboardCursosPage() {
   }, [user]);
 
   const filtered = useMemo(() => {
-    const q = String(query || "").trim().toLowerCase();
     return courses
-      .filter((course) => (status ? course.status === status : true))
-      .filter((course) => (institutionId ? course.companyId === institutionId : true))
-      .filter((course) =>
-        q
-          ? [course.title, course.companyName, course.city, course.area, course.subRubro].some((value) =>
-              String(value || "").toLowerCase().includes(q)
-            )
-          : true
-      );
-  }, [courses, query, status, institutionId]);
+      .filter((course) => (statusFilter ? course.status === statusFilter : true))
+      .filter((course) => (institutionFilter ? course.companyId === institutionFilter : true));
+  }, [courses, statusFilter, institutionFilter]);
 
   const handleApprove = async (id) => {
     if (!user) return;
@@ -142,6 +166,256 @@ export default function DashboardCursosPage() {
     await refresh();
   };
 
+  const columns = useMemo(() => {
+    return [
+      {
+        id: "curso",
+        header: "Curso",
+        accessorKey: "title",
+        enableSorting: true,
+        meta: { enableColumnFilter: true },
+        cell: ({ row }) => {
+          const c = row.original;
+          return (
+            <div className="flex min-w-0 items-start gap-3">
+              <span className="mt-0.5 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#EEF2FF] text-[#4338CA] ring-1 ring-[#E0E7FF]">
+                <GraduationCap className="h-5 w-5" />
+              </span>
+              <div className="min-w-0">
+                <div className="truncate text-sm font-semibold text-[#0F172A]">{c.title || "Sin título"}</div>
+                <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-[#64748B]">
+                  <span className="inline-flex items-center gap-1">
+                    <Award className="h-3 w-3" />
+                    {c.subRubro || "Sin categoría"}
+                  </span>
+                  {c.level ? (
+                    <span className="inline-flex items-center gap-1">
+                      <span className="text-[#CBD5E1]">·</span>
+                      {c.level}
+                    </span>
+                  ) : null}
+                  {c.modality ? (
+                    <span className="inline-flex items-center gap-1">
+                      <span className="text-[#CBD5E1]">·</span>
+                      {c.modality}
+                    </span>
+                  ) : null}
+                  {c.duration ? (
+                    <span className="inline-flex items-center gap-1">
+                      <Clock3 className="h-3 w-3" />
+                      {c.duration}
+                    </span>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+          );
+        },
+      },
+      {
+        id: "company",
+        header: "Institución",
+        accessorKey: "companyName",
+        enableSorting: true,
+        meta: { enableColumnFilter: true },
+        size: 220,
+        cell: ({ row }) => {
+          const c = row.original;
+          const name = c.companyName || c.institutionName || null;
+          const city = c.city;
+          return (
+            <div className="flex items-start gap-2 text-sm">
+              <Building2 className="mt-0.5 h-4 w-4 shrink-0 text-[#94A3B8]" />
+              <div className="min-w-0">
+                <div className="truncate text-[#0F172A]">{name || "Sin institución"}</div>
+                {city ? <div className="truncate text-xs text-[#94A3B8]">{city}</div> : null}
+              </div>
+            </div>
+          );
+        },
+      },
+      {
+        id: "status",
+        header: "Estado",
+        accessorKey: "status",
+        enableSorting: true,
+        meta: { enableColumnFilter: true },
+        size: 160,
+        cell: ({ row }) => (
+          <div className="flex items-center gap-2">{statusBadge(row.original.status)}</div>
+        ),
+      },
+      {
+        id: "dates",
+        header: "Fechas",
+        accessorKey: "createdAt",
+        enableSorting: true,
+        meta: { enableColumnFilter: false },
+        size: 200,
+        cell: ({ row }) => {
+          const c = row.original;
+          return (
+            <div className="grid gap-1 text-xs text-[#475569]">
+              <div className="flex items-center gap-1.5">
+                <CalendarDays className="h-3.5 w-3.5 text-[#94A3B8]" />
+                <span className="text-[#64748B]">Creado</span>
+                <span className="font-medium text-[#0F172A]">{dateLabel(c.createdAt)}</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <Clock3 className="h-3.5 w-3.5 text-[#94A3B8]" />
+                <span className="text-[#64748B]">Cierre</span>
+                <span className="font-medium text-[#0F172A]">{dateLabel(c.expiresAt)}</span>
+              </div>
+            </div>
+          );
+        },
+      },
+      {
+        id: "actions",
+        header: "Acciones",
+        enableSorting: false,
+        meta: { enableColumnFilter: false },
+        size: 380,
+        cell: ({ row }) => {
+          const c = row.original;
+          return (
+            <div className="flex justify-end" onClick={(e) => e.stopPropagation()}>
+              <div className="flex flex-wrap items-center justify-end gap-1.5">
+                <Button
+                  type="button"
+                  variant="outline"
+                  asChild
+                  className="h-9 rounded-2xl border-[#E5E7EB] bg-white text-sm text-[#0F172A] hover:bg-[#F8FAFC]"
+                >
+                  <Link href={buildLocalizedPath(`/dashboard/cursos/${c.id}`)}>Editar</Link>
+                </Button>
+
+                {actor?.role === "admin" && c.status === "pendiente_revision" ? (
+                  <Button
+                    type="button"
+                    onClick={() => handleApprove(c.id)}
+                    className="inline-flex h-9 items-center gap-1.5 rounded-2xl px-3 text-sm"
+                  >
+                    <CheckCircle2 className="h-4 w-4" />
+                    Aprobar
+                  </Button>
+                ) : null}
+
+                {actor?.role === "admin" && c.status === "pendiente_revision" ? (
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    onClick={() => setRejectCourseId(c.id)}
+                    className="inline-flex h-9 items-center gap-1.5 rounded-2xl px-3 text-sm"
+                  >
+                    <XCircle className="h-4 w-4" />
+                    Rechazar
+                  </Button>
+                ) : null}
+
+                {["activa"].includes(c.status) ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => handlePause(c.id)}
+                    className="inline-flex h-9 items-center gap-1.5 rounded-2xl border-[#E5E7EB] bg-white px-3 text-sm text-[#0F172A] hover:bg-[#F8FAFC]"
+                  >
+                    <PauseCircle className="h-4 w-4" />
+                    Pausar
+                  </Button>
+                ) : null}
+
+                {["pausada"].includes(c.status) ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => handleResume(c.id)}
+                    className="inline-flex h-9 items-center gap-1.5 rounded-2xl border-[#E5E7EB] bg-white px-3 text-sm text-[#0F172A] hover:bg-[#F8FAFC]"
+                  >
+                    <PlayCircle className="h-4 w-4" />
+                    Reactivar
+                  </Button>
+                ) : null}
+
+                {["activa", "pausada"].includes(c.status) ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setCloseCourseId(c.id)}
+                    className="inline-flex h-9 items-center gap-1.5 rounded-2xl border-[#E5E7EB] bg-white px-3 text-sm text-[#0F172A] hover:bg-[#F8FAFC]"
+                  >
+                    <XCircle className="h-4 w-4" />
+                    Cerrar
+                  </Button>
+                ) : null}
+
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => handleDuplicate(c.id)}
+                  className="inline-flex h-9 items-center gap-1.5 rounded-2xl border-[#E5E7EB] bg-white px-3 text-sm text-[#0F172A] hover:bg-[#F8FAFC]"
+                >
+                  <Copy className="h-4 w-4" />
+                  Duplicar
+                </Button>
+
+                {actor?.role === "admin" ? (
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    onClick={() => setDeleteCourseId(c.id)}
+                    className="inline-flex h-9 items-center gap-1.5 rounded-2xl px-3 text-sm"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    Eliminar
+                  </Button>
+                ) : null}
+              </div>
+            </div>
+          );
+        },
+      },
+    ];
+  }, [actor, buildLocalizedPath]);
+
+  const filtersToolbar = (
+    <div className="flex flex-col items-stretch gap-2 md:flex-row md:items-center md:gap-2">
+      <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v === "all" ? "" : v)}>
+        <SelectTrigger className="h-11 w-full md:w-[200px] rounded-2xl border-[#E5E7EB] bg-white px-3 text-sm">
+          <SelectValue placeholder="Filtrar por estado" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">Todos</SelectItem>
+          <SelectItem value="borrador">Borrador</SelectItem>
+          <SelectItem value="pendiente_revision">Pendiente revisión</SelectItem>
+          <SelectItem value="activa">Activa</SelectItem>
+          <SelectItem value="pausada">Pausada</SelectItem>
+          <SelectItem value="cerrada">Cerrada</SelectItem>
+          <SelectItem value="vencida">Vencida</SelectItem>
+          <SelectItem value="rechazada">Rechazada</SelectItem>
+        </SelectContent>
+      </Select>
+
+      <Select
+        value={institutionFilter}
+        onValueChange={(v) => setInstitutionFilter(v === "all" ? "" : v)}
+        disabled={actor?.role !== "admin"}
+      >
+        <SelectTrigger className="h-11 w-full md:w-[220px] rounded-2xl border-[#E5E7EB] bg-white px-3 text-sm disabled:cursor-not-allowed">
+          <SelectValue placeholder="Filtrar por institución" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">Todas</SelectItem>
+          {institutions.map((i) => (
+            <SelectItem key={i.id} value={i.id}>
+              {i.name}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+
   if (actorLoading || loading) {
     return <DashboardPageShellSkeleton filterColumns={3} rowCount={6} />;
   }
@@ -162,11 +436,11 @@ export default function DashboardCursosPage() {
       <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
           <div className="text-sm font-semibold uppercase tracking-[0.2em] text-primary">Cursos</div>
-          <h1 className="mt-3 text-3xl font-bold text-foreground">Gestion de cursos</h1>
+          <h1 className="mt-3 text-3xl font-bold text-foreground">Gestión de cursos</h1>
           <p className="mt-2 text-sm text-muted-foreground">
             {actor?.role === "admin"
-              ? "Aproba, rechaza, pausa o cierra cursos."
-              : "Crea cursos y gestiona su estado dentro de tu institucion."}
+              ? "Aprueba, rechaza, pausa o cierra cursos."
+              : "Crea cursos y gestiona su estado dentro de tu institución."}
           </p>
         </div>
 
@@ -178,130 +452,34 @@ export default function DashboardCursosPage() {
         </Button>
       </div>
 
-      <div className="mt-8 rounded-3xl border border-border/60 bg-card p-6">
-        <div className="grid gap-3 md:grid-cols-3">
-          <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar por curso, categoría, modalidad o nivel" />
-          <Select value={status} onValueChange={(value) => setStatus(value === "all" ? "" : value)}>
-            <SelectTrigger>
-              <SelectValue placeholder="Filtrar por estado" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos</SelectItem>
-              <SelectItem value="borrador">borrador</SelectItem>
-              <SelectItem value="pendiente_revision">pendiente_revision</SelectItem>
-              <SelectItem value="activa">activa</SelectItem>
-              <SelectItem value="pausada">pausada</SelectItem>
-              <SelectItem value="cerrada">cerrada</SelectItem>
-              <SelectItem value="vencida">vencida</SelectItem>
-              <SelectItem value="rechazada">rechazada</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select
-            value={institutionId}
-            onValueChange={(value) => setInstitutionId(value === "all" ? "" : value)}
-            disabled={actor?.role !== "admin"}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Filtrar por institucion" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todas</SelectItem>
-              {institutions.map((institution) => (
-                <SelectItem key={institution.id} value={institution.id}>
-                  {institution.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="mt-2 text-sm text-muted-foreground">{filtered.length} resultado(s)</div>
-
-        <div className="mt-6 grid gap-4">
-          {filtered.map((course) => (
-            <div key={course.id} className="rounded-3xl border border-border/60 bg-background p-5">
-              <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                <div>
-                  <div className="text-lg font-semibold text-foreground">{course.title}</div>
-                  <div className="text-sm text-muted-foreground">
-                    {course.subRubro || "Sin categoría"} · {course.modality || "Sin modalidad"} · {course.status}
-                  </div>
-                  <div className="mt-1 text-xs text-muted-foreground">
-                    {course.level || "Sin nivel"}{course.duration ? ` · ${course.duration}` : ""} · Cierre: {dateLabel(course.expiresAt)} · Creada: {dateLabel(course.createdAt)}
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap gap-2">
-                  <Button variant="outline" asChild>
-                    <Link href={buildLocalizedPath(`/dashboard/cursos/${course.id}`)}>Editar</Link>
-                  </Button>
-
-                  {actor?.role === "admin" && course.status === "pendiente_revision" ? (
-                    <Button onClick={() => handleApprove(course.id)} className="inline-flex items-center gap-2">
-                      <CheckCircle2 className="h-4 w-4" />
-                      Aprobar
-                    </Button>
-                  ) : null}
-
-                  {actor?.role === "admin" && course.status === "pendiente_revision" ? (
-                    <Button
-                      variant="destructive"
-                      onClick={() => setRejectCourseId(course.id)}
-                      className="inline-flex items-center gap-2"
-                    >
-                      <XCircle className="h-4 w-4" />
-                      Rechazar
-                    </Button>
-                  ) : null}
-
-                  {["activa"].includes(course.status) ? (
-                    <Button variant="outline" onClick={() => handlePause(course.id)} className="inline-flex items-center gap-2">
-                      <PauseCircle className="h-4 w-4" />
-                      Pausar
-                    </Button>
-                  ) : null}
-
-                  {["pausada"].includes(course.status) ? (
-                    <Button variant="outline" onClick={() => handleResume(course.id)} className="inline-flex items-center gap-2">
-                      <PlayCircle className="h-4 w-4" />
-                      Reactivar
-                    </Button>
-                  ) : null}
-
-                  {["activa", "pausada"].includes(course.status) ? (
-                    <Button variant="outline" onClick={() => setCloseCourseId(course.id)} className="inline-flex items-center gap-2">
-                      <StopCircle className="h-4 w-4" />
-                      Cerrar
-                    </Button>
-                  ) : null}
-
-                  <Button variant="outline" onClick={() => handleDuplicate(course.id)} className="inline-flex items-center gap-2">
-                    <Copy className="h-4 w-4" />
-                    Duplicar
-                  </Button>
-
-                  {actor?.role === "admin" ? (
-                    <Button
-                      variant="destructive"
-                      onClick={() => setDeleteCourseId(course.id)}
-                      className="inline-flex items-center gap-2"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                      Eliminar
-                    </Button>
-                  ) : null}
-                </div>
-              </div>
-            </div>
-          ))}
-
-          {!filtered.length ? (
-            <div className="rounded-3xl border border-border/60 bg-background p-8 text-center">
-              <div className="text-lg font-semibold text-foreground">No hay cursos para mostrar.</div>
-              <p className="mt-2 text-sm text-muted-foreground">Crea un curso para comenzar.</p>
-            </div>
-          ) : null}
-        </div>
+      <div className="mt-8">
+        <DataTableEnhanced
+          data={filtered}
+          columns={columns}
+          defaultPageSize={20}
+          pageSizes={[10, 20, 40, 60, 100]}
+          searchPlaceholder="Buscar curso, categoría, modalidad, nivel, ciudad o institución"
+          searchableColumnKeys={[
+            "title",
+            "subRubro",
+            "area",
+            "modality",
+            "level",
+            "city",
+            "companyName",
+            "companyId",
+          ]}
+          showFiltersRow={true}
+          showColumnVisibility={true}
+          toolbarLeft={filtersToolbar}
+          emptyTitle="No hay cursos para mostrar"
+          emptySubtitle="Ajusta los filtros o crea un curso nuevo para empezar."
+          onRowClick={(row) => {
+            if (row?.id) {
+              window.location.href = buildLocalizedPath(`/dashboard/cursos/${row.id}`);
+            }
+          }}
+        />
       </div>
 
       <CourseRejectDialog

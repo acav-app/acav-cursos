@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
-import { CheckCircle2, FilterX, Loader2, RotateCcw, XCircle } from "lucide-react";
+import { ArrowUpRight, GraduationCap, Loader2, MapPin, Phone, RotateCcw, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -14,11 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { DataTableEnhanced } from "@/components/ui/data-table-enhanced";
 import { useAuth } from "@/provider/auth.provider";
 import { authedFetch, asArray } from "@/lib/auth/authed-fetch";
 import { useLocalizedPath } from "@/lib/utils";
@@ -34,6 +31,7 @@ function dateLabel(iso) {
 }
 
 export default function DashboardInscripcionesPage() {
+  const router = useRouter();
   const buildLocalizedPath = useLocalizedPath();
   const { user } = useAuth();
   const { actor, loading: actorLoading, error: actorError } = useCourseActor();
@@ -146,6 +144,218 @@ export default function DashboardInscripcionesPage() {
     setToDate("");
   };
 
+  const columns = useMemo(() => {
+    const openDetail = (row) => {
+      router.push(buildLocalizedPath(`/dashboard/inscripciones/${row.id}`));
+    };
+    return [
+      {
+        id: "student",
+        header: "Alumno",
+        accessorKey: "email",
+        enableSorting: true,
+        meta: { enableColumnFilter: true },
+        size: 280,
+        cell: ({ row }) => {
+          const app = row.original;
+          const studentName =
+            [app.firstName, app.lastName].filter(Boolean).join(" ").trim() ||
+            app.studentName ||
+            app.candidateName ||
+            "Postulante";
+          const contact = [app.city, app.province].filter(Boolean).join(", ");
+          return (
+            <div className="flex min-w-0 items-start gap-3">
+              <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#E0F2FE] text-[#0369A1] ring-1 ring-[#BAE6FD]">
+                <GraduationCap className="h-5 w-5" />
+              </span>
+              <div className="min-w-0">
+                <div className="truncate text-sm font-semibold text-[#0F172A]">{studentName}</div>
+                <div className="mt-0.5 flex items-center gap-1 text-xs text-[#64748B]">
+                  <Mail className="h-3.5 w-3.5" />
+                  <span className="truncate">{app.email || "-"}</span>
+                </div>
+                {app.phone || contact ? (
+                  <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-[#94A3B8]">
+                    {app.phone ? (
+                      <span className="inline-flex items-center gap-1">
+                        <Phone className="h-3 w-3" />
+                        {app.phone}
+                      </span>
+                    ) : null}
+                    {contact ? (
+                      <span className="inline-flex items-center gap-1">
+                        <MapPin className="h-3 w-3" />
+                        {contact}
+                      </span>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          );
+        },
+      },
+      {
+        id: "course",
+        header: "Curso",
+        accessorKey: "courseTitle",
+        enableSorting: true,
+        meta: { enableColumnFilter: true },
+        size: 240,
+        cell: ({ row }) => {
+          const app = row.original;
+          const courseTitle = app.courseTitle || app.jobTitle || "Curso";
+          const institutionName = app.institutionName || app.companyName || "ACAV";
+          return (
+            <div className="grid gap-0.5 text-sm">
+              <div className="truncate font-semibold text-[#0F172A]">{courseTitle}</div>
+              <div className="truncate text-xs text-[#64748B]">{institutionName}</div>
+            </div>
+          );
+        },
+      },
+      {
+        id: "status",
+        header: "Estado inscripción",
+        accessorKey: "status",
+        enableSorting: true,
+        meta: { enableColumnFilter: true },
+        size: 180,
+        cell: ({ row }) => {
+          const app = row.original;
+          const educationalMeta = resolveEducationalStatusMeta(app.status);
+          const EdIcon = educationalMeta.Icon;
+          return (
+            <Badge
+              color={educationalMeta.tone}
+              variant="soft"
+              className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px]"
+            >
+              <EdIcon className="h-3 w-3" />
+              {educationalMeta.title}
+            </Badge>
+          );
+        },
+      },
+      {
+        id: "paymentStatus",
+        header: "Estado de pago",
+        accessorKey: "paymentStatus",
+        enableSorting: true,
+        meta: { enableColumnFilter: true },
+        size: 180,
+        cell: ({ row }) => {
+          const app = row.original;
+          const paymentMeta = resolvePaymentStatusMeta(
+            app.paymentStatus || app?.payment?.status || ""
+          );
+          const PayIcon = paymentMeta.Icon;
+          return (
+            <Badge
+              color={paymentMeta.tone}
+              variant="soft"
+              className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px]"
+            >
+              <PayIcon className="h-3 w-3" />
+              {paymentMeta.title}
+            </Badge>
+          );
+        },
+      },
+      {
+        id: "createdAt",
+        header: "Fecha",
+        accessorKey: "createdAt",
+        enableSorting: true,
+        meta: { enableColumnFilter: false },
+        size: 180,
+        cell: ({ row }) => (
+          <div className="text-sm text-[#475569]">{dateLabel(row.original.createdAt)}</div>
+        ),
+      },
+      {
+        id: "actions",
+        header: "Acciones",
+        enableSorting: false,
+        meta: { enableColumnFilter: false },
+        size: 220,
+        cell: ({ row }) => {
+          const app = row.original;
+          const detailHref = buildLocalizedPath(`/dashboard/inscripciones/${app.id}`);
+          return (
+            <div
+              className="flex flex-wrap items-center justify-end gap-2"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {actor?.role === "admin" ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleQuickAction(app, "request_receipt")}
+                  disabled={actionLoadingId === String(app.id)}
+                  className="h-9 rounded-2xl border-[#FDE68A] bg-white text-[#B45309] hover:bg-[#FFFBEB]"
+                >
+                  {actionLoadingId === String(app.id) ? (
+                    <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
+                  )}
+                  Nuevo comprobante
+                </Button>
+              ) : null}
+              <Link
+                href={detailHref}
+                onClick={(e) => e.stopPropagation()}
+                passHref
+                legacyBehavior
+              >
+                <Button
+                  type="button"
+                  size="sm"
+                  className="h-9 rounded-2xl bg-[#2356B8] text-white hover:bg-[#1D4ED8]"
+                  onClick={() => openDetail(app)}
+                >
+                  Abrir ficha
+                  <ArrowUpRight className="ml-1.5 h-4 w-4" />
+                </Button>
+              </Link>
+            </div>
+          );
+        },
+      },
+    ];
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [actor?.role, actionLoadingId, buildLocalizedPath, router]);
+
+  const searchableColumnKeys = useMemo(
+    () => [
+      "email",
+      "firstName",
+      "lastName",
+      "studentName",
+      "candidateName",
+      "phone",
+      "city",
+      "province",
+      "courseId",
+      "courseTitle",
+      "jobId",
+      "jobTitle",
+      "institutionId",
+      "institutionName",
+      "companyId",
+      "companyName",
+      "status",
+      "paymentStatus",
+      "documentNumber",
+      "agency",
+      "employeeFileNumber",
+    ],
+    []
+  );
+
   if (actorLoading || loading) {
     return <DashboardPageShellSkeleton showHeaderAction={false} filterColumns={3} rowCount={6} />;
   }
@@ -162,7 +372,7 @@ export default function DashboardInscripcionesPage() {
   }
 
   return (
-    <div className="py-8 px-2 mx-auto">
+    <div className="py-8 px-2 mx-auto space-y-6">
       <div>
         <div className="text-sm font-semibold uppercase tracking-[0.2em] text-primary">Inscripciones</div>
         <h1 className="mt-3 text-3xl font-bold text-foreground">Inscripciones a cursos</h1>
@@ -173,23 +383,34 @@ export default function DashboardInscripcionesPage() {
         </p>
       </div>
 
-      <div className="mt-8 rounded-3xl border border-border/60 bg-card p-6">
-        <div className="flex flex-wrap items-center justify-between gap-3">
+      <section className="rounded-[28px] border border-[#E5E7EB] bg-[#FFFFFF] p-5 shadow-[0_16px_40px_rgba(15,23,42,0.04)] md:p-7">
+        <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
           <div>
-            <div className="text-base font-semibold text-foreground">Filtros rápidos</div>
-            <p className="mt-1 text-xs text-muted-foreground">Combinalos para encontrar lo que buscás en segundos.</p>
+            <div className="text-base font-semibold text-[#0F172A]">Filtros rápidos</div>
+            <p className="mt-1 text-xs text-[#64748B]">Combinalos con la búsqueda global para encontrar lo que buscás en segundos.</p>
           </div>
           {hasActiveFilters ? (
-            <Button type="button" variant="ghost" size="sm" onClick={resetFilters}>
-              <FilterX className="mr-2 h-4 w-4" />
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={resetFilters}
+              className="h-9 rounded-2xl border-[#E5E7EB] bg-white text-[#0F172A] hover:bg-[#F8FAFC]"
+            >
+              <RotateCcw className="mr-2 h-4 w-4" />
               Limpiar filtros
             </Button>
           ) : null}
         </div>
         <div className="mt-4 grid gap-3 md:grid-cols-3">
-          <Input value={queryEmail} onChange={(e) => setQueryEmail(e.target.value)} placeholder="Buscar por email" />
+          <Input
+            value={queryEmail}
+            onChange={(e) => setQueryEmail(e.target.value)}
+            placeholder="Buscar por email"
+            className="h-11 rounded-2xl bg-white"
+          />
           <Select value={status} onValueChange={(value) => setStatus(value === "all" ? "" : value)}>
-            <SelectTrigger>
+            <SelectTrigger className="h-11 rounded-2xl bg-white">
               <SelectValue placeholder="Filtrar por estado" />
             </SelectTrigger>
             <SelectContent>
@@ -202,7 +423,7 @@ export default function DashboardInscripcionesPage() {
             </SelectContent>
           </Select>
           <Select value={courseId} onValueChange={(value) => setCourseId(value === "all" ? "" : value)}>
-            <SelectTrigger>
+            <SelectTrigger className="h-11 rounded-2xl bg-white">
               <SelectValue placeholder="Filtrar por curso" />
             </SelectTrigger>
             <SelectContent>
@@ -222,7 +443,7 @@ export default function DashboardInscripcionesPage() {
             onValueChange={(value) => setInstitutionId(value === "all" ? "" : value)}
             disabled={actor?.role !== "admin"}
           >
-            <SelectTrigger>
+            <SelectTrigger className="h-11 rounded-2xl bg-white">
               <SelectValue placeholder="Filtrar por institución" />
             </SelectTrigger>
             <SelectContent>
@@ -234,123 +455,54 @@ export default function DashboardInscripcionesPage() {
               ))}
             </SelectContent>
           </Select>
-          <Input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} placeholder="Desde" />
-          <Input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} placeholder="Hasta" />
+          <Input
+            type="date"
+            value={fromDate}
+            onChange={(e) => setFromDate(e.target.value)}
+            placeholder="Desde"
+            className="h-11 rounded-2xl bg-white"
+          />
+          <Input
+            type="date"
+            value={toDate}
+            onChange={(e) => setToDate(e.target.value)}
+            placeholder="Hasta"
+            className="h-11 rounded-2xl bg-white"
+          />
         </div>
 
-        <div className="mt-5 flex flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground">
-          <div>
-            Se encontraron{" "}
-            <span className="font-semibold text-foreground">{filtered.length}</span> inscripción
-            {filtered.length === 1 ? "" : "es"}.
-          </div>
-          <div className="flex flex-wrap items-center gap-2 text-[11px] uppercase tracking-[0.16em]">
-            <Badge variant="soft" color="info">En revisión</Badge>
-            <Badge variant="soft" color="success">Activo</Badge>
-            <Badge variant="soft" color="warning">En espera</Badge>
-            <Badge variant="soft" color="destructive">Rechazado</Badge>
-          </div>
+        <div className="mt-5 flex flex-wrap items-center gap-2 text-[11px] uppercase tracking-[0.16em] text-[#64748B]">
+          <Badge variant="soft" color="info">En revisión</Badge>
+          <Badge variant="soft" color="success">Activo</Badge>
+          <Badge variant="soft" color="warning">En espera</Badge>
+          <Badge variant="soft" color="destructive">Rechazado</Badge>
         </div>
+      </section>
 
-        <div className="mt-6 grid gap-4">
-          {filtered.length ? (
-            filtered.map((application) => {
-              const studentName = [application.firstName, application.lastName].filter(Boolean).join(" ").trim() ||
-                application.studentName ||
-                application.candidateName ||
-                "Postulante";
-              const courseTitle = application.courseTitle || application.jobTitle || "Curso";
-              const institutionName = application.institutionName || application.companyName || "ACAV";
-              const contact = [application.city, application.province].filter(Boolean).join(", ");
-              const educationalMeta = resolveEducationalStatusMeta(application.status);
-              const paymentMeta = resolvePaymentStatusMeta(
-                application.paymentStatus || application?.payment?.status || ""
-              );
-              const EdIcon = educationalMeta.Icon;
-              const PayIcon = paymentMeta.Icon;
-              return (
-                <Link
-                  key={application.id}
-                  href={buildLocalizedPath(`/dashboard/inscripciones/${application.id}`)}
-                  className="group rounded-[28px] border border-border/60 bg-background p-5 transition hover:-translate-y-0.5 hover:border-slate-200 hover:shadow-[0_18px_45px_rgba(15,23,42,0.08)]"
-                >
-                  <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="text-lg font-semibold tracking-tight text-foreground">{studentName}</h3>
-                      </div>
-                      <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
-                        <span className="font-medium text-foreground/90">{courseTitle}</span>
-                        <span className="opacity-60">·</span>
-                        <span>{institutionName}</span>
-                      </div>
-                      <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                        <span>{application.email}</span>
-                        {application.phone ? <span>· {application.phone}</span> : null}
-                        {contact ? <span>· {contact}</span> : null}
-                        <span>· {dateLabel(application.createdAt)}</span>
-                      </div>
-                    </div>
-                    <div className="flex flex-col items-stretch gap-3 md:items-end">
-                      <div className="flex flex-wrap items-center gap-2 md:justify-end">
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Badge color={educationalMeta.tone} variant="soft" className="gap-1.5 rounded-full px-3 py-1 text-[11px]">
-                              <EdIcon className="h-3 w-3" />
-                              {educationalMeta.title}
-                            </Badge>
-                          </TooltipTrigger>
-                          <TooltipContent side="top" align="end">{educationalMeta.description}</TooltipContent>
-                        </Tooltip>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Badge color={paymentMeta.tone} variant="soft" className="gap-1.5 rounded-full px-3 py-1 text-[11px]">
-                              <PayIcon className="h-3 w-3" />
-                              Pago · {paymentMeta.title}
-                            </Badge>
-                          </TooltipTrigger>
-                          <TooltipContent side="top" align="end">{paymentMeta.description}</TooltipContent>
-                        </Tooltip>
-                      </div>
-                      <div className="flex flex-wrap items-center gap-2 md:justify-end">
-                        {actor?.role === "admin" ? (
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            onClick={(event) => {
-                              event.preventDefault();
-                              handleQuickAction(application, "request_receipt");
-                            }}
-                            disabled={actionLoadingId === String(application.id)}
-                            className="border-amber-200 text-amber-700 hover:bg-amber-50"
-                          >
-                            <RotateCcw className="mr-2 h-4 w-4" />
-                            Nuevo comprobante
-                          </Button>
-                        ) : null}
-                        <Button type="button" variant="ghost" size="sm" className="md:ml-2">
-                          Abrir ficha
-                          <span className="ml-1 transition-transform duration-200 group-hover:translate-x-0.5">→</span>
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                </Link>
-              );
-            })
-          ) : (
-            <div className="rounded-3xl border border-dashed border-border/60 bg-background p-10 text-center">
-              <div className="text-lg font-semibold text-foreground">Todavía no hay inscripciones con estos filtros.</div>
-              <p className="mx-auto mt-2 max-w-xl text-sm text-muted-foreground">
-                {hasActiveFilters
-                  ? "Probá limpiando los filtros o ajustando la búsqueda para ver más resultados."
-                  : "Las inscripciones nuevas aparecerán aquí en cuanto los alumnos comiencen el proceso."}
-              </p>
-            </div>
-          )}
-        </div>
-      </div>
+      <DataTableEnhanced
+        data={filtered}
+        columns={columns}
+        searchPlaceholder="Buscar alumno, curso, DNI, estado, contacto o institución"
+        searchableColumnKeys={searchableColumnKeys}
+        defaultPageSize={20}
+        defaultSorting={[{ id: "createdAt", desc: true }]}
+        showFiltersRow
+        showColumnVisibility
+        emptyTitle="No hay inscripciones con estos filtros"
+        emptySubtitle={
+          hasActiveFilters
+            ? "Limpiá los filtros o modificá la búsqueda para ver más resultados."
+            : "Las inscripciones nuevas aparecerán aquí en cuanto los alumnos comiencen el proceso."
+        }
+        onRowClick={(row) => router.push(buildLocalizedPath(`/dashboard/inscripciones/${row.id}`))}
+        toolbarRight={
+          <div className="hidden items-center gap-2 md:flex">
+            <Badge variant="soft" color="secondary">
+              Total {filtered.length}
+            </Badge>
+          </div>
+        }
+      />
     </div>
   );
 }

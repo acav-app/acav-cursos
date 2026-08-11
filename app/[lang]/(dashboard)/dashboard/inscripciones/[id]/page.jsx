@@ -12,7 +12,6 @@ import {
   FileDown,
   FileText,
   Loader2,
-  RotateCcw,
   Save,
   ShieldCheck,
   Trash2,
@@ -40,10 +39,7 @@ import { useLocalizedPath } from "@/lib/utils";
 import {
   ALLOWED_SCORE_ATTACHMENT_MIME_TYPES,
   COURSE_COMPLETION_STATUSES,
-  EDUCATIONAL_ENROLLMENT_STATUSES,
-  ENROLLMENT_STATUSES,
   MAX_SCORE_ATTACHMENT_SIZE_BYTES,
-  PAYMENT_STATUSES,
 } from "@/lib/courses/constants";
 import { DashboardDetailSkeleton } from "@/components/courses/dashboard/page-skeletons";
 import PaymentReceiptUploader from "@/components/courses/dashboard/payment-receipt-uploader";
@@ -177,7 +173,6 @@ export default function InscripcionDetailPage({ params: { id } }) {
   const [course, setCourse] = useState(null);
   const [status, setStatus] = useState("");
   const [paymentStatus, setPaymentStatus] = useState("");
-  const [reviewComment, setReviewComment] = useState("");
   const [institutionStatus, setInstitutionStatus] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -205,7 +200,6 @@ export default function InscripcionDetailPage({ params: { id } }) {
         setApplication(nextApplication);
         setStatus(nextApplication?.status || "");
         setPaymentStatus(nextApplication?.paymentStatus || nextApplication?.payment?.status || "");
-        setReviewComment(nextApplication?.payment?.reviewComment || "");
         setFirstName(nextApplication?.firstName || "");
         setLastName(nextApplication?.lastName || "");
         setPhone(nextApplication?.phone || "");
@@ -288,84 +282,6 @@ export default function InscripcionDetailPage({ params: { id } }) {
   const completionMeta = useMemo(() => resolveCourseCompletionStatusMeta(courseStatus), [courseStatus]);
   const completionIcon = useMemo(() => completionMeta?.Icon, [completionMeta]);
   const isCourseSuspended = String(courseStatus || "").trim().toLowerCase() === "suspended";
-
-  const handleSave = async () => {
-    if (!user || !isAdmin) return;
-    if (!institutionAllowsManualManagement) {
-      toast.error(`No se puede cambiar manualmente el estado mientras la institución esté ${institutionStatusLabel}.`, {
-        position: "top-right",
-      });
-      return;
-    }
-
-    try {
-      setSaving(true);
-      const data = await authedFetch(user, `/api/enrollments/${id}`, {
-        method: "PATCH",
-        body: JSON.stringify({
-          status,
-          paymentStatus,
-          reviewComment: reviewComment || undefined,
-          reviewedBy: user?.email || user?.uid || "admin",
-        }),
-      });
-      setApplication(data?.enrollment || null);
-      setStatus(data?.enrollment?.status || status);
-      setPaymentStatus(data?.enrollment?.paymentStatus || data?.enrollment?.payment?.status || paymentStatus);
-      setReviewComment(data?.enrollment?.payment?.reviewComment || reviewComment);
-      toast.success("Estado actualizado", { position: "top-right" });
-    } catch (error) {
-      toast.error(error?.message || "Error actualizando estado", { position: "top-right" });
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleQuickAction = async (action) => {
-    if (!user || !isAdmin) return;
-    if (!institutionAllowsManualManagement) {
-      toast.error(`No se puede revisar manualmente mientras la institución esté ${institutionStatusLabel}.`, {
-        position: "top-right",
-      });
-      return;
-    }
-
-    const payloadByAction = {
-      request_receipt: {
-        status: "waiting_payment",
-        paymentStatus: "rejected",
-      },
-    };
-
-    const payload = payloadByAction[action];
-    if (!payload) return;
-
-    try {
-      setSaving(true);
-      const data = await authedFetch(user, `/api/enrollments/${id}`, {
-        method: "PATCH",
-        body: JSON.stringify({
-          ...payload,
-          reviewComment: reviewComment || undefined,
-          reviewedBy: user?.email || user?.uid || "admin",
-        }),
-      });
-      setApplication(data?.enrollment || null);
-      setStatus(data?.enrollment?.status || payload.status);
-      setPaymentStatus(data?.enrollment?.paymentStatus || data?.enrollment?.payment?.status || payload.paymentStatus);
-      setReviewComment(data?.enrollment?.payment?.reviewComment || reviewComment);
-      toast.success(
-        action === "request_receipt"
-          ? "Se solicitó una nueva revisión del pago."
-          : "Revisión actualizada.",
-        { position: "top-right" }
-      );
-    } catch (error) {
-      toast.error(error?.message || "No pudimos actualizar la revisión.", { position: "top-right" });
-    } finally {
-      setSaving(false);
-    }
-  };
 
   const handleSaveStudentData = async () => {
     if (!user || !isAdmin) return;
@@ -831,7 +747,7 @@ export default function InscripcionDetailPage({ params: { id } }) {
           </p>
         </div>
 
-        <div className="grid gap-6 px-6 py-6 md:grid-cols-2 md:px-8">
+        <div className="grid gap-6 px-6 py-6 md:grid-cols-1 md:px-8">
           <div className="rounded-[28px] border border-[#E5E7EB] bg-[#FAFAFA] p-6">
             <div className="flex items-start justify-between gap-4">
               <div>
@@ -922,80 +838,6 @@ export default function InscripcionDetailPage({ params: { id } }) {
               >
                 {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
                 Guardar datos del alumno
-              </Button>
-            </div>
-          </div>
-
-          <div className="rounded-[28px] border border-[#E5E7EB] bg-[#FAFAFA] p-6">
-            <div className="text-sm font-semibold text-[#0F172A]">Estado y pago</div>
-            <p className="mt-1 text-xs leading-5 text-[#64748B]">
-              Aprobación de pago y seguimiento administrativo de la inscripción. La aprobación académica (cursada) se gestiona en el bloque siguiente.
-            </p>
-            <div className="mt-4 grid gap-3">
-              {!institutionAllowsManualManagement ? (
-                <Alert color="warning" variant="soft" className="items-start rounded-[22px] border border-warning/20">
-                  <div className="grid gap-1">
-                    <AlertTitle>Gestión manual bloqueada</AlertTitle>
-                    <AlertDescription>
-                      La institución asociada está en estado {institutionStatusLabel}. Para cambiar manualmente esta inscripción,
-                      primero debe volver a estar activa.
-                    </AlertDescription>
-                  </div>
-                </Alert>
-              ) : null}
-
-              <Select value={status} onValueChange={setStatus}>
-                <SelectTrigger disabled={!institutionAllowsManualManagement || saving} className="rounded-2xl">
-                  <SelectValue placeholder="Seleccionar estado" />
-                </SelectTrigger>
-                <SelectContent>
-                  {allowedStatuses.map((item) => (
-                    <SelectItem key={item} value={item}>
-                      {item}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              <Select value={paymentStatus} onValueChange={setPaymentStatus}>
-                <SelectTrigger disabled={!institutionAllowsManualManagement || saving} className="rounded-2xl">
-                  <SelectValue placeholder="Seleccionar estado del pago" />
-                </SelectTrigger>
-                <SelectContent>
-                  {PAYMENT_STATUSES.map((item) => (
-                    <SelectItem key={item} value={item}>
-                      {item}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              <Textarea
-                value={reviewComment}
-                onChange={(event) => setReviewComment(event.target.value)}
-                placeholder="Comentario interno o motivo de revisión (solo administración)."
-                className="min-h-[110px] rounded-2xl"
-                disabled={!institutionAllowsManualManagement || saving}
-              />
-
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => handleQuickAction("request_receipt")}
-                disabled={!institutionAllowsManualManagement || saving}
-                className="rounded-2xl border-amber-200 text-amber-700 hover:bg-amber-50"
-              >
-                <RotateCcw className="mr-2 h-4 w-4" />
-                Revisar otra vez (pedir nuevo comprobante)
-              </Button>
-
-              <Button
-                onClick={handleSave}
-                disabled={!institutionAllowsManualManagement || saving}
-                className="rounded-2xl bg-[#0F172A] text-white hover:bg-[#1E293B]"
-              >
-                {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                Guardar estado y pago
               </Button>
             </div>
           </div>

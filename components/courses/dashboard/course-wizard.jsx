@@ -29,6 +29,7 @@ import {
   Layers,
   Loader2,
   Plus,
+  RefreshCcw,
   Rocket,
   Save,
   Settings2,
@@ -1240,6 +1241,9 @@ function WorkspaceSummary({ values, course, publicHref }) {
     { label: "Precio", done: Boolean(values.freeCourse || Number(values.price || 0) > 0) },
     { label: "Publicación", done: Boolean(values.status && values.expiresAtDate) },
   ];
+  const completedCount = completionItems.filter((i) => i.done).length;
+  const progressPct = Math.max(0, Math.min(100, Math.round((completedCount / completionItems.length) * 100)));
+
 }
 
 function ChipListField({ label, description, items, onChange, placeholder, error }) {
@@ -3216,16 +3220,31 @@ export default function CourseWizard({ jobId }) {
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
   const [newCategoryTitle, setNewCategoryTitle] = useState("");
   const [preventSubmitUntil, setPreventSubmitUntil] = useState(0);
+  const [submitBlocked, setSubmitBlocked] = useState(false);
   const activeTabRef = useRef(activeTab);
   useEffect(() => {
     activeTabRef.current = activeTab;
   }, [activeTab]);
 
+  useEffect(() => {
+    if (preventSubmitUntil <= 0) {
+      if (submitBlocked) setSubmitBlocked(false);
+      return;
+    }
+    setSubmitBlocked(true);
+    const remaining = preventSubmitUntil - Date.now();
+    if (remaining <= 0) {
+      setSubmitBlocked(false);
+      return;
+    }
+    const timer = window.setTimeout(() => setSubmitBlocked(false), remaining);
+    return () => window.clearTimeout(timer);
+  }, [preventSubmitUntil, submitBlocked]);
+
   const activeTabIndex = TAB_ITEMS.findIndex((tab) => tab.id === activeTab);
   const isLastTab = activeTabIndex === TAB_ITEMS.length - 1;
   const isFirstTab = activeTabIndex <= 0;
   const busy = submitting || uploading;
-  const submitBlocked = typeof window !== "undefined" && Date.now() < preventSubmitUntil;
   const primarySubmitLabel = actor?.role === "empresa" ? "Enviar a revisión" : "Guardar curso";
   const savingSubmitLabel = actor?.role === "empresa" ? "Enviando curso..." : "Guardando curso...";
 
@@ -3956,7 +3975,7 @@ export default function CourseWizard({ jobId }) {
             <WorkspaceSidebar activeTab={activeTab} onSelect={handleTabChange} values={values} errors={errors} />
           </div>
 
-          <div className="grid gap-6">
+          <div className="grid gap-6 content-baseline">
             {activeTab === "general" ? (
               <SectionCard title="Información base">
                 <div className="grid gap-6 md:grid-cols-2">
@@ -4196,7 +4215,21 @@ export default function CourseWizard({ jobId }) {
               <SectionCard title="Multimedia y recursos">
                 <div className="grid gap-6 lg:grid-cols-2">
                   <div className="grid gap-3">
-                    <Label>Portada del curso</Label>
+                    <div className="flex items-center justify-between gap-2">
+                      <Label>Portada del curso</Label>
+                      {values.coverImage ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-8 rounded-full text-xs text-destructive hover:text-destructive hover:border-destructive/50"
+                          onClick={() => handleImageUploadField("coverImage", [], "courses/covers", undefined, undefined)}
+                        >
+                          <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+                          Eliminar
+                        </Button>
+                      ) : null}
+                    </div>
                     <MediaUploader
                       mode="image"
                       accept={{
@@ -4216,7 +4249,21 @@ export default function CourseWizard({ jobId }) {
                   </div>
 
                   <div className="grid gap-3">
-                    <Label>Miniatura</Label>
+                    <div className="flex items-center justify-between gap-2">
+                      <Label>Miniatura</Label>
+                      {values.thumbnail ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-8 rounded-full text-xs text-destructive hover:text-destructive hover:border-destructive/50"
+                          onClick={() => handleImageUploadField("thumbnail", [], "courses/thumbnails", undefined, undefined)}
+                        >
+                          <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+                          Eliminar
+                        </Button>
+                      ) : null}
+                    </div>
                     <MediaUploader
                       mode="image"
                       accept={{
@@ -4501,36 +4548,7 @@ export default function CourseWizard({ jobId }) {
               </>
             ) : null}
 
-            <div className="sticky bottom-2 z-30 rounded-[20px] border border-border/60 bg-card/95 px-3 py-2.5 shadow-sm backdrop-blur">
-              <div className="flex flex-wrap items-center gap-2 justify-between">
-                <div className="min-w-0 shrink-0">
-                  {uploading ? (
-                    <span className="inline-flex h-8 items-center gap-1.5 rounded-full border border-primary/15 bg-primary/5 px-3 text-[11px] font-medium text-primary">
-                      <Loader2 className="h-3 w-3 animate-spin" />
-                      Subiendo
-                    </span>
-                  ) : null}
-                </div>
-                <div className="flex flex-wrap items-center gap-2 ml-auto">
-                  {!isFirstTab ? (
-                    <Button type="button" variant="ghost" size="sm" onClick={goToPreviousTab} disabled={busy} className="h-8 text-[11px]">
-                      Anterior
-                    </Button>
-                  ) : null}
-                  {!isLastTab ? (
-                    <Button type="button" size="sm" onClick={goToNextTab} disabled={busy} className="h-8 text-[11px]">
-                      Siguiente
-                      <ChevronRight className="ml-1 h-3.5 w-3.5" />
-                    </Button>
-                  ) : (
-                    <Button type="submit" size="sm" disabled={busy || submitBlocked} className="h-8 text-[11px] min-w-[160px]">
-                      {submitting ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Save className="mr-1.5 h-3.5 w-3.5" />}
-                      {submitting ? savingSubmitLabel : primarySubmitLabel}
-                    </Button>
-                  )}
-                </div>
-              </div>
-            </div>
+            
           </div>
 
           <WorkspaceSummary values={values} course={course} publicHref={publicCourseHref} />

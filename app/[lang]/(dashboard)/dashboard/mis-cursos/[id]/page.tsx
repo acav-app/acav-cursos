@@ -1,7 +1,7 @@
 // @ts-nocheck
 "use client";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import {
   ArrowLeft,
@@ -12,6 +12,7 @@ import {
   ChevronDown,
   ChevronUp,
   Circle,
+  CircleDot,
   ClipboardCheck,
   Clock3,
   Download,
@@ -546,8 +547,8 @@ function LessonEvalStatusBadge({ lesson, evalState, evalUnlocked, summary }) {
             {typeof evalState.attempts === "number" && evalState.attempts > 1
               ? ` (${evalState.attempts} intentos realizados)`
               : evalState.attempts === 1
-              ? " (1 intento realizado)"
-              : ""}
+                ? " (1 intento realizado)"
+                : ""}
           </div>
         </TooltipContent>
       </Tooltip>
@@ -633,12 +634,12 @@ function LessonEvaluationCard({
   const buttonLabel = passed
     ? "Ya aprobada"
     : outOfAttempts
-    ? "Sin intentos disponibles"
-    : evalUnlocked
-    ? isOpen
-      ? "Ocultar evaluación"
-      : "Rendir evaluación"
-    : "Esperando recursos";
+      ? "Sin intentos disponibles"
+      : evalUnlocked
+        ? isOpen
+          ? "Ocultar evaluación"
+          : "Rendir evaluación"
+        : "Esperando recursos";
   const buttonDisabled = !evalUnlocked || passed || outOfAttempts;
 
   return (
@@ -701,28 +702,28 @@ function LessonEvaluationCard({
             previousResult={
               evalState?.submitted
                 ? {
-                    questions: [],
-                    totalScore: Number(evalState.score ?? 0),
-                    totalMaxScore: Number(evalState.maxScore ?? 0),
-                    percentage: Number.isFinite(Number(evalState.percentage))
-                      ? Number(evalState.percentage)
-                      : Number(evalState.maxScore) > 0
+                  questions: [],
+                  totalScore: Number(evalState.score ?? 0),
+                  totalMaxScore: Number(evalState.maxScore ?? 0),
+                  percentage: Number.isFinite(Number(evalState.percentage))
+                    ? Number(evalState.percentage)
+                    : Number(evalState.maxScore) > 0
                       ? Math.round(
-                          (Number(evalState.score ?? 0) / Number(evalState.maxScore)) * 100
-                        )
+                        (Number(evalState.score ?? 0) / Number(evalState.maxScore)) * 100
+                      )
                       : 0,
-                    passingPercentage: Number(lesson.evaluation.passingScore ?? 60),
-                    passed: Boolean(evalState.passed),
-                    correctCount: Number.isFinite(Number((evalState.bestEntry || {})?.correctCount))
-                      ? Number((evalState.bestEntry || {}).correctCount)
-                      : typeof evalState.percentage === "number" &&
-                        Number.isFinite(evalState.percentage)
+                  passingPercentage: Number(lesson.evaluation.passingScore ?? 60),
+                  passed: Boolean(evalState.passed),
+                  correctCount: Number.isFinite(Number((evalState.bestEntry || {})?.correctCount))
+                    ? Number((evalState.bestEntry || {}).correctCount)
+                    : typeof evalState.percentage === "number" &&
+                      Number.isFinite(evalState.percentage)
                       ? Math.round((questions.length * evalState.percentage) / 100)
                       : undefined,
-                    totalCount: Number.isFinite(Number((evalState.bestEntry || {})?.totalCount))
-                      ? Number((evalState.bestEntry || {}).totalCount)
-                      : questions.length,
-                  }
+                  totalCount: Number.isFinite(Number((evalState.bestEntry || {})?.totalCount))
+                    ? Number((evalState.bestEntry || {}).totalCount)
+                    : questions.length,
+                }
                 : undefined
             }
             onSubmit={async (result) => onSubmit(lesson, result)}
@@ -737,7 +738,10 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
   const buildLocalizedPath = useLocalizedPath();
   const { user } = useAuth();
   const { loading: actorLoading } = useCourseActor();
-  const [loading, setLoading] = useState<boolean>(true);
+  const hasShownSkeletonRef = useRef<boolean>(false);
+  const hasCompletedFirstLoadRef = useRef<boolean>(false);
+  const initialLoading = !hasShownSkeletonRef.current || !hasCompletedFirstLoadRef.current;
+  const [loading, setLoading] = useState<boolean>(initialLoading);
   const [savingLesson, setSavingLesson] = useState<string>("");
   const [savingActivity, setSavingActivity] = useState<string>("");
   const [course, setCourse] = useState<Course | null>(null);
@@ -760,7 +764,11 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
 
     async function load() {
       if (!user) return;
-      setLoading(true);
+      const isFirstLoad = !hasCompletedFirstLoadRef.current;
+      if (isFirstLoad) {
+        hasShownSkeletonRef.current = true;
+        setLoading(true);
+      }
       setLocked(false);
       try {
         const data = await authedFetch(user, `/api/student-courses/${id}`, { method: "GET" });
@@ -791,14 +799,22 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
           } catch {
             setEnrollment(null);
           }
-        } else {
+        } else if (isFirstLoad) {
           toast.error(error?.message || "No pudimos cargar la cursada.", { position: "top-right" });
         }
       } finally {
         if (!alive) return;
-        setLoading(false);
+        if (isFirstLoad) {
+          hasCompletedFirstLoadRef.current = true;
+          setLoading(false);
+        }
       }
     }
+
+    const silentRefresh = () => {
+      if (!user) return;
+      void load();
+    };
 
     let intervalId: ReturnType<typeof setInterval> | null = null;
 
@@ -829,8 +845,8 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
               return base;
             });
           })
-          .catch(() => {});
-      }, 15000);
+          .catch(() => { });
+      }, 30000);
     }
 
     function stopPolling() {
@@ -840,27 +856,16 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
       }
     }
 
-    function handleVisibility() {
-      if (document?.hidden) {
-        stopPolling();
-        return;
-      }
-      load();
-      startPolling();
-    }
+    void silentRefresh;
 
     load();
     startPolling();
-    window?.addEventListener?.("focus", load);
-    window?.document?.addEventListener?.("visibilitychange", handleVisibility);
 
     return () => {
       alive = false;
       stopPolling();
-      window?.removeEventListener?.("focus", load);
-      window?.document?.removeEventListener?.("visibilitychange", handleVisibility);
     };
-  }, [id, user]);
+  }, [id, user?.uid || user?.email || ""]);
 
   const curriculum = useMemo(
     () => (Array.isArray(course?.curriculum) ? course.curriculum : []),
@@ -1224,27 +1229,27 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
 
     const evaluationItems = course?.finalEvaluation?.enabled
       ? [
-          {
-            id: "final-evaluation",
-            title: course?.finalEvaluation?.title || "Evaluación final",
-            description:
-              course?.finalEvaluation?.description ||
-              `${Array.isArray(course?.finalEvaluation?.questions) ? course.finalEvaluation.questions.length : 0} preguntas`,
-            type: "final_evaluation",
-            status:
-              gradebook.some((entry) => String(entry?.sourceType || "") === "final_evaluation")
-                ? String(
-                    gradebook.find((entry) => String(entry?.sourceType || "") === "final_evaluation")?.status || "pending"
-                  )
-                : "pending",
-            sectionTitle: "Cierre académico",
-            durationMinutes: 0,
-            dateValue: course?.expiresAt || course?.publishedAt || "",
-            ctaHref: "",
-            ctaLabel: "",
-            isCurrent: false,
-          },
-        ]
+        {
+          id: "final-evaluation",
+          title: course?.finalEvaluation?.title || "Evaluación final",
+          description:
+            course?.finalEvaluation?.description ||
+            `${Array.isArray(course?.finalEvaluation?.questions) ? course.finalEvaluation.questions.length : 0} preguntas`,
+          type: "final_evaluation",
+          status:
+            gradebook.some((entry) => String(entry?.sourceType || "") === "final_evaluation")
+              ? String(
+                gradebook.find((entry) => String(entry?.sourceType || "") === "final_evaluation")?.status || "pending"
+              )
+              : "pending",
+          sectionTitle: "Cierre académico",
+          durationMinutes: 0,
+          dateValue: course?.expiresAt || course?.publishedAt || "",
+          ctaHref: "",
+          ctaLabel: "",
+          isCurrent: false,
+        },
+      ]
       : [];
 
     return [...lessonItems, ...attachmentItems, ...gradeItems, ...evaluationItems];
@@ -1657,8 +1662,8 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
         const gradebookSnapshot = Array.isArray((mergedEnrollment as any)?.gradebook)
           ? (mergedEnrollment as any).gradebook
           : Array.isArray(enrollment?.gradebook)
-          ? enrollment.gradebook
-          : [];
+            ? enrollment.gradebook
+            : [];
         const lessonStatesSnapshot = buildLessonEvaluationStatesFromEnrollment(
           curriculum,
           gradebookSnapshot
@@ -1667,8 +1672,8 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
         const progressSnapshot = updatedProgressTo100
           ? totalLessons
           : Array.isArray((mergedEnrollment as any)?.lessonProgress)
-          ? (mergedEnrollment as any).lessonProgress.length
-          : lessonProgress.length;
+            ? (mergedEnrollment as any).lessonProgress.length
+            : lessonProgress.length;
         const allLessonsFinished = totalLessons === 0 || progressSnapshot >= totalLessons;
         if (allLessonsFinished && perClassSnapshot.allPassed) {
           setShowCertificate(true);
@@ -1727,7 +1732,7 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
       perClassProgress.totalEvaluations === 0 ? 100 : Math.round(
         ((perClassProgress.passed + (course?.finalEvaluation?.enabled ? 0 : perClassProgress.failed)) /
           perClassProgress.totalEvaluations) *
-          100
+        100
       );
     const finalEvalScore = (() => {
       if (!course?.finalEvaluation?.enabled) return 100;
@@ -1799,9 +1804,9 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
       completionDate:
         String(
           finalEvalEntry?.reviewedAt ||
-            enrollment?.approvedAt ||
-            enrollment?.updatedAt ||
-            new Date().toISOString()
+          enrollment?.approvedAt ||
+          enrollment?.updatedAt ||
+          new Date().toISOString()
         ),
       certificateId: `ACAV-CERT-${String(id || "").toUpperCase().slice(0, 8)}-${String(
         enrollment?.id || user?.uid || ""
@@ -2120,15 +2125,12 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
 
         <div className="grid gap-5 md:gap-6 xl:grid-cols-[minmax(0,1fr)_330px] 2xl:grid-cols-[minmax(0,1fr)_360px]">
           <div className="space-y-5 md:space-y-6">
-            <section id="video-destacado" className="rounded-[28px] md:rounded-[32px] border border-slate-200 bg-white p-4 shadow-[0_22px_70px_rgba(15,23,42,0.06)] md:p-5 lg:p-6">
-              <div className="grid gap-4 md:gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] xl:grid-cols-[420px_minmax(0,1fr)] 2xl:grid-cols-[480px_minmax(0,1fr)]">
-                <div
-                  className={cn(
-                    "flex flex-col gap-4 overflow-hidden rounded-[24px] md:rounded-[28px] border border-[#D9D5FF] bg-[radial-gradient(circle_at_top,#9B8BFF_0%,#5F43FF_42%,#24104D_100%)] shadow-[0_30px_80px_rgba(76,29,149,0.28)] transition duration-500",
-                    effectiveVideo ? "border-[#C9BFFF]" : "border-slate-200"
-                  )}
-                >
-                  <div className="relative aspect-video w-full overflow-hidden bg-black/90">
+            <section id="video-destacado" className="rounded-[24px] md:rounded-[28px] border border-slate-200 bg-white p-2.5 shadow-[0_22px_70px_rgba(15,23,42,0.06)] md:p-3 lg:p-4">
+              <div
+                className="flex flex-col overflow-hidden rounded-[18px] md:rounded-[22px] border border-slate-200 bg-white transition duration-500 md:grid md:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] md:gap-0 md:items-stretch"
+              >
+                <div className="relative flex items-center justify-start w-full md:p-7 lg:p-8 bg-white md:border-r md:border-slate-200">
+                  <div className="relative w-full aspect-video overflow-hidden rounded-[18px] md:rounded-[20px] border border-slate-200 bg-slate-900/95 shadow-[0_16px_44px_rgba(15,23,42,0.14)]">
                     {effectiveVideo ? (
                       <>
                         {effectiveInlineVideo ? (
@@ -2137,7 +2139,7 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
                               key={effectivePlayerKey}
                               src={toEmbedUrl(effectiveVideo.url)}
                               title={effectiveVideo.title || "Video"}
-                              className="absolute inset-0 h-full w-full border-0"
+                              className="absolute inset-0 h-full w-full border-0 rounded-[17px] md:rounded-[19px]"
                               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                               allowFullScreen
                             />
@@ -2149,12 +2151,12 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
                               playsInline
                               src={effectivePlayerSrc}
                               poster={effectiveVideo.posterUrl || undefined}
-                              className="absolute inset-0 h-full w-full object-contain bg-black"
+                              className="absolute inset-0 h-full w-full object-contain bg-black rounded-[17px] md:rounded-[19px]"
                             />
                           )
                         ) : effectiveVideo.posterUrl ? (
                           <div
-                            className="absolute inset-0 transition duration-500"
+                            className="absolute inset-0 transition duration-500 rounded-[17px] md:rounded-[19px]"
                             style={{
                               backgroundImage: `url(${effectiveVideo.posterUrl})`,
                               backgroundPosition: "center",
@@ -2166,179 +2168,105 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
                           />
                         ) : null}
 
-                        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(15,23,42,0)_0%,rgba(15,23,42,0.08)_35%,rgba(15,23,42,0.35)_100%)]" />
-
-                        <div className="absolute inset-x-3 top-3 flex flex-wrap items-center justify-between gap-2">
-                          <div className="flex flex-wrap gap-2">
-                            <TonePill
-                              icon={Video}
-                              label={effectiveVideo.durationLabel || "Video"}
-                              className="border-white/30 bg-black/45 text-white backdrop-blur-sm"
-                            />
-                            <TonePill
-                              icon={CalendarDays}
-                              label={formatDate(effectiveVideo.publishedAt) || "Disponible ahora"}
-                              className="border-white/30 bg-black/45 text-white backdrop-blur-sm"
-                            />
-                          </div>
-                          {activeVideoSource ? (
+                        {activeVideoSource ? (
+                          <div className="absolute inset-x-3 top-3 flex items-center justify-end gap-2">
                             <Button
                               type="button"
                               variant="ghost"
                               size="sm"
-                              className="rounded-full border-white/20 bg-black/50 text-white hover:bg-black/60 h-8 backdrop-blur-sm"
+                              className="rounded-full border-slate-700/40 bg-slate-950/60 text-white hover:bg-slate-950/70 h-8 backdrop-blur-sm"
                               onClick={() => setActiveVideoSource(null)}
                             >
                               Volver al video principal
                             </Button>
-                          ) : null}
-                        </div>
+                          </div>
+                        ) : null}
                       </>
                     ) : (
-                      <div className="flex h-full w-full items-center justify-center">
+                      <div className="absolute inset-0 flex items-center justify-center rounded-[17px] md:rounded-[19px]">
                         <TonePill
                           icon={PlayCircle}
                           label="Sin video principal"
-                          className="border-white/20 bg-white/10 text-white backdrop-blur"
+                          className="border-slate-300 bg-white text-slate-700"
                         />
                       </div>
                     )}
                   </div>
-
-                  <div className="space-y-4 px-4 pb-4 sm:px-5 sm:pb-5 text-white">
-                    <div>
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-white/70">
-                        {effectiveVideo ? effectiveVideo.topic : "Vista principal"}
-                      </div>
-                      <h2 className="mt-2 text-[18px] sm:text-[20px] md:text-[22px] font-semibold tracking-[-0.03em]">
-                        {effectiveVideo ? effectiveVideo.title : course.title}
-                      </h2>
-                      {effectiveVideo?.summary ? (
-                        <p className="mt-2 line-clamp-3 max-w-none text-sm leading-6 text-white/82">
-                          {effectiveVideo.summary}
-                        </p>
-                      ) : !effectiveVideo ? (
-                        <p className="mt-3 text-sm leading-6 text-white/78">
-                          Esta cursada no tiene un video principal cargado, pero el temario y los recursos ya están organizados para continuar.
-                        </p>
-                      ) : null}
-                    </div>
-
-                    <div className="rounded-[18px] border border-white/15 bg-white/10 p-3 backdrop-blur-md">
-                        <div className="flex items-center justify-between gap-3">
-                          <div>
-                            <div className="text-xs font-semibold text-white">Progreso de visualización estimado</div>
-                            <div className="mt-1 text-[11px] text-white/72">
-                              {(effectiveVideo?.progress ?? 0) > 0 ? "Contenido retomable" : "Aún no comenzado"}
-                            </div>
-                          </div>
-                          <div className="text-lg font-semibold tracking-[-0.03em] text-white">
-                            {effectiveVideo?.progress ?? 0}%
-                          </div>
-                        </div>
-                      <Progress
-                        value={effectiveVideo?.progress ?? 0}
-                        size="sm"
-                        className="mt-3 bg-white/15 [&>div]:bg-[linear-gradient(90deg,#7C3AED_0%,#A78BFA_100%)]"
-                        aria-label="Progreso de visualización"
-                      />
-                    </div>
-                  </div>
                 </div>
 
-                <div className="flex flex-col justify-between rounded-[24px] md:rounded-[28px] border border-slate-100 bg-[linear-gradient(180deg,#FFFFFF_0%,#FBFAFF_100%)] p-4 sm:p-5 md:p-6">
-                  <div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <TonePill
-                        icon={CheckCircle2}
-                        label="Activo"
-                        className="border-emerald-200 bg-emerald-50 text-emerald-700"
-                      />
-                      {course?.lifetimeAccess ? (
-                        <TonePill
-                          icon={Sparkles}
-                          label="Acceso de por vida"
-                          className="border-violet-200 bg-violet-50 text-violet-700"
-                        />
-                      ) : null}
-                      {course?.includesCertificate ? (
-                        <TonePill
-                          icon={ShieldCheck}
-                          label="Certificado"
-                          className="border-sky-200 bg-sky-50 text-sky-700"
-                        />
-                      ) : null}
+                <div className="flex flex-col min-h-[260px] px-4 py-5 md:px-7 md:py-8 lg:px-8 lg:py-10 text-slate-900">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <TonePill
+                      icon={Sparkles}
+                      label={effectiveVideo?.topic || "Cursada actual"}
+                      className="border-slate-200 bg-slate-50 text-slate-700"
+                    />
+                    {effectiveVideo?.progress === 100 ? (
+                      <Badge variant="soft" color="success" className="rounded-full border-emerald-100 bg-emerald-50 text-emerald-700">
+                        <CheckCircle2 className="mr-1 h-3 w-3" />
+                        Completado
+                      </Badge>
+                    ) : completion > 0 ? (
+                      <Badge variant="soft" color="info" className="rounded-full border-sky-100 bg-sky-50 text-sky-700">
+                        <CircleDot className="mr-1 h-3 w-3" />
+                        {completion}% avanzado
+                      </Badge>
+                    ) : null}
+                  </div>
+
+                  <h1 className="mt-4 text-[26px] md:text-[30px] lg:text-[34px] font-semibold tracking-[-0.03em] leading-[1.08] text-slate-950">
+                    {String(course?.title || effectiveVideo?.title || "Curso").trim()}
+                  </h1>
+
+                  <div className="mt-4 flex flex-wrap items-center gap-3 text-xs md:text-[13px] text-slate-600">
+                    {String(course?.companyName || course?.company?.name || "").trim() ? (
+                      <span className="inline-flex items-center gap-1.5">
+                        <Award className="h-3.5 w-3.5 text-slate-400" />
+                        {String(course.companyName || course.company?.name).trim()}
+                      </span>
+                    ) : null}
+                    {String(course?.modality || "").trim() ? (
+                      <span className="inline-flex items-center gap-1.5">
+                        <BookOpen className="h-3.5 w-3.5 text-slate-400" />
+                        {titleCase(String(course.modality))}
+                      </span>
+                    ) : null}
+                    {String(effectiveVideo?.durationLabel || course?.duration || "").trim() ? (
+                      <span className="inline-flex items-center gap-1.5">
+                        <Clock3 className="h-3.5 w-3.5 text-slate-400" />
+                        {String(effectiveVideo?.durationLabel || course?.duration).trim()}
+                      </span>
+                    ) : null}
+                    {String(course?.level || "").trim() ? (
+                      <span className="inline-flex items-center gap-1.5">
+                        <GraduationCap className="h-3.5 w-3.5 text-slate-400" />
+                        {titleCase(String(course.level))}
+                      </span>
+                    ) : null}
+                  </div>
+
+                  <p className="mt-5 text-sm md:text-[15px] leading-7 text-slate-700 line-clamp-none">
+                    {String(
+                      course?.description?.trim() ||
+                      course?.shortDescription?.trim() ||
+                      effectiveVideo?.summary?.trim() ||
+                      ""
+                    ) || "Contenido disponible dentro de la ruta de aprendizaje, sección por sección."}
+                  </p>
+
+                  <div className="mt-auto pt-7">
+                    <div className="flex items-center justify-between text-[11px] font-medium uppercase tracking-[0.16em] text-slate-500">
+                      <span>Tu progreso</span>
+                      <span>{completion}%</span>
                     </div>
-
-                    <h1 className="mt-4 text-[24px] sm:text-[28px] md:text-[32px] font-semibold tracking-[-0.04em] text-slate-950 lg:text-[36px]">
-                      {course.title}
-                    </h1>
-                    <p className="mt-2 text-sm text-slate-500">
-                      {course.institutionName || course.companyName || "ACAV Cursos"}
-                    </p>
-
-                    <div className="mt-5 sm:mt-7">
-                      <div className="flex items-end justify-between gap-3 md:gap-4">
-                        <div>
-                          <div className="text-sm font-semibold text-slate-900">Tu progreso general</div>
-                          <p className="mt-1 text-xs text-slate-500">
-                            {lessonProgress.length} de {totalLessons} clases completadas
-                          </p>
-                        </div>
-                        <div className="text-[20px] sm:text-[24px] font-semibold tracking-[-0.03em] text-[#6D4CFF]">
-                          {completion}%
-                        </div>
-                      </div>
-                      <Progress
-                        value={completion}
-                        size="sm"
-                        className="mt-4 bg-[#ECE9F8] [&>div]:bg-[linear-gradient(90deg,#6D4CFF_0%,#8B5CF6_100%)]"
-                        aria-label="Progreso general del curso"
+                    <div className="mt-2 h-2.5 w-full overflow-hidden rounded-full bg-slate-100">
+                      <div
+                        className="h-full rounded-full bg-gradient-to-r from-violet-500 via-sky-500 to-emerald-500 transition-all duration-500"
+                        style={{ width: `${Math.max(0, Math.min(100, Number(completion) || 0))}%` }}
                       />
                     </div>
-
-                    <div className="mt-5 sm:mt-6 rounded-[20px] md:rounded-[24px] border border-slate-200 bg-white p-3 sm:p-4 shadow-[0_14px_36px_rgba(15,23,42,0.04)]">
-                      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                        <div className="flex items-center gap-3 sm:gap-4">
-                          <div className="flex h-14 w-14 sm:h-16 sm:w-16 shrink-0 items-center justify-center rounded-[18px] md:rounded-[20px] bg-[linear-gradient(145deg,#7C3AED_0%,#5B5BD6_100%)] text-white shadow-[0_12px_28px_rgba(109,76,255,0.28)]">
-                            <PlayCircle className="h-7 w-7 sm:h-8 sm:w-8" />
-                          </div>
-                          <div className="min-w-0">
-                            <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
-                              Continúa donde dejaste
-                            </div>
-                            <div className="mt-2 text-sm text-slate-500">
-                              {(curriculum.findIndex((section) =>
-                                (Array.isArray(section?.lessons) ? section.lessons : []).some(
-                                  (lesson) => String(lesson?.id || "") === String(currentLesson?.id || "")
-                                )
-                              ) || 0) + 1 > 0
-                                ? `Clase ${currentLesson ? titleCase(currentLesson?.lessonType, "Clase") : "Clase"} · ${
-                                    curriculum.find((section) =>
-                                      (Array.isArray(section?.lessons) ? section.lessons : []).some(
-                                        (lesson) => String(lesson?.id || "") === String(currentLesson?.id || "")
-                                      )
-                                    )?.title || "Módulo actual"
-                                  }`
-                                : "Ruta del curso"}
-                            </div>
-                            <div className="line-clamp-2 text-base font-semibold text-slate-950">
-                              {currentLesson?.title || "No hay clase destacada disponible"}
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="flex flex-wrap items-center gap-3">
-                          <span className="text-sm font-medium text-slate-500">
-                            {currentLesson?.durationMinutes ? `${currentLesson.durationMinutes} min` : "Duración flexible"}
-                          </span>
-                          <Button asChild className="rounded-2xl bg-[#6D4CFF] px-5 hover:bg-[#5E3EF0]">
-                            <a href="#ruta-del-curso">
-                              Continuar clase
-                            </a>
-                          </Button>
-                        </div>
-                      </div>
+                    <div className="mt-3 text-[11px] text-slate-500">
+                      {lessonProgress.length} / {totalLessons || 0} clases completadas
                     </div>
                   </div>
                 </div>
@@ -2381,18 +2309,12 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
                 <div>
                   <h2 className="text-[22px] font-semibold tracking-[-0.03em] text-slate-950">Ruta del curso</h2>
                   <p className="mt-1 text-sm text-slate-500">
-                    Recorrido completo del contenido con estados visuales y acceso rápido a cada recurso.
+                    Toda la cursada, clase por clase: videos, materiales, descripción completa y evaluaciones, todo listo para avanzar a tu ritmo.
                   </p>
                 </div>
-                <a
-                  href="#contenidos-academicos"
-                  className="text-sm font-semibold text-[#6D4CFF] transition hover:text-[#5E3EF0]"
-                >
-                  Ver todo el temario
-                </a>
               </div>
 
-              <div className="mt-6 space-y-3">
+              <div className="mt-6 space-y-4">
                 {curriculum.length ? (
                   curriculum.map((section, sectionIndex) => {
                     const lessons = Array.isArray(section?.lessons) ? section.lessons : [];
@@ -2445,8 +2367,7 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
                         </button>
 
                         {isOpen ? (
-                          <div className="border-t border-slate-100 bg-[#FCFCFF] px-3 py-3 md:px-4">
-                            <div className="space-y-2">
+<div className="space-y-2">
                               {lessons.map((lesson, lessonIndex) => {
                                 const completed = isLessonCompleted(lesson?.id);
                                 const isCurrent = String(currentLesson?.id || "") === String(lesson?.id || "");
@@ -2455,213 +2376,175 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
                                   completed ? "completed" : isCurrent ? "in_progress" : "pending"
                                 );
                                 const Icon = typeMeta.icon;
+                                const lessonVideoUrl = String(lesson?.videoUrl || lesson?.video?.url || "").trim();
+                                const lessonVideoPoster = String(lesson?.video?.posterUrl || "").trim();
+                                const lessonVideoTitle = String(lesson?.title || `Clase ${lessonIndex + 1}`);
+                                const hasLessonVideo = Boolean(lessonVideoUrl);
+                                const resources = Array.isArray(lesson?.resources) ? lesson.resources : [];
+                                const summary = summarizeLessonResources(lesson);
+                                const hasEval = lesson?.evaluation?.enabled;
+                                const evalUnlocked = isLessonEvaluationUnlocked(lesson);
+                                const lessonId = String(lesson?.id || "");
+                                const evalState = lessonId ? perClassStates[lessonId] : undefined;
+                                const canShowReadiness = resources.length || hasEval;
 
                                 return (
                                   <div
                                     key={lesson.id || `${safeSectionId}-${lessonIndex}`}
                                     className={cn(
-                                      "grid gap-3 rounded-[20px] border px-3 py-3 transition md:grid-cols-[minmax(0,1fr)_auto_auto]",
+                                      "group rounded-[24px] border bg-white shadow-[0_12px_32px_rgba(15,23,42,0.04)] transition hover:shadow-[0_18px_44px_rgba(15,23,42,0.06)]",
                                       isCurrent
-                                        ? "border-violet-200 bg-violet-50/80 shadow-[0_10px_30px_rgba(109,76,255,0.10)]"
-                                        : "border-slate-200 bg-white"
+                                        ? "border-violet-200 ring-1 ring-violet-200/70 bg-gradient-to-b from-violet-50/70 to-white"
+                                        : "border-slate-200"
                                     )}
                                   >
-                                    <div className="flex min-w-0 items-start gap-3">
-                                      <span className={cn("mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl", typeMeta.iconClass)}>
-                                        <Icon className="h-4 w-4" />
-                                      </span>
-                                      <div className="min-w-0">
-                                        <div className="flex flex-wrap items-center gap-2">
-                                          <span className="text-sm font-medium text-slate-500">
-                                            {sectionIndex + 1}.{lessonIndex + 1}
+                                    <div className="flex flex-col gap-3 px-4 py-4 md:px-5 md:py-5">
+                                      <div className="flex flex-wrap items-start justify-between gap-3">
+                                        <div className="flex min-w-0 items-start gap-3">
+                                          <span className={cn("mt-0.5 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl", typeMeta.iconClass)}>
+                                            <Icon className="h-4 w-4" />
                                           </span>
-                                          <span className="line-clamp-1 text-sm font-semibold text-slate-950">
-                                            {lesson?.title || `Clase ${lessonIndex + 1}`}
-                                          </span>
+                                          <div className="min-w-0">
+                                            <div className="flex flex-wrap items-center gap-2">
+                                              <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+                                                {sectionIndex + 1}.{lessonIndex + 1}
+                                              </span>
+                                              <h3 className="line-clamp-1 text-[15px] font-semibold text-slate-950">
+                                                {lesson?.title || `Clase ${lessonIndex + 1}`}
+                                              </h3>
+                                            </div>
+                                            <div className="mt-2 flex flex-wrap items-center gap-2">
+                                              <span className={cn("inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold", typeMeta.badgeClass)}>
+                                                {typeMeta.label}
+                                              </span>
+                                              <span className={cn("inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold", stateMeta.badgeClass)}>
+                                                {stateMeta.label}
+                                              </span>
+                                              <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-medium text-slate-500">
+                                                {lesson?.durationMinutes ? `${lesson.durationMinutes} min` : "Duración flexible"}
+                                              </span>
+                                            </div>
+                                          </div>
                                         </div>
-                                        {lesson?.description ? (
-                                          <p className="mt-1 line-clamp-2 text-sm text-slate-500">{lesson.description}</p>
-                                        ) : null}
-                                        <div className="mt-2 flex flex-wrap items-center gap-2">
-                                          <Tooltip>
-                                            <TooltipTrigger asChild>
-                                              <span>
-                                                <span className={cn("inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold cursor-help", typeMeta.badgeClass)}>
-                                                  {typeMeta.label}
-                                                </span>
-                                              </span>
-                                            </TooltipTrigger>
-                                            <TooltipContent side="bottom">
-                                              <div className="max-w-xs leading-5 text-[11px]">
-                                                <div className="font-semibold">{typeMeta.label}</div>
-                                                <div className="mt-1 text-slate-100/90">{typeMeta.description || "Tipo de recurso dentro del itinerario formativo."}</div>
-                                              </div>
-                                            </TooltipContent>
-                                          </Tooltip>
-                                          <Tooltip>
-                                            <TooltipTrigger asChild>
-                                              <span>
-                                                <span className={cn("inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold cursor-help", stateMeta.badgeClass)}>
-                                                  {stateMeta.label}
-                                                </span>
-                                              </span>
-                                            </TooltipTrigger>
-                                            <TooltipContent side="bottom">
-                                              <div className="max-w-xs leading-5 text-[11px]">
-                                                <div className="font-semibold">{stateMeta.label}</div>
-                                                <div className="mt-1 text-slate-100/90">{stateMeta.description || "Tu estado actual dentro del recurso."}</div>
-                                              </div>
-                                            </TooltipContent>
-                                          </Tooltip>
+                                        <div className="flex items-center gap-2">
+                                          {completed ? (
+                                            <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
+                                          ) : (
+                                            <Circle className="h-4 w-4 text-slate-300 shrink-0" />
+                                          )}
+                                          <Button
+                                            type="button"
+                                            variant={completed ? "outline" : "default"}
+                                            size="sm"
+                                            className={cn(
+                                              "h-9 rounded-2xl",
+                                              completed
+                                                ? "border-slate-200 text-slate-600 hover:text-slate-900"
+                                                : "bg-[#6D4CFF] hover:bg-[#5E3EF0] text-white"
+                                            )}
+                                            onClick={() => toggleLesson(lesson)}
+                                            disabled={savingLesson === lesson.id}
+                                          >
+                                            {savingLesson === lesson.id ? (
+                                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                            ) : completed ? (
+                                              <CheckCircle2 className="mr-2 h-4 w-4" />
+                                            ) : (
+                                              <Circle className="mr-2 h-4 w-4" />
+                                            )}
+                                            {completed ? "Completada" : "Marcar completa"}
+                                          </Button>
                                         </div>
                                       </div>
-                                    </div>
 
-                                    <div className="flex items-center gap-3 text-sm text-slate-500 md:justify-end">
-                                      <Tooltip>
-                                        <TooltipTrigger asChild>
-                                          <span className="cursor-help">
-                                            {lesson?.durationMinutes ? `${lesson.durationMinutes} min` : "Flexible"}
-                                          </span>
-                                        </TooltipTrigger>
-                                        <TooltipContent side="left">
-                                          <div className="text-[11px]">
-                                            {lesson?.durationMinutes
-                                              ? `Duración estimada para completar esta clase.`
-                                              : "Duración sugerida — definida por la institución."}
-                                          </div>
-                                        </TooltipContent>
-                                      </Tooltip>
-                                      {completed ? (
-                                        <Tooltip>
-                                          <TooltipTrigger asChild>
-                                            <CheckCircle2 className="h-4 w-4 text-emerald-500 cursor-help" />
-                                          </TooltipTrigger>
-                                          <TooltipContent side="left">
-                                            <div className="text-[11px]">Marcada como completada en tu progreso.</div>
-                                          </TooltipContent>
-                                        </Tooltip>
-                                      ) : (
-                                        <Tooltip>
-                                          <TooltipTrigger asChild>
-                                            <Circle className="h-4 w-4 text-slate-300 cursor-help" />
-                                          </TooltipTrigger>
-                                          <TooltipContent side="left">
-                                            <div className="text-[11px]">Clase aún no completada.</div>
-                                          </TooltipContent>
-                                        </Tooltip>
-                                      )}
-                                    </div>
-
-                                    <div className="flex items-center justify-start gap-2 md:justify-end">
-                                      {lesson?.videoUrl ? (
-                                        <Tooltip>
-                                          <TooltipTrigger asChild>
-                                            <span>
-                                              <Button
-                                                type="button"
-                                                variant="outline"
-                                                className="rounded-2xl border-slate-200"
-                                                onClick={() => playSourceFromLesson(lesson, section?.title)}
-                                                aria-label={`Reproducir ${lesson.title || "clase"}`}
-                                              >
-                                                <PlayCircle className="mr-2 h-4 w-4" />
-                                                Reproducir
-                                              </Button>
-                                            </span>
-                                          </TooltipTrigger>
-                                          <TooltipContent side="top">
-                                            <div className="text-[11px]">
-                                              Reproduce el video de la clase directamente en el panel superior.
-                                            </div>
-                                          </TooltipContent>
-                                        </Tooltip>
+                                      {lesson?.description ? (
+                                        <div className="pl-0 md:pl-[3.25rem]">
+                                          <p className="text-[14px] leading-7 text-slate-600 whitespace-pre-line">
+                                            {lesson.description}
+                                          </p>
+                                        </div>
                                       ) : null}
-                                      <Tooltip>
-                                        <TooltipTrigger asChild>
-                                          <span>
-                                            <Button
-                                              type="button"
-                                              variant={completed ? "outline" : "default"}
-                                              className={cn(
-                                                "rounded-2xl",
-                                                completed
-                                                  ? "border-slate-200"
-                                                  : "bg-[#6D4CFF] hover:bg-[#5E3EF0]"
-                                              )}
-                                              onClick={() => toggleLesson(lesson)}
-                                              disabled={savingLesson === lesson.id}
-                                              aria-label={completed ? "Marcar clase como pendiente" : "Marcar clase como completada"}
-                                            >
-                                              {savingLesson === lesson.id ? (
-                                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                              ) : completed ? (
-                                                <CheckCircle2 className="mr-2 h-4 w-4" />
-                                              ) : (
-                                                <Circle className="mr-2 h-4 w-4" />
-                                              )}
-                                              {completed ? "Pendiente" : "Completa"}
-                                            </Button>
-                                          </span>
-                                        </TooltipTrigger>
-                                        <TooltipContent side="top">
-                                          <div className="max-w-[220px] leading-5 text-[11px]">
-                                            {completed
-                                              ? "Desmarca la clase y la devuelve al estado pendiente en tu progreso."
-                                              : "Marca la clase como completada y actualiza tu avance del curso."}
-                                          </div>
-                                        </TooltipContent>
-                                      </Tooltip>
-                                    </div>
 
-                                    {(() => {
-                                      const resources = Array.isArray(lesson?.resources) ? lesson.resources : [];
-                                      const summary = summarizeLessonResources(lesson);
-                                      const hasEval = lesson?.evaluation?.enabled;
-                                      const evalUnlocked = isLessonEvaluationUnlocked(lesson);
-                                      const lessonId = String(lesson?.id || "");
-                                      const evalState = lessonId ? perClassStates[lessonId] : undefined;
-                                      if (!resources.length && !hasEval) return null;
-                                      return (
-                                        <div className="w-full md:col-span-3 space-y-3 border-t border-dashed border-slate-200 pt-3">
-                                          <div className="flex flex-wrap items-center gap-2">
-                                            <Tooltip>
-                                              <TooltipTrigger asChild>
-                                                <Badge
-                                                  variant="soft"
-                                                  color={readinessTone(summary)}
-                                                  className="rounded-full cursor-help"
-                                                >
-                                                  <FolderKanban className="mr-1 h-3 w-3" />
-                                                  {readinessProgressText(summary)}
-                                                </Badge>
-                                              </TooltipTrigger>
-                                              <TooltipContent side="bottom">
-                                                <div className="max-w-[240px] leading-5 text-[11px]">
-                                                  Estado de integridad de recursos para esta clase (videos, documentos, imágenes).
-                                                </div>
-                                              </TooltipContent>
-                                            </Tooltip>
-                                            <LessonEvalStatusBadge
-                                              lesson={lesson}
-                                              evalState={evalState}
-                                              evalUnlocked={evalUnlocked}
-                                              summary={summary}
-                                            />
-                                          </div>
-
-                                          {resources.length ? (
-                                            <div className="grid gap-3 md:grid-cols-2">
-                                              {resources.map((r, idx) => (
-                                                <DocumentPreviewCard
-                                                  key={r.id || `${lesson.id}_${idx}`}
-                                                  resource={r}
-                                                  compact
+                                      {hasLessonVideo ? (
+                                        <div className="pl-0 md:pl-[3.25rem]">
+                                          <div className="overflow-hidden rounded-[20px] md:rounded-[22px] border border-slate-200 bg-slate-950/95 shadow-[0_16px_40px_rgba(15,23,42,0.12)]">
+                                            <div className="relative aspect-video w-full max-w-2xl mx-auto bg-black">
+                                              {isYoutubeUrl(lessonVideoUrl) || isVimeoUrl(lessonVideoUrl) || isVideoEmbedUrl(lessonVideoUrl) ? (
+                                                <iframe
+                                                  key={`lesson-video-${lesson.id || lessonIndex}`}
+                                                  src={toEmbedUrl(lessonVideoUrl)}
+                                                  title={lessonVideoTitle}
+                                                  className="absolute inset-0 h-full w-full border-0"
+                                                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                                                  allowFullScreen
                                                 />
-                                              ))}
+                                              ) : (
+                                                <video
+                                                  key={`lesson-video-${lesson.id || lessonIndex}`}
+                                                  controls
+                                                  preload="metadata"
+                                                  playsInline
+                                                  src={lessonVideoUrl}
+                                                  poster={lessonVideoPoster || undefined}
+                                                  className="absolute inset-0 h-full w-full object-contain bg-black"
+                                                />
+                                              )}
+                                            </div>
+                                          </div>
+                                          {hasLessonVideo && canShowReadiness ? (
+                                            <div className="mt-4 flex flex-wrap items-center gap-2">
+                                              <Badge
+                                                variant="soft"
+                                                color={readinessTone(summary)}
+                                                className="rounded-full"
+                                              >
+                                                <FolderKanban className="mr-1 h-3 w-3" />
+                                                {readinessProgressText(summary)}
+                                              </Badge>
+                                              <LessonEvalStatusBadge
+                                                lesson={lesson}
+                                                evalState={evalState}
+                                                evalUnlocked={evalUnlocked}
+                                                summary={summary}
+                                              />
                                             </div>
                                           ) : null}
+                                        </div>
+                                      ) : canShowReadiness ? (
+                                        <div className="pl-0 md:pl-[3.25rem] flex flex-wrap items-center gap-2">
+                                          <Badge
+                                            variant="soft"
+                                            color={readinessTone(summary)}
+                                            className="rounded-full"
+                                          >
+                                            <FolderKanban className="mr-1 h-3 w-3" />
+                                            {readinessProgressText(summary)}
+                                          </Badge>
+                                          <LessonEvalStatusBadge
+                                            lesson={lesson}
+                                            evalState={evalState}
+                                            evalUnlocked={evalUnlocked}
+                                            summary={summary}
+                                          />
+                                        </div>
+                                      ) : null}
 
+                                      {resources.length ? (
+                                        <div className="pl-0 md:pl-[3.25rem]">
+                                          <div className="grid gap-3 sm:grid-cols-1 md:grid-cols-2 2xl:grid-cols-3">
+                                            {resources.map((r, idx) => (
+                                              <DocumentPreviewCard
+                                                key={r.id || `${lesson.id}_${idx}`}
+                                                resource={r}
+                                                compact
+                                              />
+                                            ))}
+                                          </div>
+                                        </div>
+                                      ) : null}
+
+                                      {hasEval ? (
+                                        <div className="pl-0 md:pl-[3.25rem]">
                                           <LessonEvaluationCard
                                             lesson={lesson}
                                             evalState={evalState}
@@ -2671,13 +2554,12 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
                                             onSubmit={submitLessonEvaluation}
                                           />
                                         </div>
-                                      );
-                                    })()}
+                                      ) : null}
+                                    </div>
                                   </div>
                                 );
                               })}
                             </div>
-                          </div>
                         ) : null}
                       </div>
                     );
@@ -2687,7 +2569,7 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
                 )}
               </div>
             </section>
-
+{/* 
             <section id="contenidos-academicos" className="rounded-[24px] md:rounded-[30px] border border-slate-200 bg-white p-4 shadow-[0_20px_60px_rgba(15,23,42,0.05)] md:p-6">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
                 <div>
@@ -2933,7 +2815,7 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
                             </div>
                           </div>
 
-                          {/* <div className="flex flex-wrap gap-2">
+                          <div className="flex flex-wrap gap-2">
                             {["video", "text", "live", "download"].includes(item.type) && item.id ? (
                               <Button
                                 type="button"
@@ -2963,7 +2845,7 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
                                 {String(item.status) === "completed" ? "Finalizada" : "Marcar completa"}
                               </Button>
                             ) : null}
-                          </div> */}
+                          </div>
                         </div>
                       </article>
                     );
@@ -2975,7 +2857,7 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
                   />
                 )}
               </div>
-            </section>
+            </section> */}
 
             <section className="rounded-[24px] md:rounded-[30px] border border-slate-200 bg-white p-4 shadow-[0_20px_60px_rgba(15,23,42,0.05)] md:p-6">
               <div className="flex items-center gap-3">
@@ -3102,8 +2984,8 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
 
               <div className="mt-5">
                 {attachments.length ? (
-                  <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-2">
-                    {attachments.slice(0, 8).map((resource, idx) => (
+                  <div className="grid gap-4 sm:grid-cols-1 md:grid-cols-2 2xl:grid-cols-3">
+                    {attachments.slice(0, 9).map((resource, idx) => (
                       <DocumentPreviewCard key={resource.id || `${resource.url}_${idx}`} resource={resource} />
                     ))}
                   </div>
@@ -3145,7 +3027,7 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
                 )}
               </div>
             </section>
-          </div>
+          </div >
 
           <aside className="space-y-5 md:space-y-6">
             <section className="rounded-[24px] md:rounded-[30px] border border-slate-200 bg-white p-4 md:p-5 shadow-[0_20px_60px_rgba(15,23,42,0.05)]">
@@ -3542,8 +3424,8 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
                                         progress.allPassed
                                           ? "bg-emerald-500"
                                           : progress.passed > 0
-                                          ? "bg-amber-500"
-                                          : "bg-slate-300"
+                                            ? "bg-amber-500"
+                                            : "bg-slate-300"
                                       )}
                                       style={{
                                         width: `${progress.totalEvaluations > 0 ? Math.round((progress.passed / progress.totalEvaluations) * 100) : 0}%`,
@@ -3591,8 +3473,8 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
                                   {finalEvalEntry?.status === "passed"
                                     ? "Examen final aprobado"
                                     : unlocked
-                                    ? "Rendir evaluación final"
-                                    : "Próximamente"}
+                                      ? "Rendir evaluación final"
+                                      : "Próximamente"}
                                 </span>
                               </Button>
                             ) : (
@@ -3630,9 +3512,9 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
                         </div>
 
                         {openEvaluationId === "final_evaluation" &&
-                        unlocked &&
-                        Array.isArray(course.finalEvaluation.questions) &&
-                        course.finalEvaluation.questions.length ? (
+                          unlocked &&
+                          Array.isArray(course.finalEvaluation.questions) &&
+                          course.finalEvaluation.questions.length ? (
                           <div className="mt-4 w-full min-w-0">
                             <EvaluationRenderer
                               key="final-evaluation"
@@ -3646,43 +3528,43 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
                               defaultPoints={(course.finalEvaluation as any).defaultPoints}
                               previousResult={
                                 finalEvalEntry?.reviewedAt ||
-                                (finalEvalEntry && typeof (finalEvalEntry as any).score !== "undefined")
+                                  (finalEvalEntry && typeof (finalEvalEntry as any).score !== "undefined")
                                   ? {
-                                      questions: [],
-                                      totalScore: Number((finalEvalEntry as any).score ?? 0),
-                                      totalMaxScore: Number((finalEvalEntry as any).maxScore ?? 0),
-                                      percentage: Number.isFinite(Number((finalEvalEntry as any).percentage))
-                                        ? Number((finalEvalEntry as any).percentage)
-                                        : Number((finalEvalEntry as any).maxScore) > 0
+                                    questions: [],
+                                    totalScore: Number((finalEvalEntry as any).score ?? 0),
+                                    totalMaxScore: Number((finalEvalEntry as any).maxScore ?? 0),
+                                    percentage: Number.isFinite(Number((finalEvalEntry as any).percentage))
+                                      ? Number((finalEvalEntry as any).percentage)
+                                      : Number((finalEvalEntry as any).maxScore) > 0
                                         ? Math.round(
-                                            (Number((finalEvalEntry as any).score ?? 0) /
-                                              Number((finalEvalEntry as any).maxScore)) *
-                                              100
-                                          )
+                                          (Number((finalEvalEntry as any).score ?? 0) /
+                                            Number((finalEvalEntry as any).maxScore)) *
+                                          100
+                                        )
                                         : 0,
-                                      passingPercentage: Number(
-                                        course.finalEvaluation.passingScore ?? 60
-                                      ),
-                                      correctCount: Number.isFinite(Number((finalEvalEntry as any).correctCount))
-                                        ? Number((finalEvalEntry as any).correctCount)
-                                        : Number.isFinite(Number((finalEvalEntry as any).percentage)) &&
-                                          Array.isArray(course.finalEvaluation.questions)
+                                    passingPercentage: Number(
+                                      course.finalEvaluation.passingScore ?? 60
+                                    ),
+                                    correctCount: Number.isFinite(Number((finalEvalEntry as any).correctCount))
+                                      ? Number((finalEvalEntry as any).correctCount)
+                                      : Number.isFinite(Number((finalEvalEntry as any).percentage)) &&
+                                        Array.isArray(course.finalEvaluation.questions)
                                         ? Math.round(
-                                            ((course.finalEvaluation.questions || []).length *
-                                              Number((finalEvalEntry as any).percentage)) /
-                                              100
-                                          )
+                                          ((course.finalEvaluation.questions || []).length *
+                                            Number((finalEvalEntry as any).percentage)) /
+                                          100
+                                        )
                                         : undefined,
-                                      totalCount: Number.isFinite(Number((finalEvalEntry as any).totalCount))
-                                        ? Number((finalEvalEntry as any).totalCount)
-                                        : Array.isArray(course.finalEvaluation.questions)
+                                    totalCount: Number.isFinite(Number((finalEvalEntry as any).totalCount))
+                                      ? Number((finalEvalEntry as any).totalCount)
+                                      : Array.isArray(course.finalEvaluation.questions)
                                         ? (course.finalEvaluation.questions || []).length
                                         : undefined,
-                                      passed: String((finalEvalEntry as any).status || "")
-                                        .trim()
-                                        .toLowerCase()
-                                        .includes("pass"),
-                                    }
+                                    passed: String((finalEvalEntry as any).status || "")
+                                      .trim()
+                                      .toLowerCase()
+                                      .includes("pass"),
+                                  }
                                   : undefined
                               }
                               onSubmit={submitFinalEvaluation}
@@ -3701,15 +3583,16 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
               </div>
             </section>
           </aside>
-        </div>
-      </div>
-      {certificateData ? (
-        <CourseCertificate
-          open={showCertificate}
-          onClose={() => setShowCertificate(false)}
-          data={certificateData}
-        />
-      ) : null}
-    </div>
+        </div >
+      </div >
+      {
+        certificateData ? (
+          <CourseCertificate
+            open={showCertificate}
+            onClose={() => setShowCertificate(false)}
+            data={certificateData}
+          />
+        ) : null}
+    </div >
   );
 }

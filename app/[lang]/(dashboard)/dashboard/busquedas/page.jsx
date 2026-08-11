@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
-import { Plus, CheckCircle2, PauseCircle, PlayCircle, Copy, Trash2, XCircle, StopCircle } from "lucide-react";
+import { Plus, CheckCircle2, PauseCircle, PlayCircle, Copy, Trash2, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -268,7 +268,7 @@ export default function DashboardBusquedasPage() {
 
                   {["activa", "pausada"].includes(job.status) ? (
                     <Button variant="outline" onClick={() => setCloseJobId(job.id)} className="inline-flex items-center gap-2">
-                      <StopCircle className="h-4 w-4" />
+                      <XCircle className="h-4 w-4" />
                       Cerrar
                     </Button>
                   ) : null}

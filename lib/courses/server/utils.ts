@@ -36,29 +36,37 @@ export function slugify(input: unknown) {
 }
 
 export function removeUndefined<T extends Record<string, any>>(value: T): T {
+  if (value === null || value === undefined) return value;
   if (Array.isArray(value)) {
-    return value.map((item) => (item && typeof item === "object" ? removeUndefined(item as any) : item)) as unknown as T;
+    return (value as any[]).map((item) =>
+      item && typeof item === "object" ? removeUndefined(item as any) : item
+    ) as unknown as T;
   }
   if (!value || typeof value !== "object") {
     return value;
   }
+  const keys = Object.keys(value);
   const next: Record<string, any> = {};
-  Object.entries(value).forEach(([key, val]) => {
-    if (val === undefined) return;
+  for (let i = 0; i < keys.length; i++) {
+    const key = keys[i];
+    const val = (value as Record<string, any>)[key];
+    if (val === undefined) continue;
     if (val === null) {
       next[key] = null;
-      return;
+      continue;
     }
     if (Array.isArray(val)) {
-      next[key] = val.map((item) => (item && typeof item === "object" ? removeUndefined(item as any) : item));
-      return;
+      next[key] = val.map((item) =>
+        item && typeof item === "object" ? removeUndefined(item as any) : item
+      );
+      continue;
     }
     if (typeof val === "object") {
       next[key] = removeUndefined(val as any);
-      return;
+      continue;
     }
     next[key] = val;
-  });
+  }
   return next as T;
 }
 
