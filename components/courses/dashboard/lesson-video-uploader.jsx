@@ -38,6 +38,65 @@ function isEmbedUrl(url) {
   return u.includes("youtube.com") || u.includes("youtu.be") || u.includes("vimeo.com");
 }
 
+function toEmbedUrl(url) {
+  const raw = String(url || "").trim();
+  if (!raw) return "";
+  try {
+    const parsed = new URL(raw);
+    const host = parsed.hostname.toLowerCase().replace(/^www\./, "");
+    if (host === "youtube.com" || host === "m.youtube.com" || host === "music.youtube.com") {
+      if (parsed.pathname.toLowerCase().startsWith("/embed/")) return raw;
+      const videoId = parsed.searchParams.get("v");
+      if (videoId) {
+        const clean = new URL(`https://www.youtube.com/embed/${videoId}`);
+        for (const [k, v] of parsed.searchParams.entries()) {
+          if (k.toLowerCase() === "v") continue;
+          if (["t", "start", "end", "rel", "controls", "autoplay", "mute", "loop", "playlist"].includes(k.toLowerCase())) {
+            clean.searchParams.set(k, v);
+          }
+        }
+        return clean.toString();
+      }
+      const shortsMatch = parsed.pathname.match(/^\/shorts\/([A-Za-z0-9_-]{6,})/i);
+      if (shortsMatch) {
+        return `https://www.youtube.com/embed/${shortsMatch[1]}`;
+      }
+      const liveMatch = parsed.pathname.match(/^\/live\/([A-Za-z0-9_-]{6,})/i);
+      if (liveMatch) {
+        return `https://www.youtube.com/embed/${liveMatch[1]}`;
+      }
+      const embedMatch = parsed.pathname.match(/^\/v\/([A-Za-z0-9_-]{6,})/i);
+      if (embedMatch) {
+        return `https://www.youtube.com/embed/${embedMatch[1]}`;
+      }
+    }
+    if (host === "youtu.be") {
+      const id = parsed.pathname.replace(/^\//, "").split("/")[0];
+      if (id) {
+        const clean = new URL(`https://www.youtube.com/embed/${id}`);
+        for (const [k, v] of parsed.searchParams.entries()) {
+          if (["t", "start", "end", "rel", "controls", "autoplay", "mute", "loop", "playlist"].includes(k.toLowerCase())) {
+            clean.searchParams.set(k, v);
+          }
+        }
+        return clean.toString();
+      }
+    }
+    if (host === "vimeo.com" || host === "www.vimeo.com") {
+      const idMatch = parsed.pathname.match(/^\/(\d{5,})(?:\/|$)/);
+      if (idMatch) {
+        return `https://player.vimeo.com/video/${idMatch[1]}${parsed.search || ""}`;
+      }
+    }
+    if (host === "player.vimeo.com") {
+      return raw;
+    }
+  } catch {
+    return raw;
+  }
+  return raw;
+}
+
 export default function LessonVideoUploader({
   value = "",
   asset,
@@ -45,11 +104,12 @@ export default function LessonVideoUploader({
   compact = false,
   folderPrefix = "courses/lessons/videos",
   onBeforeUpload,
+  forceUrlOnly = false,
 }) {
   const [progress, setProgress] = useState({ percent: 0, loaded: 0, total: 0 });
   const [uploading, setUploading] = useState(false);
   const [manualUrl, setManualUrl] = useState("");
-  const [tab, setTab] = useState("upload");
+  const [tab, setTab] = useState(forceUrlOnly ? "url" : "upload");
   const [preview, setPreview] = useState(null);
 
   useEffect(() => {
@@ -64,7 +124,7 @@ export default function LessonVideoUploader({
     };
   }, [preview?.objectUrl]);
 
-  const current = String(value || "").trim();
+  const current = String(value || asset?.url || "").trim();
   const hasAsset = asset && typeof asset === "object" && (asset.url || asset.storageKey);
   const assetMime = hasAsset ? asset.mimeType : undefined;
   const assetSize = hasAsset ? asset.fileSize : undefined;
@@ -73,8 +133,11 @@ export default function LessonVideoUploader({
   const assetStorageKey = hasAsset ? asset.storageKey : undefined;
 
   const displayUrl = useMemo(() => {
-    if (current) return current;
     if (preview?.objectUrl) return preview.objectUrl;
+    if (current) {
+      const normalized = isEmbedUrl(current) ? toEmbedUrl(current) : current;
+      return normalized || current;
+    }
     return "";
   }, [current, preview?.objectUrl]);
 
@@ -170,18 +233,20 @@ export default function LessonVideoUploader({
   });
 
   const handleApplyManualUrl = () => {
-    const url = String(manualUrl || "").trim();
-    if (!url) {
+    const raw = String(manualUrl || "").trim();
+    if (!raw) {
       toast.error("Pega una URL de video primero.");
       return;
     }
     try {
-      new URL(url);
+      new URL(raw);
     } catch {
       toast.error("La URL no es válida.");
       return;
     }
-    onChange(url);
+    const url = isEmbedUrl(raw) ? toEmbedUrl(raw) : raw;
+    setPreview(null);
+    onChange(url, null, null);
     setManualUrl("");
     toast.success("URL del video actualizada.");
   };
@@ -200,28 +265,30 @@ export default function LessonVideoUploader({
   if (compact) {
     return (
       <div className="grid gap-3">
-        <div className="inline-flex rounded-xl border border-border/60 bg-background p-1 w-full md:w-auto">
-          <button
-            type="button"
-            onClick={() => setTab("upload")}
-            className={`inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-xs transition md:flex-none ${
-              tab === "upload" ? "bg-[#1B2B50] text-white shadow-sm" : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            <UploadCloud className="h-3.5 w-3.5" />
-            Subir
-          </button>
-          <button
-            type="button"
-            onClick={() => setTab("url")}
-            className={`inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-xs transition md:flex-none ${
-              tab === "url" ? "bg-[#1B2B50] text-white shadow-sm" : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            <ExternalLink className="h-3.5 w-3.5" />
-            URL
-          </button>
-        </div>
+        {forceUrlOnly ? null : (
+          <div className="inline-flex rounded-xl border border-border/60 bg-background p-1 w-full md:w-auto">
+            <button
+              type="button"
+              onClick={() => setTab("upload")}
+              className={`inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-xs transition md:flex-none ${
+                tab === "upload" ? "bg-[#1B2B50] text-white shadow-sm" : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <UploadCloud className="h-3.5 w-3.5" />
+              Subir
+            </button>
+            <button
+              type="button"
+              onClick={() => setTab("url")}
+              className={`inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-xs transition md:flex-none ${
+                tab === "url" ? "bg-[#1B2B50] text-white shadow-sm" : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <ExternalLink className="h-3.5 w-3.5" />
+              URL
+            </button>
+          </div>
+        )}
 
         {displayHasAssetLike ? (
           <div className="overflow-hidden rounded-2xl border border-emerald-200 bg-emerald-50/40">
@@ -313,7 +380,29 @@ export default function LessonVideoUploader({
               ) : null}
             </div>
           </div>
-        ) : tab === "upload" ? (
+        ) : (forceUrlOnly || tab === "url") ? (
+          <div className="grid gap-2 rounded-2xl border border-border/60 bg-card p-3">
+            <div className="grid gap-2 md:grid-cols-[1fr_auto] md:items-center">
+              <Input
+                value={manualUrl}
+                onChange={(event) => setManualUrl(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    handleApplyManualUrl();
+                  }
+                }}
+                placeholder="https://www.youtube.com/watch?v=..."
+                className="h-9"
+              />
+              <Button type="button" onClick={handleApplyManualUrl} className="h-9 rounded-xl">
+                <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
+                Aplicar URL
+              </Button>
+            </div>
+            <p className="text-[11px] text-muted-foreground">YouTube / Vimeo. Usa la URL de compartir.</p>
+          </div>
+        ) : (
           <div
             {...getRootProps()}
             className={`cursor-pointer rounded-2xl border-2 border-dashed px-3 py-4 text-center transition ${dropTone}`}
@@ -353,28 +442,6 @@ export default function LessonVideoUploader({
               </div>
             ) : null}
           </div>
-        ) : (
-          <div className="grid gap-2 rounded-2xl border border-border/60 bg-card p-3">
-            <div className="grid gap-2 md:grid-cols-[1fr_auto] md:items-center">
-              <Input
-                value={manualUrl}
-                onChange={(event) => setManualUrl(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") {
-                    event.preventDefault();
-                    handleApplyManualUrl();
-                  }
-                }}
-                placeholder="https://www.youtube.com/watch?v=..."
-                className="h-9"
-              />
-              <Button type="button" onClick={handleApplyManualUrl} className="h-9 rounded-xl">
-                <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
-                Aplicar URL
-              </Button>
-            </div>
-            <p className="text-[11px] text-muted-foreground">YouTube / Vimeo. Usa la URL de compartir.</p>
-          </div>
         )}
       </div>
     );
@@ -384,33 +451,36 @@ export default function LessonVideoUploader({
     <div className="grid gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-start gap-2 text-muted-foreground">
-          <UploadCloud className="mt-0.5 h-4 w-4 shrink-0" />
           <p className="text-xs leading-5 text-muted-foreground">
-            Subí archivo (MP4/WebM/MOV/MKV) o pegá un link de YouTube/Vimeo. Máximo {formatSize(COURSE_VIDEO_MAX_SIZE_BYTES)}.
+            {forceUrlOnly
+              ? ""
+              : `Subí archivo (MP4/WebM/MOV/MKV) o pegá un link de YouTube/Vimeo. Máximo ${formatSize(COURSE_VIDEO_MAX_SIZE_BYTES)}.`}
           </p>
         </div>
-        <div className="inline-flex rounded-xl border border-border/60 bg-background p-1">
-          <button
-            type="button"
-            onClick={() => setTab("upload")}
-            className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm transition ${
-              tab === "upload" ? "bg-[#1B2B50] text-white shadow-sm" : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            <UploadCloud className="h-4 w-4" />
-            Subir
-          </button>
-          <button
-            type="button"
-            onClick={() => setTab("url")}
-            className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm transition ${
-              tab === "url" ? "bg-[#1B2B50] text-white shadow-sm" : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            <ExternalLink className="h-4 w-4" />
-            URL
-          </button>
-        </div>
+        {forceUrlOnly ? null : (
+          <div className="inline-flex rounded-xl border border-border/60 bg-background p-1">
+            <button
+              type="button"
+              onClick={() => setTab("upload")}
+              className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm transition ${
+                tab === "upload" ? "bg-[#1B2B50] text-white shadow-sm" : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <UploadCloud className="h-4 w-4" />
+              Subir
+            </button>
+            <button
+              type="button"
+              onClick={() => setTab("url")}
+              className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm transition ${
+                tab === "url" ? "bg-[#1B2B50] text-white shadow-sm" : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <ExternalLink className="h-4 w-4" />
+              URL
+            </button>
+          </div>
+        )}
       </div>
 
       {displayHasAssetLike ? (
@@ -559,7 +629,34 @@ export default function LessonVideoUploader({
             </div>
           </div>
         </div>
-      ) : tab === "upload" ? (
+      ) : (forceUrlOnly || tab === "url") ? (
+        <div className="grid gap-3 rounded-[22px] border border-border/60 bg-card p-4">
+          <div className="grid gap-2 md:grid-cols-[1fr_auto] md:items-end">
+            <div className="grid gap-2">
+              <Label htmlFor="lesson-video-url">URL de YouTube / Vimeo</Label>
+              <Input
+                id="lesson-video-url"
+                value={manualUrl}
+                onChange={(event) => setManualUrl(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    handleApplyManualUrl();
+                  }
+                }}
+                placeholder="https://www.youtube.com/watch?v=..."
+              />
+            </div>
+            <Button type="button" onClick={handleApplyManualUrl} className="h-11 rounded-2xl">
+              <ExternalLink className="mr-2 h-4 w-4" />
+              Aplicar URL
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Tip: pega la URL de compartir, no el código iframe. La plataforma se encarga del embebido.
+          </p>
+        </div>
+      ) : (
         <div className="grid gap-3">
           <div
             {...getRootProps()}
@@ -607,33 +704,6 @@ export default function LessonVideoUploader({
               ) : null}
             </div>
           </div>
-        </div>
-      ) : (
-        <div className="grid gap-3 rounded-[22px] border border-border/60 bg-card p-4">
-          <div className="grid gap-2 md:grid-cols-[1fr_auto] md:items-end">
-            <div className="grid gap-2">
-              <Label htmlFor="lesson-video-url">URL de YouTube / Vimeo</Label>
-              <Input
-                id="lesson-video-url"
-                value={manualUrl}
-                onChange={(event) => setManualUrl(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") {
-                    event.preventDefault();
-                    handleApplyManualUrl();
-                  }
-                }}
-                placeholder="https://www.youtube.com/watch?v=..."
-              />
-            </div>
-            <Button type="button" onClick={handleApplyManualUrl} className="h-11 rounded-2xl">
-              <ExternalLink className="mr-2 h-4 w-4" />
-              Aplicar URL
-            </Button>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Tip: pega la URL de compartir, no el código iframe. La plataforma se encarga del embebido.
-          </p>
         </div>
       )}
     </div>

@@ -1,6 +1,6 @@
 import { getAdminDb } from "@/lib/firebase-admin";
 import { COURSE_COLLECTIONS } from "@/lib/courses/collections";
-import { COURSE_MODALITIES, COURSE_SALES_MODALITIES, COURSE_VIDEO_ALLOWED_TYPES, COURSE_VIDEO_MAX_SIZE_BYTES } from "@/lib/courses/constants";
+import { COURSE_MODALITIES, COURSE_SALES_MODALITIES, COURSE_VIDEO_ALLOWED_TYPES, COURSE_VIDEO_MAX_SIZE_BYTES, isExternalVideoUrl } from "@/lib/courses/constants";
 import { CourseCreateSchema, CourseUpdateSchema, type Course } from "@/lib/courses/schemas";
 import type { CourseActor } from "@/lib/courses/server/auth";
 import { err } from "@/lib/courses/server/errors";
@@ -247,13 +247,16 @@ function validateCourseBusinessRules(input: Record<string, any>) {
     throw err(400, "old_price_invalid");
   }
   if (input.videoUrl) {
-    const videoMimeType = String(input.videoMimeType || "").trim();
-    const videoSizeBytes = Number(input.videoSizeBytes || 0);
-    if (!COURSE_VIDEO_ALLOWED_TYPES.includes(videoMimeType as (typeof COURSE_VIDEO_ALLOWED_TYPES)[number])) {
-      throw err(400, "invalid_video_type");
-    }
-    if (!Number.isFinite(videoSizeBytes) || videoSizeBytes <= 0 || videoSizeBytes > COURSE_VIDEO_MAX_SIZE_BYTES) {
-      throw err(400, "invalid_video_size");
+    const isExternal = isExternalVideoUrl(input.videoUrl);
+    if (!isExternal) {
+      const videoMimeType = String(input.videoMimeType || "").trim();
+      const videoSizeBytes = Number(input.videoSizeBytes || 0);
+      if (!COURSE_VIDEO_ALLOWED_TYPES.includes(videoMimeType as (typeof COURSE_VIDEO_ALLOWED_TYPES)[number])) {
+        throw err(400, "invalid_video_type");
+      }
+      if (!Number.isFinite(videoSizeBytes) || videoSizeBytes <= 0 || videoSizeBytes > COURSE_VIDEO_MAX_SIZE_BYTES) {
+        throw err(400, "invalid_video_size");
+      }
     }
   }
   ensureDateIsTodayOrFuture(String(input.expiresAt || ""));

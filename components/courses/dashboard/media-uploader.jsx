@@ -115,7 +115,7 @@ export default function MediaUploader({
     };
   }, [accept, mode]);
 
-  const maxBytes = mode === "video" ? MAX_VIDEO_BYTES : MAX_DOCUMENT_BYTES;
+  const maxBytes = mode === "video" ? MAX_VIDEO_BYTES : mode === "image" ? 20 * 1024 * 1024 : MAX_DOCUMENT_BYTES;
 
   const isValidFile = useCallback(
     (file) => {

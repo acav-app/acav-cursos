@@ -142,6 +142,18 @@ export const COURSE_VIDEO_ALLOWED_TYPES = [
   "video/x-msvideo",
 ] as const;
 
+export function isExternalVideoUrl(url: unknown) {
+  const s = String(url || "").trim().toLowerCase();
+  if (!s) return false;
+  return (
+    s.includes("youtube.com") ||
+    s.includes("youtu.be") ||
+    s.includes("vimeo.com") ||
+    s.startsWith("https://") ||
+    s.startsWith("http://")
+  );
+}
+
 export const COURSE_VIDEO_MAX_SIZE_BYTES = 4 * 1024 * 1024 * 1024;
 
 export const COURSE_CLOSE_REASONS = [
