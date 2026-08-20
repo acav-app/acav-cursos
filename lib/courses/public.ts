@@ -158,6 +158,8 @@ export function mapCourseForCard(course: any) {
     imageUrl,
     thumbnailUrl,
     videoUrl,
+    documentationUrl: String(course?.documentationUrl || "").trim() || undefined,
+    forumQuestions: Array.isArray(course?.forumQuestions) ? course.forumQuestions : [],
     pricingLabel: formattedPrice,
     oldPricingLabel: formattedOldPrice,
     durationLabel: String(course?.duration || "").trim(),

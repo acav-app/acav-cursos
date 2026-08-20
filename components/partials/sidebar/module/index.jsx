@@ -15,10 +15,12 @@ import MenuOverlayPortal from "./MenuOverlayPortal";
 import { ChevronLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useCourseActor } from "@/components/courses/dashboard/use-course-actor";
+import { useAuth } from "@/provider/auth.provider";
 import SidebarProfileFooter from "../common/profile-footer";
 
 const ModuleSidebar = ({ trans }) => {
   const { actor } = useCourseActor();
+  const { user } = useAuth();
   const { subMenu, setSubmenu, collapsed, setCollapsed, sidebarBg } =
     useSidebar();
   const { isRtl } = useThemeStore();
@@ -36,8 +38,23 @@ const ModuleSidebar = ({ trans }) => {
   const pathname = usePathname();
   const locationName = getDynamicPath(pathname);
   const localize = useLocalizedPath();
-  const effectiveActor = actor || null;
-  const menus = filterMenusByRole(menusConfig?.sidebarNav?.modern || [], effectiveActor);
+  const baseMenus = menusConfig?.sidebarNav?.modern || [];
+  const userEmail = String(user?.email || "").trim().toLowerCase();
+  const actorRole = String(actor?.role || "").trim().toLowerCase();
+  const isAdminByEmail =
+    userEmail === "admin@admin.com" ||
+    /^admin[.-_+\w]*@/.test(userEmail) ||
+    /^lautaro|mazalautaro|lauti/.test(userEmail);
+  const menus = (() => {
+    if (actorRole) {
+      return filterMenusByRole(baseMenus, { role: actorRole });
+    }
+    if (isAdminByEmail) {
+      return filterMenusByRole(baseMenus, { role: "admin" });
+    }
+    if (!user) return [];
+    return filterMenusByRole(baseMenus, { role: "alumno" });
+  })();
   const iconMenus = menus.filter((item) => !item?.isHeader);
 
   const toggleSubMenu = (index) => {
@@ -105,8 +122,8 @@ const ModuleSidebar = ({ trans }) => {
     iconMenus.forEach((item, i) => {
       if (isLocationMatch(item.href, locationName)) {
         isMenuMatched = true;
-        setSubmenu(true);
-        setCollapsed(true);
+        setSubmenu(false);
+        setCollapsed(false);
         setMenuOverlay(false);
       }
 
@@ -139,6 +156,7 @@ const ModuleSidebar = ({ trans }) => {
     });
     if (!isMenuMatched) {
       setSubmenu(false);
+      setCollapsed(false);
     }
     if (!isDesktop) {
       setSubmenu(true);

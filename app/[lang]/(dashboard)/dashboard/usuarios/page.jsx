@@ -67,7 +67,6 @@ export default function DashboardUsuariosPage() {
     agency: "",
     employeeFileNumber: "",
     phone: "",
-    contactEmail: "",
     isMember: false,
     password: "",
     role: "admin",
@@ -295,7 +294,6 @@ export default function DashboardUsuariosPage() {
       agency: "",
       employeeFileNumber: "",
       phone: "",
-      contactEmail: "",
       isMember: false,
       password: "",
       role: "admin",
@@ -318,7 +316,6 @@ export default function DashboardUsuariosPage() {
       agency: u.agency || "",
       employeeFileNumber: u.employeeFileNumber || "",
       phone: u.phone || "",
-      contactEmail: u.contactEmail || "",
       isMember: Boolean(u.isMember),
       password: "",
       role: u.role || "admin",
@@ -361,7 +358,6 @@ export default function DashboardUsuariosPage() {
           agency: normalizeString(form.agency) || undefined,
           employeeFileNumber: normalizeString(form.employeeFileNumber) || undefined,
           phone: normalizeString(form.phone) || undefined,
-          contactEmail: normalizeString(form.contactEmail) || undefined,
           isMember: Boolean(form.isMember),
           password: normalizeString(form.password) || undefined,
           role: normalizeString(form.role),
@@ -400,7 +396,6 @@ export default function DashboardUsuariosPage() {
           agency: normalizeString(form.agency) || undefined,
           employeeFileNumber: normalizeString(form.employeeFileNumber) || undefined,
           phone: normalizeString(form.phone) || undefined,
-          contactEmail: normalizeString(form.contactEmail) || undefined,
           isMember: typeof form.isMember === "boolean" ? form.isMember : undefined,
           role: normalizeString(form.role),
           companyId: normalizeString(form.companyId) || undefined,
@@ -509,7 +504,7 @@ export default function DashboardUsuariosPage() {
       />
 
       <Dialog open={createOpen} onOpenChange={(open) => setCreateOpen(open)}>
-        <DialogContent className="w-[95vw] max-w-[720px]">
+        <DialogContent className="max-h-[90vh] w-[95vw] max-w-[720px] overflow-y-auto pr-8">
           <DialogHeader>
             <DialogTitle>Crear usuario del portal</DialogTitle>
           </DialogHeader>
@@ -542,15 +537,9 @@ export default function DashboardUsuariosPage() {
               <Label>Nombre visible (opcional)</Label>
               <Input value={form.displayName} onChange={(e) => setForm((s) => ({ ...s, displayName: e.target.value }))} />
             </div>
-            <div className="grid gap-6 md:grid-cols-2">
-              <div className="grid gap-2">
-                <Label>Teléfono</Label>
-                <Input value={form.phone} onChange={(e) => setForm((s) => ({ ...s, phone: e.target.value }))} placeholder="Opcional" />
-              </div>
-              <div className="grid gap-2">
-                <Label>Email de contacto</Label>
-                <Input value={form.contactEmail} onChange={(e) => setForm((s) => ({ ...s, contactEmail: e.target.value }))} placeholder="Opcional" type="email" />
-              </div>
+            <div className="grid gap-2">
+              <Label>Teléfono</Label>
+              <Input value={form.phone} onChange={(e) => setForm((s) => ({ ...s, phone: e.target.value }))} placeholder="Opcional" />
             </div>
             <div className="grid gap-6 md:grid-cols-2">
               <div className="grid gap-2">
@@ -645,7 +634,7 @@ export default function DashboardUsuariosPage() {
       </Dialog>
 
       <Dialog open={editOpen} onOpenChange={(open) => setEditOpen(open)}>
-        <DialogContent className="w-[95vw] max-w-[720px]">
+        <DialogContent className="max-h-[90vh] w-[95vw] max-w-[720px] overflow-y-auto pr-8">
           <DialogHeader>
             <DialogTitle>Editar usuario</DialogTitle>
           </DialogHeader>
@@ -677,15 +666,9 @@ export default function DashboardUsuariosPage() {
               <Label>Nombre visible</Label>
               <Input value={form.displayName} onChange={(e) => setForm((s) => ({ ...s, displayName: e.target.value }))} />
             </div>
-            <div className="grid gap-6 md:grid-cols-2">
-              <div className="grid gap-2">
-                <Label>Teléfono</Label>
-                <Input value={form.phone} onChange={(e) => setForm((s) => ({ ...s, phone: e.target.value }))} placeholder="Opcional" />
-              </div>
-              <div className="grid gap-2">
-                <Label>Email de contacto</Label>
-                <Input value={form.contactEmail} onChange={(e) => setForm((s) => ({ ...s, contactEmail: e.target.value }))} placeholder="Opcional" type="email" />
-              </div>
+            <div className="grid gap-2">
+              <Label>Teléfono</Label>
+              <Input value={form.phone} onChange={(e) => setForm((s) => ({ ...s, phone: e.target.value }))} placeholder="Opcional" />
             </div>
             <div className="grid gap-6 md:grid-cols-2">
               <div className="grid gap-2">

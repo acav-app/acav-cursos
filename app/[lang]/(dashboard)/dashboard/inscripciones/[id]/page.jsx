@@ -39,6 +39,8 @@ import { useLocalizedPath } from "@/lib/utils";
 import {
   ALLOWED_SCORE_ATTACHMENT_MIME_TYPES,
   COURSE_COMPLETION_STATUSES,
+  EDUCATIONAL_ENROLLMENT_STATUSES,
+  ENROLLMENT_STATUSES,
   MAX_SCORE_ATTACHMENT_SIZE_BYTES,
 } from "@/lib/courses/constants";
 import { DashboardDetailSkeleton } from "@/components/courses/dashboard/page-skeletons";
@@ -50,7 +52,15 @@ import { resolveCourseCompletionStatusMeta } from "@/lib/courses/status-meta";
 function dateLabel(iso) {
   const d = new Date(String(iso || ""));
   if (Number.isNaN(d.getTime())) return "-";
-  return d.toLocaleString("es-AR");
+  return d.toLocaleString("es-AR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  });
 }
 
 function formatCurrency(value) {
@@ -77,6 +87,24 @@ function resolveTone(value) {
   if (["rejected", "cancelled", "canceled"].includes(normalized)) return "destructive";
   if (["pending", "waiting_payment", "payment_under_review", "under_review", "started"].includes(normalized)) return "warning";
   return "info";
+}
+
+function resolveSubmissionStatusMeta(value) {
+  const normalized = String(value || "pending").trim().toLowerCase();
+  const labels = {
+    pending: "Pendiente",
+    submitted: "Enviada",
+    reviewed: "Revisada",
+    approved: "Aprobada",
+    passed: "Aprobada",
+    rejected: "Rechazada",
+    failed: "Desaprobada",
+    in_progress: "En progreso",
+  };
+  return {
+    label: labels[normalized] || titleCase(normalized),
+    tone: resolveTone(normalized),
+  };
 }
 
 function buildStudentNotice(status, paymentStatus) {
@@ -249,7 +277,7 @@ export default function InscripcionDetailPage({ params: { id } }) {
   }, [id, user]);
 
   const isAdmin = actor?.role === "admin";
-  const institutionAllowsManualManagement = institutionStatus === "activa";
+  const institutionAllowsManualManagement = isAdmin || institutionStatus === "activa";
   const institutionStatusLabel = institutionStatus || "sin estado";
   const courseTitle = application?.courseTitle || application?.jobTitle || course?.title || "Inscripción";
   const institutionName = application?.institutionName || application?.companyName || course?.institutionName || "ACAV";
@@ -282,6 +310,43 @@ export default function InscripcionDetailPage({ params: { id } }) {
   const completionMeta = useMemo(() => resolveCourseCompletionStatusMeta(courseStatus), [courseStatus]);
   const completionIcon = useMemo(() => completionMeta?.Icon, [completionMeta]);
   const isCourseSuspended = String(courseStatus || "").trim().toLowerCase() === "suspended";
+  const curriculumSections = Array.isArray(course?.curriculum) ? course.curriculum : [];
+  const completedLessonIds = new Set(
+    (Array.isArray(application?.lessonProgress) ? application.lessonProgress : [])
+      .map((item) => String(item?.lessonId || "").trim())
+      .filter(Boolean)
+  );
+  const courseLessons = curriculumSections.flatMap((section) =>
+    (Array.isArray(section?.lessons) ? section.lessons : []).map((lesson) => ({
+      ...lesson,
+      sectionTitle: section?.title || "Módulo",
+    }))
+  );
+  const moduleProgress = curriculumSections.map((section, index) => {
+    const lessons = Array.isArray(section?.lessons) ? section.lessons : [];
+    const completed = lessons.filter((lesson) => completedLessonIds.has(String(lesson?.id || "").trim())).length;
+    return {
+      id: String(section?.id || `module-${index}`),
+      title: section?.title || `Módulo ${index + 1}`,
+      completed,
+      total: lessons.length,
+    };
+  });
+  const activityLessons = courseLessons.filter((lesson) =>
+    ["assignment", "quiz"].includes(String(lesson?.lessonType || "").trim().toLowerCase())
+  );
+  const activitySubmissions = Array.isArray(application?.activitySubmissions)
+    ? application.activitySubmissions
+    : [];
+  const gradebookEntries = Array.isArray(application?.gradebook) ? application.gradebook : [];
+  const forumAnswers = Array.isArray(course?.forumQuestions)
+    ? course.forumQuestions.flatMap((question) =>
+        (Array.isArray(question?.answers) ? question.answers : []).map((answer) => ({
+          ...answer,
+          questionTitle: question?.title || "Pregunta del foro",
+        }))
+      )
+    : [];
 
   const handleSaveStudentData = async () => {
     if (!user || !isAdmin) return;
@@ -747,21 +812,18 @@ export default function InscripcionDetailPage({ params: { id } }) {
           </p>
         </div>
 
-        <div className="grid gap-6 px-6 py-6 md:grid-cols-1 md:px-8">
-          <div className="rounded-[28px] border border-[#E5E7EB] bg-[#FAFAFA] p-6">
-            <div className="flex items-start justify-between gap-4">
+        <div className="border-t border-[#EEF2F7] px-6 py-6 md:px-8">
+          <section className="rounded-[24px] border border-[#E5E7EB] bg-white p-5 md:p-6">
+            <div className="flex flex-col gap-4 border-b border-[#EEF2F7] pb-5 sm:flex-row sm:items-start sm:justify-between">
               <div>
-                <div className="text-sm font-semibold text-[#0F172A]">Datos del alumno</div>
-                <p className="mt-1 text-xs leading-5 text-[#64748B]">
-                  Podés editar la información asociada a esta inscripción. Los cambios se guardan aquí.
-                </p>
+                <h2 className="text-lg font-semibold tracking-[-0.02em] text-[#0F172A]">Datos del alumno</h2>
+                <p className="mt-1 text-sm text-[#64748B]">Información personal asociada a esta inscripción.</p>
               </div>
-              <Badge variant="soft" color="info" className="rounded-full">
-                Administración
-              </Badge>
+              <Badge variant="soft" color="info" className="w-fit rounded-full">Editable</Badge>
             </div>
-            <div className="mt-4 grid gap-3">
-              <div className="grid gap-3 sm:grid-cols-2">
+
+            <div className="mt-5 grid gap-5">
+              <div className="grid gap-4 sm:grid-cols-2">
                 <div className="grid gap-2">
                   <Label>Nombre</Label>
                   <Input
@@ -769,7 +831,7 @@ export default function InscripcionDetailPage({ params: { id } }) {
                     onChange={(e) => setFirstName(e.target.value)}
                     placeholder="Nombre del alumno"
                     disabled={saving || !institutionAllowsManualManagement}
-                    className="rounded-2xl"
+                    className="h-10 rounded-xl"
                   />
                 </div>
                 <div className="grid gap-2">
@@ -779,32 +841,36 @@ export default function InscripcionDetailPage({ params: { id } }) {
                     onChange={(e) => setLastName(e.target.value)}
                     placeholder="Apellido del alumno"
                     disabled={saving || !institutionAllowsManualManagement}
-                    className="rounded-2xl"
+                    className="h-10 rounded-xl"
                   />
                 </div>
               </div>
-              <div className="grid gap-2">
-                <Label>Email</Label>
-                <Input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="correo@alumno.com"
-                  disabled={saving || !institutionAllowsManualManagement}
-                  className="rounded-2xl"
-                />
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="grid gap-2">
+                  <Label>Email</Label>
+                  <Input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="correo@alumno.com"
+                    disabled={saving || !institutionAllowsManualManagement}
+                    className="h-10 rounded-xl"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label>Teléfono</Label>
+                  <Input
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    placeholder="+54..."
+                    disabled={saving || !institutionAllowsManualManagement}
+                    className="h-10 rounded-xl"
+                  />
+                </div>
               </div>
-              <div className="grid gap-2">
-                <Label>Teléfono</Label>
-                <Input
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder="+54..."
-                  disabled={saving || !institutionAllowsManualManagement}
-                  className="rounded-2xl"
-                />
-              </div>
-              <div className="grid gap-3 sm:grid-cols-2">
+
+              <div className="grid gap-4 sm:grid-cols-2">
                 <div className="grid gap-2">
                   <Label>Ciudad</Label>
                   <Input
@@ -812,7 +878,7 @@ export default function InscripcionDetailPage({ params: { id } }) {
                     onChange={(e) => setCity(e.target.value)}
                     placeholder="Ciudad"
                     disabled={saving || !institutionAllowsManualManagement}
-                    className="rounded-2xl"
+                    className="h-10 rounded-xl"
                   />
                 </div>
                 <div className="grid gap-2">
@@ -822,70 +888,168 @@ export default function InscripcionDetailPage({ params: { id } }) {
                     onChange={(e) => setProvince(e.target.value)}
                     placeholder="Provincia"
                     disabled={saving || !institutionAllowsManualManagement}
-                    className="rounded-2xl"
+                    className="h-10 rounded-xl"
                   />
                 </div>
               </div>
-              <div className="grid gap-2 text-xs text-[#64748B]">
-                <div>Creada: <span className="font-semibold text-[#0F172A]">{dateLabel(application.createdAt)}</span></div>
-                {application?.userId ? <div>UID: <span className="font-mono text-[#0F172A]">{application.userId}</span></div> : null}
+            </div>
+
+            <div className="mt-5 flex flex-col gap-4 border-t border-[#EEF2F7] pt-5 sm:flex-row sm:items-center sm:justify-between">
+              <div className="space-y-1 text-xs text-[#64748B]">
+                <div>Inscripción creada: <span className="font-medium text-[#334155]">{dateLabel(application.createdAt)}</span></div>
               </div>
               <Button
                 type="button"
                 onClick={handleSaveStudentData}
                 disabled={saving || !institutionAllowsManualManagement}
-                className="mt-1 rounded-2xl bg-[#0F172A] text-white hover:bg-[#1E293B]"
+                className="w-full rounded-xl bg-[#0F172A] text-white hover:bg-[#1E293B] sm:w-auto"
               >
                 {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                Guardar datos del alumno
+                Guardar cambios
               </Button>
             </div>
-          </div>
+          </section>
         </div>
 
         <div className="border-t border-[#EEF2F7] px-6 py-6 md:px-8">
-          <div className="rounded-[28px] border border-[#E5E7EB] bg-white p-6 md:p-7">
-            <div className="flex items-start justify-between gap-4">
+          <section className="rounded-[24px] border border-[#E5E7EB] bg-white p-5 md:p-6">
+            <div className="flex flex-col gap-4 border-b border-[#EEF2F7] pb-5 sm:flex-row sm:items-start sm:justify-between">
               <div>
-                <div className="inline-flex items-center gap-2 rounded-full bg-[#EEF2FF] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#4338CA]">
-                  <Award className="h-3.5 w-3.5" />
-                  Gestión académica
-                </div>
-                <div className="mt-4 text-lg font-semibold text-[#0F172A]">
-                  Estado, puntaje y material de apoyo
-                </div>
-                <p className="mt-2 text-sm leading-6 text-[#64748B]">
-                  Solo administración puede modificar estos campos. Al cambiar el estado se envían notificaciones automáticas al alumno,
-                  se actualiza el libro de calificaciones y, en caso de aprobar, se genera el certificado.
-                </p>
+                <h2 className="text-lg font-semibold tracking-[-0.02em] text-[#0F172A]">Resultado de la cursada</h2>
+                <p className="mt-1 text-sm text-[#64748B]">Estado y evaluación final del alumno.</p>
               </div>
-              {completionIcon ? (
-                <Badge color={completionMeta?.tone || "info"} variant="soft" className="gap-1.5 rounded-full">
-                  {(() => {
-                    const Icon = completionIcon;
-                    return Icon ? <Icon className="h-3 w-3" /> : null;
-                  })()}
-                  {completionMeta?.title || titleCase(courseStatus)}
-                </Badge>
-              ) : (
-                <Badge color={completionMeta?.tone || "info"} variant="soft" className="rounded-full">
-                  {completionMeta?.title || titleCase(courseStatus)}
-                </Badge>
-              )}
+              <Badge color={completionMeta?.tone || "info"} variant="soft" className="w-fit gap-1.5 rounded-full">
+                {completionIcon ? (() => {
+                  const Icon = completionIcon;
+                  return Icon ? <Icon className="h-3 w-3" /> : null;
+                })() : null}
+                {completionMeta?.title || titleCase(courseStatus)}
+              </Badge>
             </div>
 
-            <div className="mt-6 grid gap-4 lg:grid-cols-2">
-              <div className="grid gap-3">
+            <div className="mt-5 grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-2">
+                <Label>Estado <span className="text-rose-600">*</span></Label>
+                <Select value={courseStatus} onValueChange={(val) => setCourseStatus(val)}>
+                  <SelectTrigger
+                    disabled={courseStatusSaving || !institutionAllowsManualManagement}
+                    className="h-10 rounded-xl"
+                  >
+                    <SelectValue placeholder="Seleccionar estado" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {COURSE_COMPLETION_STATUSES.map((raw) => {
+                      const meta = resolveCourseCompletionStatusMeta(raw);
+                      return <SelectItem key={raw} value={raw}>{meta?.title || titleCase(raw)}</SelectItem>;
+                    })}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs leading-5 text-[#64748B]">{completionMeta?.description || "Estado actual de la cursada."}</p>
+              </div>
+
+              <div className="grid gap-2">
+                <Label>Puntaje final <span className="text-rose-600">*</span></Label>
+                <Input
+                  type="number"
+                  min={0}
+                  max={100}
+                  step={1}
+                  value={manualScore}
+                  onChange={(e) => setManualScore(e.target.value)}
+                  placeholder="0 a 100"
+                  inputMode="numeric"
+                  disabled={courseStatusSaving || !institutionAllowsManualManagement}
+                  className="h-10 rounded-xl"
+                />
+                <p className="text-xs leading-5 text-[#64748B]">Ingresá un valor entre 0 y 100.</p>
+              </div>
+            </div>
+
+            <div className="mt-5 grid gap-5 border-t border-[#EEF2F7] pt-5 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
+              <div className="grid gap-2">
+                <Label>Observaciones</Label>
+                <Textarea
+                  value={courseStatusReason}
+                  onChange={(e) => setCourseStatusReason(e.target.value)}
+                  placeholder="Agregá una observación breve para el alumno."
+                  className="min-h-[128px] resize-y rounded-xl"
+                  disabled={courseStatusSaving || !institutionAllowsManualManagement}
+                />
+              </div>
+
+              <div className="grid content-start gap-4">
+                <div className="grid gap-2">
+                  <Label>Material de apoyo <span className="font-normal text-[#94A3B8]">(opcional)</span></Label>
+                  <input
+                    ref={attachmentInputRef}
+                    type="file"
+                    accept={ALLOWED_SCORE_ATTACHMENT_MIME_TYPES.join(",")}
+                    onChange={handleAttachmentUpload}
+                    className="hidden"
+                    multiple
+                  />
+                  <button
+                    type="button"
+                    onClick={() => attachmentInputRef.current?.click()}
+                    disabled={courseStatusSaving || uploadingAttachment || !institutionAllowsManualManagement}
+                    className="flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-dashed border-[#CBD5E1] bg-[#F8FAFC] px-4 text-sm font-medium text-[#0F172A] transition hover:border-[#93A4E9] hover:bg-[#EFF4FF] disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <Upload className="h-4 w-4 text-[#4338CA]" />
+                    <span>{uploadingAttachment ? "Subiendo archivo…" : "Agregar archivo"}</span>
+                  </button>
+                  <p className="text-xs leading-5 text-[#64748B]">{allowedScoreMimeLabel()} · hasta {formatBytes(MAX_SCORE_ATTACHMENT_SIZE_BYTES)}.</p>
+                </div>
+
+                <div className="grid gap-2">
+                  <div className="text-xs font-semibold uppercase tracking-[0.12em] text-[#94A3B8]">Adjuntos ({(scoreAttachments || []).length})</div>
+                  {!(Array.isArray(scoreAttachments) && scoreAttachments.length) ? (
+                    <div className="rounded-xl border border-dashed border-[#E5E7EB] bg-[#FAFAFA] px-3 py-2.5 text-xs text-[#64748B]">Todavía no hay archivos adjuntos.</div>
+                  ) : (
+                    <div className="grid gap-2">
+                      {scoreAttachments.map((attach) => (
+                        <div key={String(attach.id || attach.name || Math.random())} className="flex items-center justify-between gap-3 rounded-xl bg-[#F8FAFC] px-3 py-2.5">
+                          <div className="min-w-0">
+                            <div className="truncate text-sm font-medium text-[#0F172A]">{attach.name || "Archivo adjunto"}</div>
+                            <div className="text-xs text-[#64748B]">{formatBytes(attach.sizeBytes)} · {attach.mimeType || "archivo"}</div>
+                          </div>
+                          <div className="flex shrink-0 items-center gap-1.5">
+                            {attach.url ? <Button asChild type="button" size="sm" variant="outline" className="h-8 w-8 rounded-lg p-0"><a href={attach.url} target="_blank" rel="noreferrer"><FileDown className="h-3.5 w-3.5" /></a></Button> : null}
+                            <Button type="button" size="sm" variant="outline" className="h-8 w-8 rounded-lg p-0 text-rose-700 hover:bg-rose-50" onClick={() => handleRemoveAttachment(attach.id)} disabled={courseStatusSaving || !institutionAllowsManualManagement}><Trash2 className="h-3.5 w-3.5" /></Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-5 flex flex-col gap-4 border-t border-[#EEF2F7] pt-5 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-xs text-[#64748B]">Los campos marcados con * son obligatorios.</p>
+              <Button
+                type="button"
+                onClick={handleSaveCourseStatus}
+                disabled={courseStatusSaving || !institutionAllowsManualManagement || saving}
+                className="w-full rounded-xl bg-[#4338CA] text-white hover:bg-[#3730A3] sm:w-auto"
+              >
+                {courseStatusSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                Guardar cambios
+              </Button>
+            </div>
+          </section>
+        </div>
+        {/* legacy block replaced above
+              <div className="grid content-start gap-4">
                 <div className="grid gap-2">
                   <Label>
-                    Estado de cursada <span className="text-rose-600">*</span>
+                    Estado <span className="text-rose-600">*</span>
                   </Label>
                   <Select value={courseStatus} onValueChange={(val) => setCourseStatus(val)}>
                     <SelectTrigger
                       disabled={courseStatusSaving || !institutionAllowsManualManagement}
                       className="rounded-2xl"
                     >
-                      <SelectValue placeholder="Seleccionar estado de cursada" />
+                      <SelectValue placeholder="Seleccionar estado" />
                     </SelectTrigger>
                     <SelectContent>
                       {COURSE_COMPLETION_STATUSES.map((raw) => {
@@ -898,12 +1062,10 @@ export default function InscripcionDetailPage({ params: { id } }) {
                       })}
                     </SelectContent>
                   </Select>
-                  <p className="text-xs leading-5 text-[#64748B]">{completionMeta?.description || ""}</p>
+                  <p className="text-xs leading-5 text-[#64748B]">{completionMeta?.description || "Estado actual de la cursada."}</p>
                 </div>
                 <div className="grid gap-2">
-                  <Label>
-                    Puntaje final (0 a 100) <span className="text-rose-600">*</span>
-                  </Label>
+                  <Label>Puntaje final <span className="text-rose-600">*</span></Label>
                   <Input
                     type="number"
                     min={0}
@@ -911,30 +1073,29 @@ export default function InscripcionDetailPage({ params: { id } }) {
                     step={1}
                     value={manualScore}
                     onChange={(e) => setManualScore(e.target.value)}
-                    placeholder="Ej: 85"
+                    placeholder="0 a 100"
                     inputMode="numeric"
                     disabled={courseStatusSaving || !institutionAllowsManualManagement}
                     className="rounded-2xl"
                   />
-                  <p className="text-xs leading-5 text-[#64748B]">
-                    Es obligatorio antes de marcar la cursada como aprobada. Este puntaje se vincula al certificado.
-                  </p>
-                </div>
-                <div className="grid gap-2">
-                  <Label>Motivo u observaciones</Label>
-                  <Textarea
-                    value={courseStatusReason}
-                    onChange={(e) => setCourseStatusReason(e.target.value)}
-                    placeholder="Motivo de desaprobación, detalle de suspensión o comentarios de aprobación. Se incluye en la notificación al alumno."
-                    className="min-h-[120px] rounded-2xl"
-                    disabled={courseStatusSaving || !institutionAllowsManualManagement}
-                  />
+                  <p className="text-xs leading-5 text-[#64748B]">Ingresá un valor entre 0 y 100.</p>
                 </div>
               </div>
 
-              <div className="grid gap-3">
+              <div className="grid content-start gap-5">
                 <div className="grid gap-2">
-                  <Label>Archivos de respaldo (opcional)</Label>
+                  <Label>Observaciones</Label>
+                  <Textarea
+                    value={courseStatusReason}
+                    onChange={(e) => setCourseStatusReason(e.target.value)}
+                    placeholder="Agregá una observación breve para el alumno."
+                    className="min-h-[132px] resize-y rounded-2xl"
+                    disabled={courseStatusSaving || !institutionAllowsManualManagement}
+                  />
+                </div>
+
+                <div className="grid gap-2">
+                  <Label>Material de apoyo <span className="font-normal text-[#94A3B8]">(opcional)</span></Label>
                   <div>
                     <input
                       ref={attachmentInputRef}
@@ -951,13 +1112,9 @@ export default function InscripcionDetailPage({ params: { id } }) {
                       className="flex w-full items-center justify-center gap-2 rounded-[22px] border border-dashed border-[#CBD5E1] bg-[#F8FAFC] px-4 py-5 text-sm font-medium text-[#0F172A] transition hover:border-[#93A4E9] hover:bg-[#EFF4FF] disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       <Upload className="h-4 w-4 text-[#4338CA]" />
-                      <span>
-                        {uploadingAttachment ? "Subiendo archivo…" : "Cargar archivo (PDF, DOCX, XLSX, PNG, JPG, JPEG)"}
-                      </span>
+                      <span>{uploadingAttachment ? "Subiendo archivo…" : "Agregar archivo"}</span>
                     </button>
-                    <p className="mt-2 text-xs leading-5 text-[#64748B]">
-                      Peso máximo por archivo: {formatBytes(MAX_SCORE_ATTACHMENT_SIZE_BYTES)}. Formatos: {allowedScoreMimeLabel()}.
-                    </p>
+                    <p className="mt-2 text-xs leading-5 text-[#64748B]">{allowedScoreMimeLabel()} · hasta {formatBytes(MAX_SCORE_ATTACHMENT_SIZE_BYTES)}.</p>
                   </div>
                 </div>
 
@@ -968,7 +1125,7 @@ export default function InscripcionDetailPage({ params: { id } }) {
                   <div className="grid gap-2">
                     {!(Array.isArray(scoreAttachments) && scoreAttachments.length) ? (
                       <div className="rounded-[18px] border border-dashed border-[#E5E7EB] bg-[#FAFAFA] px-4 py-3 text-xs leading-5 text-[#64748B]">
-                        No hay archivos adjuntos. Podés cargar evaluaciones finales, certificados complementarios o material de respaldo.
+                        Todavía no hay archivos adjuntos.
                       </div>
                     ) : (
                       scoreAttachments.map((attach) => (
@@ -1019,9 +1176,7 @@ export default function InscripcionDetailPage({ params: { id } }) {
             </div>
 
             <div className="mt-6 flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <p className="text-xs leading-5 text-[#64748B]">
-                Al guardar se validan los campos obligatorios, se actualiza el historial académico y se notifica al alumno por email.
-              </p>
+              <p className="text-xs text-[#64748B]">Los campos marcados con * son obligatorios.</p>
               <Button
                 type="button"
                 onClick={handleSaveCourseStatus}
@@ -1033,41 +1188,114 @@ export default function InscripcionDetailPage({ params: { id } }) {
                 ) : (
                   <Save className="mr-2 h-4 w-4" />
                 )}
-                Guardar gestión de cursada
+                Guardar cambios
               </Button>
             </div>
           </div>
+        */}
+
+        <div className="border-t border-[#EEF2F7] px-6 py-6 md:px-8">
+          <section className="rounded-[28px] border border-[#E5E7EB] bg-[#FAFAFA] p-5 md:p-6">
+            <div className="flex flex-col gap-1 md:flex-row md:items-end md:justify-between">
+              <div>
+                <div className="text-lg font-semibold text-[#0F172A]">Seguimiento del alumno</div>
+                <p className="mt-1 text-sm text-[#64748B]">Resumen de avance, entregas y participación.</p>
+              </div>
+              <span className="text-xs text-[#94A3B8]">Actualizado con la inscripción</span>
+            </div>
+
+            <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
+              {[
+                ["Clases", `${completedLessonIds.size}/${courseLessons.length}`],
+                ["Módulos", `${moduleProgress.filter((item) => item.total > 0 && item.completed === item.total).length}/${moduleProgress.filter((item) => item.total > 0).length}`],
+                ["Entregas", `${activitySubmissions.length}/${activityLessons.length}`],
+                ["Evaluaciones", String(gradebookEntries.length)],
+              ].map(([label, value]) => (
+                <div key={label} className="rounded-2xl border border-[#E5E7EB] bg-white px-4 py-3">
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#94A3B8]">{label}</div>
+                  <div className="mt-1 text-xl font-semibold text-[#0F172A]">{value}</div>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-5 grid gap-4 lg:grid-cols-2">
+              <div className="rounded-2xl border border-[#E5E7EB] bg-white p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <h3 className="text-sm font-semibold text-[#0F172A]">Módulos</h3>
+                  <span className="text-xs text-[#94A3B8]">{completedLessonIds.size} clases completas</span>
+                </div>
+                <div className="mt-3 grid gap-2">
+                  {moduleProgress.length ? moduleProgress.map((module) => (
+                    <div key={module.id} className="flex items-center justify-between gap-3 rounded-xl bg-[#F8FAFC] px-3 py-2.5">
+                      <span className="truncate text-sm text-[#334155]">{module.title}</span>
+                      <span className="shrink-0 text-xs font-semibold text-[#64748B]">{module.completed}/{module.total}</span>
+                    </div>
+                  )) : <p className="text-sm text-[#94A3B8]">Sin módulos cargados.</p>}
+                </div>
+              </div>
+
+              <div className="min-w-0 rounded-2xl border border-[#E5E7EB] bg-white p-4">
+                <div className="flex min-w-0 items-center justify-between gap-3">
+                  <h3 className="min-w-0 truncate text-sm font-semibold text-[#0F172A]">Tareas y quizzes</h3>
+                  <span className="shrink-0 text-xs text-[#94A3B8]">{activitySubmissions.length} entregadas</span>
+                </div>
+                <div className="mt-3 grid gap-2">
+                  {activityLessons.length ? activityLessons.map((lesson) => {
+                    const submission = activitySubmissions.find(
+                      (item) => String(item?.lessonId || "") === String(lesson?.id || "")
+                    );
+                    const submissionStatus = resolveSubmissionStatusMeta(submission?.status);
+                    return (
+                      <div key={lesson.id} className="min-w-0 rounded-xl bg-[#F8FAFC] px-3 py-2.5">
+                        <div className="flex min-w-0 items-center justify-between gap-3">
+                          <span className="min-w-0 truncate text-sm text-[#334155]">{lesson.title}</span>
+                          <Badge color={submissionStatus.tone} variant="soft" className="shrink-0 rounded-full text-[11px]">
+                            {submissionStatus.label}
+                          </Badge>
+                        </div>
+                        {submission?.feedback ? <p className="mt-1 break-words text-xs leading-5 text-[#64748B]">{submission.feedback}</p> : null}
+                      </div>
+                    );
+                  }) : <p className="text-sm text-[#94A3B8]">Sin tareas o quizzes.</p>}
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-[#E5E7EB] bg-white p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <h3 className="text-sm font-semibold text-[#0F172A]">Evaluaciones y puntajes</h3>
+                  <span className="text-xs text-[#94A3B8]">{typeof application?.manualScore === "number" ? `${application.manualScore}/100 final` : "Sin puntaje final"}</span>
+                </div>
+                <div className="mt-3 grid gap-2">
+                  {gradebookEntries.length ? gradebookEntries.map((entry, index) => (
+                    <div key={`${entry.sourceType}-${entry.sourceId}-${index}`} className="flex items-center justify-between gap-3 rounded-xl bg-[#F8FAFC] px-3 py-2.5">
+                      <span className="truncate text-sm text-[#334155]">{entry.title || "Evaluación"}</span>
+                      <span className="shrink-0 text-xs font-semibold text-[#64748B]">
+                        {entry.percentage != null ? `${entry.percentage}%` : `${entry.score ?? "-"}/${entry.maxScore ?? "-"}`}
+                      </span>
+                    </div>
+                  )) : <p className="text-sm text-[#94A3B8]">Sin evaluaciones registradas.</p>}
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-[#E5E7EB] bg-white p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <h3 className="text-sm font-semibold text-[#0F172A]">Foro</h3>
+                  <span className="text-xs text-[#94A3B8]">{forumAnswers.length} respuestas</span>
+                </div>
+                <div className="mt-3 grid gap-2">
+                  {forumAnswers.length ? forumAnswers.map((answer) => (
+                    <div key={answer.id} className="rounded-xl bg-[#F8FAFC] px-3 py-2.5">
+                      <div className="text-xs font-semibold text-[#64748B]">{answer.questionTitle}</div>
+                      <p className="mt-1 whitespace-pre-wrap text-sm text-[#334155]">{answer.answer}</p>
+                      <div className="mt-1 text-[11px] text-[#94A3B8]">{answer.userFullName || answer.userEmail || "Alumno"} · {dateLabel(answer.createdAt)}</div>
+                    </div>
+                  )) : <p className="text-sm text-[#94A3B8]">Sin respuestas en el foro.</p>}
+                </div>
+              </div>
+            </div>
+          </section>
         </div>
 
-        <div className="grid gap-6 border-t border-[#EEF2F7] px-6 py-6 md:grid-cols-2 md:px-8">
-          {paymentReceiptUrl ? (
-            <FilePreview
-              url={paymentReceiptUrl}
-              title="Comprobante"
-              description="Vista previa del comprobante cargado para validar el pago."
-            />
-          ) : (
-            <div className="rounded-[28px] border border-dashed border-[#E5E7EB] bg-[#FAFAFA] p-6 text-sm text-[#64748B]">
-              No hay comprobante adjunto en esta inscripción.
-            </div>
-          )}
-
-          <div className="rounded-[28px] border border-[#E5E7EB] bg-[#FAFAFA] p-6">
-            <div className="text-sm font-semibold text-[#0F172A]">Pago</div>
-            <div className="mt-4 grid gap-3">
-              <Input readOnly value={amountLabel} />
-              <Input readOnly value={paymentReferenceLabel} />
-              <Input readOnly value={paymentMethodLabel} />
-              <Input readOnly value={titleCase(paymentStatus)} />
-              <Textarea
-                readOnly
-                value={application?.payment?.reviewComment || reviewComment || ""}
-                placeholder="Comentario de revisión"
-                className="min-h-[96px] rounded-2xl"
-              />
-            </div>
-          </div>
-        </div>
       </div>
     </div>
   );

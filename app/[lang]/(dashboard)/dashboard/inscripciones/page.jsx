@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
-import { ArrowUpRight, GraduationCap, Loader2, MapPin, Phone, RotateCcw, Mail } from "lucide-react";
+import { ArrowUpRight, Award, GraduationCap, Loader2, MapPin, Phone, RotateCcw, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -259,6 +259,37 @@ export default function DashboardInscripcionesPage() {
             >
               <PayIcon className="h-3 w-3" />
               {paymentMeta.title}
+            </Badge>
+          );
+        },
+      },
+      {
+        id: "score",
+        header: "Puntaje",
+        accessorKey: "manualScore",
+        enableSorting: true,
+        meta: { enableColumnFilter: false },
+        size: 140,
+        cell: ({ row }) => {
+          const app = row.original;
+          const score = Number(app?.manualScore ?? app?.score);
+          if (!Number.isFinite(score)) {
+            return (
+              <div className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold text-slate-500">
+                <Award className="h-3 w-3" />
+                Sin nota
+              </div>
+            );
+          }
+          const passed = score >= 60;
+          return (
+            <Badge
+              color={passed ? "success" : score > 0 ? "warning" : "secondary"}
+              variant="soft"
+              className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px]"
+            >
+              <Award className="h-3 w-3" />
+              {score}/100
             </Badge>
           );
         },

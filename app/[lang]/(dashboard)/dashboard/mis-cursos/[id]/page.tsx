@@ -30,6 +30,7 @@ import {
   Layers,
   Link2,
   Loader2,
+  MessageSquare,
   PlayCircle,
   Radio,
   ShieldCheck,
@@ -143,7 +144,15 @@ function formatDate(value) {
 function formatDateTime(value) {
   const date = new Date(String(value || ""));
   if (Number.isNaN(date.getTime())) return "";
-  return date.toLocaleString("es-AR");
+  return date.toLocaleString("es-AR", {
+    day: "2-digit",
+    month: "numeric",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  });
 }
 
 function formatMinutes(value) {
@@ -758,6 +767,9 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
   const [openEvaluationId, setOpenEvaluationId] = useState<string | null>(null);
   const [showCertificate, setShowCertificate] = useState<boolean>(false);
   const [showTracking, setShowTracking] = useState<boolean>(false);
+  const [forumDrafts, setForumDrafts] = useState<Record<string, string>>({});
+  const [savingForumAnswer, setSavingForumAnswer] = useState<string>("");
+  const forumSaveCooldownUntilRef = useRef<number>(0);
 
   useEffect(() => {
     let alive = true;
@@ -775,7 +787,9 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
         if (!alive) return;
         const nextEnrollment = data?.enrollment || null;
         const nextCourse = data?.course || null;
-        setCourse(nextCourse);
+        if (isFirstLoad || !(Date.now() < forumSaveCooldownUntilRef.current)) {
+          setCourse(nextCourse);
+        }
         setEnrollment(nextEnrollment);
         setLessonProgress(Array.isArray(nextEnrollment?.lessonProgress) ? nextEnrollment.lessonProgress : []);
         const nextSubmissions = Array.isArray(nextEnrollment?.activitySubmissions) ? nextEnrollment.activitySubmissions : [];
@@ -827,7 +841,9 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
             const nextEnrollment = data?.enrollment || null;
             const nextCourse = data?.course || null;
             if (!nextCourse && !nextEnrollment) return;
-            setCourse(nextCourse);
+            if (!(Date.now() < forumSaveCooldownUntilRef.current)) {
+              setCourse(nextCourse);
+            }
             setEnrollment(nextEnrollment);
             setLessonProgress(Array.isArray(nextEnrollment?.lessonProgress) ? nextEnrollment.lessonProgress : []);
             const nextSubmissions = Array.isArray(nextEnrollment?.activitySubmissions) ? nextEnrollment.activitySubmissions : [];
@@ -855,8 +871,6 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
         intervalId = null;
       }
     }
-
-    void silentRefresh;
 
     load();
     startPolling();
@@ -1687,6 +1701,90 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
     return mergedEnrollment;
   }
 
+  async function submitForumAnswer(questionId: string) {
+    if (!user || !course || !enrollment) return;
+    const qId = String(questionId || "").trim();
+    if (!qId) return;
+    const rawAnswer = String(forumDrafts[qId] || "").trim();
+    if (!rawAnswer) {
+      toast.error("Escribí una respuesta antes de enviar.", { position: "top-right" });
+      return;
+    }
+    const candidateEmail =
+      String(user?.email || "").trim() ||
+      String((enrollment as any)?.email || "").trim() ||
+      String((enrollment as any)?.candidateEmail || "").trim() ||
+      String((enrollment as any)?.studentEmail || "").trim() ||
+      String((enrollment as any)?.contactEmail || "").trim() ||
+      String((enrollment as any)?.alumnoEmail || "").trim();
+    const candidateUid =
+      String(user?.uid || "").trim() ||
+      String((enrollment as any)?.userId || "").trim() ||
+      String((enrollment as any)?.uid || "").trim() ||
+      String((enrollment as any)?.user || "").trim() ||
+      candidateEmail;
+    const userFullName =
+      [user?.firstName, user?.lastName].filter(Boolean).join(" ").trim() ||
+      user?.displayName ||
+      String((enrollment as any)?.fullName || "").trim() ||
+      String((enrollment as any)?.full_name || "").trim() ||
+      String((enrollment as any)?.name || "").trim() ||
+      "";
+    const existingQuestions = Array.isArray((course as any)?.forumQuestions)
+      ? (course as any).forumQuestions
+      : [];
+    const newAnswer = {
+      id: `forum-a-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      userId: candidateUid,
+      userEmail: candidateEmail,
+      userFullName: userFullName || undefined,
+      enrollmentId: String(enrollment?.id || id || ""),
+      answer: rawAnswer,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    const updatedQuestions = existingQuestions.map((q) => {
+      if (String(q?.id) !== qId) return q;
+      const existingAnswers = Array.isArray(q?.answers) ? q.answers : [];
+      return {
+        ...q,
+        answers: [...existingAnswers, newAnswer],
+      };
+    });
+    const optimisticCourse = {
+      ...(course || {}),
+      forumQuestions: updatedQuestions,
+    };
+    setCourse(optimisticCourse as Course);
+    setSavingForumAnswer(qId);
+    forumSaveCooldownUntilRef.current = Date.now() + 8000;
+    try {
+      const resolvedCourseId =
+        String((course as any)?.id || "").trim() ||
+        String((course as any)?.courseId || "").trim() ||
+        String((course as any)?.jobId || "").trim() ||
+        String(enrollment?.courseId || "").trim() ||
+        String(enrollment?.jobId || "").trim();
+      if (!resolvedCourseId) {
+        throw new Error("No se pudo identificar el curso para publicar tu respuesta.");
+      }
+      const data = await authedFetch(user, `/api/courses/${resolvedCourseId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ forumQuestions: updatedQuestions }),
+      });
+      if (data?.course) {
+        setCourse({ ...(optimisticCourse as Course), ...(data.course as Course) } as Course);
+      }
+      setForumDrafts((current) => ({ ...current, [qId]: "" }));
+      toast.success("Respuesta publicada correctamente.", { position: "top-right" });
+    } catch (error) {
+      setCourse(course);
+      toast.error(error?.message || "No pudimos publicar tu respuesta.", { position: "top-right" });
+    } finally {
+      setSavingForumAnswer("");
+    }
+  }
+
   function lessonEvaluationUsedAttempts(lessonId: unknown): number {
     const lid = String(lessonId || "").trim();
     if (!lid) return 0;
@@ -2183,12 +2281,28 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
                         ) : null}
                       </>
                     ) : (
-                      <div className="absolute inset-0 flex items-center justify-center rounded-[17px] md:rounded-[19px]">
-                        <TonePill
-                          icon={PlayCircle}
-                          label="Sin video principal"
-                          className="border-slate-300 bg-white text-slate-700"
-                        />
+                      <div className="absolute inset-0 rounded-[17px] md:rounded-[19px]">
+                        {String(course?.imageUrl || course?.thumbnailUrl || "").trim() ? (
+                          <div
+                            className="h-full w-full transition duration-500"
+                            style={{
+                              backgroundImage: `url(${String(course.imageUrl || course.thumbnailUrl || "").trim()})`,
+                              backgroundPosition: "center",
+                              backgroundRepeat: "no-repeat",
+                              backgroundSize: "cover",
+                            }}
+                            aria-label={`Portada de ${String(course?.title || "Curso").trim()}`}
+                            role="img"
+                          />
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center">
+                            <TonePill
+                              icon={PlayCircle}
+                              label="Sin video principal"
+                              className="border-slate-300 bg-white text-slate-700"
+                            />
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -2387,6 +2501,18 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
                                 const lessonId = String(lesson?.id || "");
                                 const evalState = lessonId ? perClassStates[lessonId] : undefined;
                                 const canShowReadiness = resources.length || hasEval;
+                                const isActivityLesson = activityLessons.some(
+                                  (activity) => String(activity?.id || "") === lessonId
+                                );
+                                const currentSubmission = isActivityLesson
+                                  ? activitySubmissions.find(
+                                      (item) => String(item?.lessonId || "") === lessonId
+                                    ) || null
+                                  : null;
+                                const submissionDraft = submissionDrafts[lessonId] || {
+                                  note: String(currentSubmission?.note || ""),
+                                  linkUrl: String(currentSubmission?.linkUrl || ""),
+                                };
 
                                 return (
                                   <div
@@ -2553,6 +2679,64 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
                                             setOpenEvaluationId={setOpenEvaluationId}
                                             onSubmit={submitLessonEvaluation}
                                           />
+                                        </div>
+                                      ) : null}
+
+                                      {isActivityLesson ? (
+                                        <div className="pl-0 md:pl-[3.25rem]">
+                                          <div className="rounded-[20px] border border-slate-200 bg-slate-50/70 p-4">
+                                            <div className="flex flex-wrap items-center gap-2">
+                                              <span className="text-sm font-semibold text-slate-900">
+                                                Entrega de la clase
+                                              </span>
+                                              <span className={cn("inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold", getStatusMeta(currentSubmission?.status || "pending").badgeClass)}>
+                                                {getStatusMeta(currentSubmission?.status || "pending").label}
+                                              </span>
+                                              {currentSubmission?.submittedAt ? (
+                                                <span className="text-xs text-slate-400">
+                                                  Enviado {formatDateTime(currentSubmission.submittedAt)}
+                                                </span>
+                                              ) : null}
+                                            </div>
+                                            <div className="mt-3 grid gap-3">
+                                              <Textarea
+                                                rows={3}
+                                                value={submissionDraft.note}
+                                                onChange={(event) => handleSubmissionDraft(lessonId, { note: event.target.value })}
+                                                placeholder="Dejá una nota sobre tu entrega o avance."
+                                                className="rounded-[16px] border-slate-200 bg-white"
+                                                aria-label={`Nota para ${lesson.title}`}
+                                              />
+                                              <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto]">
+                                                <Input
+                                                  value={submissionDraft.linkUrl}
+                                                  onChange={(event) => handleSubmissionDraft(lessonId, { linkUrl: event.target.value })}
+                                                  placeholder="https://link-a-tu-entrega.com"
+                                                  className="rounded-[16px] border-slate-200 bg-white"
+                                                  aria-label={`Link de entrega para ${lesson.title}`}
+                                                />
+                                                <Button
+                                                  type="button"
+                                                  size="sm"
+                                                  className="rounded-2xl bg-[#6D4CFF] hover:bg-[#5E3EF0]"
+                                                  onClick={() => submitActivity(lesson)}
+                                                  disabled={savingActivity === lesson.id}
+                                                >
+                                                  {savingActivity === lesson.id ? (
+                                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                                  ) : (
+                                                    <Link2 className="mr-2 h-4 w-4" />
+                                                  )}
+                                                  Guardar entrega
+                                                </Button>
+                                              </div>
+                                              {currentSubmission?.feedback ? (
+                                                <div className="rounded-[16px] border border-sky-200 bg-sky-50 p-3 text-sm leading-6 text-sky-800">
+                                                  <span className="font-semibold">Feedback docente:</span> {currentSubmission.feedback}
+                                                </div>
+                                              ) : null}
+                                            </div>
+                                          </div>
                                         </div>
                                       ) : null}
                                     </div>
@@ -2858,110 +3042,6 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
                 )}
               </div>
             </section> */}
-
-            <section className="rounded-[24px] md:rounded-[30px] border border-slate-200 bg-white p-4 shadow-[0_20px_60px_rgba(15,23,42,0.05)] md:p-6">
-              <div className="flex items-center gap-3">
-                <ClipboardCheck className="h-5 w-5 text-[#6D4CFF]" />
-                <div>
-                  <h2 className="text-[22px] font-semibold tracking-[-0.03em] text-slate-950">
-                    Entregas y seguimiento
-                  </h2>
-                  <p className="mt-1 text-sm text-slate-500">
-                    Deja notas, links y revisa feedback desde una vista compacta y clara.
-                  </p>
-                </div>
-              </div>
-
-              <div className="mt-5 grid gap-4">
-                {activityLessons.length ? (
-                  activityLessons.map((lesson) => {
-                    const currentSubmission =
-                      activitySubmissions.find((item) => String(item?.lessonId || "") === String(lesson?.id || "")) || null;
-                    const draft = submissionDrafts[String(lesson?.id || "")] || {
-                      note: String(currentSubmission?.note || ""),
-                      linkUrl: String(currentSubmission?.linkUrl || ""),
-                    };
-                    const typeMeta = getLessonTypeMeta(lesson?.lessonType);
-                    const statusMeta = getStatusMeta(currentSubmission?.status || "pending");
-                    const Icon = typeMeta.icon;
-
-                    return (
-                      <div key={lesson.id} className="rounded-[24px] border border-slate-200 bg-[#FCFCFF] p-4 md:p-5">
-                        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                          <div className="flex gap-4">
-                            <span className={cn("inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl", typeMeta.iconClass)}>
-                              <Icon className="h-5 w-5" />
-                            </span>
-                            <div>
-                              <div className="flex flex-wrap items-center gap-2">
-                                <span className={cn("inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold", typeMeta.badgeClass)}>
-                                  {typeMeta.label}
-                                </span>
-                                <span className={cn("inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold", statusMeta.badgeClass)}>
-                                  {statusMeta.label}
-                                </span>
-                                {currentSubmission?.submittedAt ? (
-                                  <span className="text-xs text-slate-400">
-                                    Enviado {formatDateTime(currentSubmission.submittedAt)}
-                                  </span>
-                                ) : null}
-                              </div>
-                              <h3 className="mt-3 text-base font-semibold text-slate-950">{lesson.title}</h3>
-                              {lesson.description ? (
-                                <p className="mt-2 text-sm leading-6 text-slate-500">{lesson.description}</p>
-                              ) : null}
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="mt-4 grid gap-3">
-                          <Textarea
-                            rows={4}
-                            value={draft.note}
-                            onChange={(event) => handleSubmissionDraft(String(lesson.id || ""), { note: event.target.value })}
-                            placeholder="Describe tu entrega, conclusiones o estado de avance."
-                            className="rounded-[20px] border-slate-200 bg-white"
-                            aria-label={`Nota para ${lesson.title}`}
-                          />
-                          <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto]">
-                            <Input
-                              value={draft.linkUrl}
-                              onChange={(event) => handleSubmissionDraft(String(lesson.id || ""), { linkUrl: event.target.value })}
-                              placeholder="https://link-a-tu-entrega.com"
-                              className="rounded-[20px] border-slate-200 bg-white"
-                              aria-label={`Link de entrega para ${lesson.title}`}
-                            />
-                            <Button
-                              type="button"
-                              className="rounded-2xl bg-[#6D4CFF] hover:bg-[#5E3EF0]"
-                              onClick={() => submitActivity(lesson)}
-                              disabled={savingActivity === lesson.id}
-                            >
-                              {savingActivity === lesson.id ? (
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                              ) : (
-                                <Link2 className="mr-2 h-4 w-4" />
-                              )}
-                              Guardar entrega
-                            </Button>
-                          </div>
-                          {currentSubmission?.feedback ? (
-                            <div className="rounded-[20px] border border-sky-200 bg-sky-50 p-3 text-sm leading-6 text-sky-800">
-                              <span className="font-semibold">Feedback docente:</span> {currentSubmission.feedback}
-                            </div>
-                          ) : null}
-                        </div>
-                      </div>
-                    );
-                  })
-                ) : (
-                  <EmptyBlock
-                    title="Sin actividades obligatorias"
-                    text="Este curso no tiene tareas o quizzes configurados para entrega."
-                  />
-                )}
-              </div>
-            </section>
 
             <section className="rounded-[24px] md:rounded-[30px] border border-slate-200 bg-white p-4 shadow-[0_20px_60px_rgba(15,23,42,0.05)] md:p-6">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -3582,6 +3662,151 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
                 )}
               </div>
             </section>
+
+            {(() => {
+              const forumQuestions = Array.isArray((course as any)?.forumQuestions)
+                ? (course as any).forumQuestions
+                : [];
+              if (!forumQuestions.length) return null;
+              const myUid = String(user?.uid || user?.email || "");
+              const myEmail = String(user?.email || "").toLowerCase();
+              return (
+                <section
+                  id="foro"
+                  className="rounded-[24px] md:rounded-[30px] border border-slate-200 bg-white p-4 shadow-[0_20px_60px_rgba(15,23,42,0.05)] md:p-6"
+                >
+                  <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                    <div>
+                      <div className="inline-flex items-center gap-2 rounded-full bg-[#EEF4FF] px-3 py-1 text-[11px] font-extrabold uppercase tracking-[0.18em] text-[#2356B8]">
+                        <HelpCircle className="h-3 w-3" />
+                        Foro
+                      </div>
+                      <h2 className="mt-3 text-[22px] font-semibold tracking-[-0.03em] text-slate-950">
+                        Preguntas de la cursada
+                      </h2>
+                      <p className="mt-1 text-sm text-slate-500">
+                        Respondé estas preguntas para compartir tu experiencia y aprendizajes.
+                      </p>
+                    </div>
+                    <Badge variant="soft" color="info" className="rounded-full shrink-0">
+                      {forumQuestions.length} pregunta{forumQuestions.length === 1 ? "" : "s"}
+                    </Badge>
+                  </div>
+
+                  <div className="mt-6 space-y-4">
+                    {forumQuestions
+                      .sort((a: any, b: any) => {
+                        const oa = Number.isFinite(Number(a?.order)) ? Number(a.order) : 0;
+                        const ob = Number.isFinite(Number(b?.order)) ? Number(b.order) : 0;
+                        return oa - ob;
+                      })
+                      .map((question: any, idx: number) => {
+                        const qId = String(question?.id || `q-${idx}`);
+                        const myAnswers = (Array.isArray(question?.answers) ? question.answers : []).filter(
+                          (a: any) =>
+                            String(a?.userId || "") === myUid ||
+                            String(a?.userEmail || "").toLowerCase() === myEmail
+                        );
+                        const draft = String(forumDrafts[qId] || "");
+                        const saving = savingForumAnswer === qId;
+                        return (
+                          <article
+                            key={qId}
+                            className="rounded-[22px] border border-slate-200 bg-[#FCFDFF] p-4 md:p-5"
+                          >
+                            <header>
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">
+                                  Pregunta {idx + 1}
+                                </span>
+                                {Array.isArray(question?.answers) && question.answers.length > 0 ? (
+                                  <Badge variant="soft" color="success" className="rounded-full">
+                                    {question.answers.length} respuesta
+                                    {question.answers.length === 1 ? "" : "s"}
+                                  </Badge>
+                                ) : (
+                                  <Badge variant="soft" color="secondary" className="rounded-full">
+                                    Sin respuestas
+                                  </Badge>
+                                )}
+                              </div>
+                              <h3 className="mt-2 text-[15px] font-semibold text-slate-950">
+                                {question?.title || "Pregunta sin título"}
+                              </h3>
+                              {question?.description ? (
+                                <p className="mt-1.5 text-sm leading-6 text-slate-600">
+                                  {question.description}
+                                </p>
+                              ) : null}
+                            </header>
+
+                            {myAnswers.length > 0 ? (
+                              <div className="mt-4 space-y-2">
+                                <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-emerald-600">
+                                  Mis respuestas
+                                </div>
+                                {myAnswers.map((a: any) => (
+                                  <div
+                                    key={a.id}
+                                    className="rounded-[18px] border border-emerald-200 bg-emerald-50/60 p-4"
+                                  >
+                                    <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
+                                      <span className="font-semibold text-emerald-700">
+                                        {a.userFullName || a.userEmail || "Yo"}
+                                      </span>
+                                      <span>·</span>
+                                      <span>{formatDateTime(a.createdAt)}</span>
+                                    </div>
+                                    <p className="mt-1.5 text-sm leading-7 text-slate-800 whitespace-pre-wrap">
+                                      {a.answer}
+                                    </p>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : null}
+
+                            <div className="mt-5 space-y-3">
+                              <Textarea
+                                value={draft}
+                                rows={4}
+                                placeholder="Escribí tu respuesta aquí..."
+                                onChange={(e) =>
+                                  setForumDrafts((current) => ({
+                                    ...current,
+                                    [qId]: e.target.value,
+                                  }))
+                                }
+                                className="rounded-[18px] border-slate-300 bg-white"
+                              />
+                              <div className="flex flex-wrap items-center justify-end gap-2">
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  disabled={saving || !draft.trim()}
+                                  onClick={() => submitForumAnswer(qId)}
+                                  className="rounded-2xl bg-[#1B2B50] hover:bg-[#233A6A]"
+                                >
+                                  {saving ? (
+                                    <>
+                                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                      Publicando...
+                                    </>
+                                  ) : (
+                                    <>
+                                      <MessageSquare className="mr-2 h-4 w-4" />
+                                      Publicar respuesta
+                                    </>
+                                  )}
+                                </Button>
+                              </div>
+                            </div>
+                          </article>
+                        );
+                      })}
+                  </div>
+                </section>
+              );
+            })()}
           </aside>
         </div >
       </div >

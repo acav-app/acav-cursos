@@ -277,7 +277,7 @@ function EmptyBlock({ text }) {
 
 function DashboardSkeleton() {
   return (
-    <div className="space-y-6 pb-8">
+    <div className="space-y-6 pb-8 mx-5">
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {[0, 1, 2, 3].map((item) => (
           <Card key={item} className="rounded-3xl border border-border/60 bg-card/90 shadow-sm">
@@ -699,7 +699,7 @@ const DashboardPageView = () => {
 
   if (isStudent) {
     return (
-      <div className="space-y-6 pb-8">
+      <div className="space-y-6 pb-8 mx-5">
         <section className="grid gap-4 lg:grid-cols-4">
           <KpiCard
             title="Inscripciones"
@@ -817,7 +817,7 @@ const DashboardPageView = () => {
   }
 
   return (
-    <div className="space-y-6 pb-8">
+    <div className="space-y-6 pb-8 mx-5">
       <section className="grid gap-4 lg:grid-cols-3">
         <KpiCard
           title="Cursos"

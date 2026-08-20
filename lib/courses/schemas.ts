@@ -289,6 +289,28 @@ export type Institution = z.infer<typeof InstitutionSchema>;
 export type InstitutionCreateInput = z.infer<typeof InstitutionCreateSchema>;
 export type InstitutionUpdateInput = z.infer<typeof InstitutionUpdateSchema>;
 
+export const CourseForumAnswerSchema = z.object({
+  id: z.string().min(1),
+  userId: z.string().min(1),
+  userEmail: z.string().email(),
+  userFullName: OptionalString.optional(),
+  enrollmentId: z.string().min(1),
+  answer: z.string().min(1),
+  createdAt: CourseIsoDateString,
+  updatedAt: CourseIsoDateString.optional(),
+});
+
+export const CourseForumQuestionSchema = z.object({
+  id: z.string().min(1),
+  title: z.string().min(1),
+  description: OptionalString.optional(),
+  createdAt: CourseIsoDateString,
+  createdBy: z.string().min(1),
+  createdByName: OptionalString.optional(),
+  order: z.number().int().min(0).default(0),
+  answers: z.array(CourseForumAnswerSchema).default([]),
+});
+
 export const CourseCreateSchema = z.object({
   title: z.string().min(4),
   slug: z.string().min(1).optional(),
@@ -338,6 +360,7 @@ export const CourseCreateSchema = z.object({
   imageUrl: OptionalUrl.optional(),
   thumbnailUrl: OptionalUrl.optional(),
   videoUrl: OptionalUrl.optional(),
+  documentationUrl: OptionalUrl.optional(),
   videoFileName: OptionalString.optional(),
   videoMimeType: z.enum(COURSE_VIDEO_ALLOWED_TYPES).optional(),
   videoSizeBytes: z.number().int().positive().max(COURSE_VIDEO_MAX_SIZE_BYTES).optional(),
@@ -350,6 +373,7 @@ export const CourseCreateSchema = z.object({
       sizeBytes: z.number().int().min(0).optional(),
     })
   ).default([]),
+  forumQuestions: z.array(CourseForumQuestionSchema).default([]),
   price: z.number().min(0).optional(),
   oldPrice: z.number().min(0).optional(),
   freeCourse: z.boolean().optional(),

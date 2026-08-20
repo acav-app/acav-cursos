@@ -6,7 +6,6 @@ import { cn } from "@/lib/utils";
 import { useSidebar, useThemeStore } from "@/store";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter, usePathname } from "next/navigation";
-import Footer from "@/components/partials/footer";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import ThemeCustomize from "@/components/partials/customizer/theme-customizer";
 import MobileSidebar from "@/components/partials/sidebar/mobile-sidebar";
@@ -14,13 +13,22 @@ import HeaderSearch from "@/components/header-search";
 import { useMounted } from "@/hooks/use-mounted";
 import LayoutLoader from "@/components/layout-loader";
 const DashBoardLayoutProvider = ({ children, trans }) => {
-  const { collapsed, sidebarType, setCollapsed, subMenu } = useSidebar();
+  const { collapsed, sidebarType, setCollapsed, subMenu, setSubmenu } =
+    useSidebar();
   const [open, setOpen] = React.useState(false);
   const _storeLayout = useThemeStore((s) => s.layout);
   const layout = "semibox";
   const location = usePathname();
   const isMobile = useMediaQuery("(min-width: 768px)");
   const mounted = useMounted();
+  React.useEffect(() => {
+    if (!mounted) return;
+    const t = window.setTimeout(() => {
+      setCollapsed(false);
+      setSubmenu(false);
+    }, 0);
+    return () => window.clearTimeout(t);
+  }, [mounted, setCollapsed, setSubmenu]);
   if (!mounted) {
     return <LayoutLoader />;
   }
@@ -39,7 +47,7 @@ const DashBoardLayoutProvider = ({ children, trans }) => {
           <div
             className={cn(
               "md:pt-6 pb-[37px] pt-[15px] md:px-6 px-4  page-min-height-semibox ",
-              {}
+              {},
             )}
           >
             <div className="">
@@ -54,7 +62,6 @@ const DashBoardLayoutProvider = ({ children, trans }) => {
             </div>
           </div>
         </div>
-        <Footer trans={trans} />
         <ThemeCustomize trans={trans} />
       </>
     );
@@ -68,7 +75,7 @@ const DashBoardLayoutProvider = ({ children, trans }) => {
           <div
             className={cn(
               "  md:pt-6 pb-[37px] pt-[15px] md:px-6 px-4  page-min-height-horizontal ",
-              {}
+              {},
             )}
           >
             <LayoutWrapper
@@ -81,7 +88,6 @@ const DashBoardLayoutProvider = ({ children, trans }) => {
             </LayoutWrapper>
           </div>
         </div>
-        <Footer />
         <ThemeCustomize />
       </>
     );
@@ -102,7 +108,7 @@ const DashBoardLayoutProvider = ({ children, trans }) => {
           <div
             className={cn(
               "  md:pt-6 pb-[37px] pt-[15px] md:px-6 px-4  page-min-height ",
-              {}
+              {},
             )}
           >
             <LayoutWrapper
@@ -115,7 +121,6 @@ const DashBoardLayoutProvider = ({ children, trans }) => {
             </LayoutWrapper>
           </div>
         </div>
-        <Footer trans={trans} />
         <ThemeCustomize trans={trans} />
       </>
     );
@@ -134,7 +139,7 @@ const DashBoardLayoutProvider = ({ children, trans }) => {
         <div
           className={cn(
             "  md:pt-6 layout-padding pt-[15px] md:px-6 px-4  page-min-height ",
-            {}
+            {},
           )}
         >
           <LayoutWrapper
@@ -147,7 +152,6 @@ const DashBoardLayoutProvider = ({ children, trans }) => {
           </LayoutWrapper>
         </div>
       </div>
-      <Footer handleOpenSearch={() => setOpen(true)} trans={trans} />
       {isMobile && <ThemeCustomize />}
     </>
   );

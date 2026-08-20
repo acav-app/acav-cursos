@@ -49,8 +49,6 @@ import { useCourseActor } from "@/components/courses/dashboard/use-course-actor"
 import { DashboardPageShellSkeleton } from "@/components/courses/dashboard/page-skeletons";
 import {
   PAYMENT_STATUSES,
-  EDUCATIONAL_ENROLLMENT_STATUSES,
-  ENROLLMENT_STATUSES,
 } from "@/lib/courses/constants";
 import { uploadToR2 } from "@/components/courses/dashboard/upload";
 import { normalizePublicR2Url } from "@/lib/r2/normalize-public-url";
@@ -79,6 +77,23 @@ function titleCase(value, fallback = "-") {
     .trim();
   if (!normalized) return fallback;
   return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+}
+
+function paymentStatusLabel(value) {
+  const labels = {
+    approved: "Aprobado",
+    pending: "Pendiente",
+    under_review: "En revisión",
+    rejected: "Rechazado",
+    failed: "Fallido",
+    cancelled: "Cancelado",
+    canceled: "Cancelado",
+    paid: "Pagado",
+    completed: "Completado",
+    waiting_payment: "Esperando pago",
+  };
+  const normalized = String(value || "").trim().toLowerCase();
+  return labels[normalized] || titleCase(value);
 }
 
 function resolvePaymentMeta(enrollment) {
@@ -158,7 +173,6 @@ export default function DashboardPagosPage() {
   const [paymentState, setPaymentState] = useState("");
   const [actionLoadingId, setActionLoadingId] = useState("");
   const [editingPaymentId, setEditingPaymentId] = useState("");
-  const [editStatus, setEditStatus] = useState("");
   const [editPaymentStatus, setEditPaymentStatus] = useState("");
   const [editReviewComment, setEditReviewComment] = useState("");
   const [editReceiptUrl, setEditReceiptUrl] = useState("");
@@ -356,6 +370,16 @@ export default function DashboardPagosPage() {
           const item = row.original;
           const loading = actionLoadingId === String(item.id);
           const detailHref = buildLocalizedPath(`/dashboard/inscripciones/${item.id}`);
+          const normalizedPaymentStatus = String(
+            item.paymentStatus || item.payment?.status || ""
+          ).trim().toLowerCase();
+          const normalizedEnrollmentStatus = String(item.status || "").trim().toLowerCase();
+          const isCredited = ["approved", "paid", "pagado", "completed", "acreditado", "accredited"].includes(normalizedPaymentStatus);
+          const isRejected = ["rejected", "rechazado", "failed", "cancelled", "canceled"].includes(normalizedPaymentStatus);
+          const isClosed = ["rejected", "descartada", "rechazada", "cancelled", "canceled"].includes(normalizedEnrollmentStatus);
+          const canApprove = !isCredited && !isClosed;
+          const canRequestReceipt = !isCredited && !isClosed;
+          const canReject = !isCredited && !isRejected && !isClosed;
           return (
             <div
               className="flex flex-wrap items-center justify-end gap-2"
@@ -378,43 +402,56 @@ export default function DashboardPagosPage() {
 
               {actor?.role === "admin" ? (
                 <>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleQuickAction(item, "approve")}
-                    disabled={loading}
-                    className="h-9 rounded-2xl border-[#A7F3D0] bg-white text-[#047857] hover:bg-[#ECFDF5]"
-                  >
-                    {loading ? (
-                      <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                    ) : (
+                  {canApprove ? (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleQuickAction(item, "approve")}
+                      disabled={loading}
+                      className="h-9 rounded-2xl border-[#A7F3D0] bg-white text-[#047857] hover:bg-[#ECFDF5]"
+                    >
+                      {loading ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />}
+                      Aprobar
+                    </Button>
+                  ) : null}
+                  {canRequestReceipt ? (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleQuickAction(item, "request_receipt")}
+                      disabled={loading}
+                      className="h-9 rounded-2xl border-[#FDE68A] bg-white text-[#B45309] hover:bg-[#FFFBEB]"
+                    >
+                      <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
+                      Nuevo comprobante
+                    </Button>
+                  ) : null}
+                  {canReject ? (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleQuickAction(item, "reject")}
+                      disabled={loading}
+                      className="h-9 rounded-2xl border-[#FECDD3] bg-white text-[#B91C1C] hover:bg-[#FFF1F2]"
+                    >
+                      <XCircle className="mr-1.5 h-3.5 w-3.5" />
+                      Rechazar
+                    </Button>
+                  ) : null}
+                  {isCredited ? (
+                    <Badge variant="soft" color="success" className="h-9 rounded-2xl px-3">
                       <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />
-                    )}
-                    Aprobar
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleQuickAction(item, "request_receipt")}
-                    disabled={loading}
-                    className="h-9 rounded-2xl border-[#FDE68A] bg-white text-[#B45309] hover:bg-[#FFFBEB]"
-                  >
-                    <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
-                    Nuevo comprobante
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleQuickAction(item, "reject")}
-                    disabled={loading}
-                    className="h-9 rounded-2xl border-[#FECDD3] bg-white text-[#B91C1C] hover:bg-[#FFF1F2]"
-                  >
-                    <XCircle className="mr-1.5 h-3.5 w-3.5" />
-                    Rechazar
-                  </Button>
+                      Pago aprobado
+                    </Badge>
+                  ) : isRejected ? (
+                    <Badge variant="soft" color="destructive" className="h-9 rounded-2xl px-3">
+                      <XCircle className="mr-1.5 h-3.5 w-3.5" />
+                      Pago rechazado
+                    </Badge>
+                  ) : null}
                   <Button
                     type="button"
                     size="sm"
@@ -480,17 +517,26 @@ export default function DashboardPagosPage() {
     () => enrollments.find((r) => String(r.id) === String(editingPaymentId || "")) || null,
     [enrollments, editingPaymentId]
   );
+  const editingPaymentStatus = String(
+    editingRow?.paymentStatus || editingRow?.payment?.status || ""
+  ).trim().toLowerCase();
+  const editingPaymentApproved = [
+    "approved",
+    "paid",
+    "pagado",
+    "completed",
+    "acreditado",
+    "accredited",
+  ].includes(editingPaymentStatus);
 
   const handleOpenEditPayment = (row) => {
     if (!row?.id) return;
-    const status = String(row.status || "");
     const paymentStatus = String(row.paymentStatus || "");
     const reviewComment = String(row.payment?.reviewComment || "");
     const receiptUrl = String(
       row.paymentReceiptUrl || row.payment?.receiptUrl || ""
     );
     setEditingPaymentId(String(row.id));
-    setEditStatus(status);
     setEditPaymentStatus(paymentStatus);
     setEditReviewComment(reviewComment);
     setEditReceiptUrl(receiptUrl);
@@ -498,7 +544,6 @@ export default function DashboardPagosPage() {
 
   const handleCloseEditPayment = () => {
     setEditingPaymentId("");
-    setEditStatus("");
     setEditPaymentStatus("");
     setEditReviewComment("");
     setEditReceiptUrl("");
@@ -533,7 +578,6 @@ export default function DashboardPagosPage() {
     try {
       setSavingEdit(true);
       const payload = {
-        status: editStatus || undefined,
         paymentStatus: editPaymentStatus || undefined,
         reviewComment: editReviewComment?.trim() || undefined,
         paymentReceiptUrl: editReceiptUrl?.trim() || undefined,
@@ -552,23 +596,6 @@ export default function DashboardPagosPage() {
       setSavingEdit(false);
     }
   };
-
-  const hasPaymentMetadataForRow = (row) =>
-    Boolean(
-      row?.paymentMethod ||
-        row?.payment?.method ||
-        row?.paymentReference ||
-        row?.payment?.reference ||
-        row?.paymentAmount != null ||
-        row?.payment?.amount != null ||
-        row?.amount != null ||
-        row?.paymentReceiptUrl ||
-        row?.payment?.receiptUrl
-    );
-
-  const editingAllowedStatuses = hasPaymentMetadataForRow(editingRow)
-    ? EDUCATIONAL_ENROLLMENT_STATUSES
-    : ENROLLMENT_STATUSES;
 
   const handleQuickAction = async (row, action) => {
     if (!user || !row?.id) return;
@@ -771,27 +798,6 @@ export default function DashboardPagosPage() {
 
             <div className="space-y-2">
               <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Estado de la inscripción
-              </Label>
-              <Select
-                value={editStatus || ""}
-                onValueChange={(value) => setEditStatus(value)}
-              >
-                <SelectTrigger className="h-11 rounded-2xl bg-background">
-                  <SelectValue placeholder="Seleccionar estado" />
-                </SelectTrigger>
-                <SelectContent>
-                  {editingAllowedStatuses.map((s) => (
-                    <SelectItem key={s} value={s}>
-                      {titleCase(s)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 Estado del pago
               </Label>
               <Select
@@ -804,7 +810,7 @@ export default function DashboardPagosPage() {
                 <SelectContent>
                   {PAYMENT_STATUSES.map((s) => (
                     <SelectItem key={s} value={s}>
-                      {titleCase(s)}
+                      {paymentStatusLabel(s)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -889,44 +895,48 @@ export default function DashboardPagosPage() {
             </div>
           </div>
 
-          <SheetFooter className="px-6 py-4 border-t border-border/60 bg-card">
-            <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-2 w-full">
+          <SheetFooter className="border-t border-border/60 bg-card px-6 py-4">
+            <div className="grid w-full grid-cols-1 gap-2 sm:grid-cols-2">
               <SheetClose asChild>
-                <Button type="button" variant="outline" className="h-10 rounded-2xl">
+                <Button type="button" variant="outline" className="h-10 w-full rounded-xl">
                   Cancelar
                 </Button>
               </SheetClose>
-              <div className="flex items-center gap-2">
-                <SheetClose asChild>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    className="h-10 rounded-2xl border-[#FDE68A] text-[#B45309] hover:bg-[#FFFBEB]"
-                    onClick={() => handleQuickAction(editingRow, "request_receipt")}
-                  >
-                    <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
-                    Pedir nuevo comprobante
-                  </Button>
-                </SheetClose>
-                <SheetClose asChild>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    className="h-10 rounded-2xl border-[#A7F3D0] text-[#047857] hover:bg-[#ECFDF5]"
-                    onClick={() => handleQuickAction(editingRow, "approve")}
-                  >
-                    <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />
-                    Aprobar
-                  </Button>
-                </SheetClose>
+              <div className="contents">
+                {!editingPaymentApproved ? (
+                  <SheetClose asChild>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="h-10 w-full rounded-xl border-[#FDE68A] text-[#B45309] hover:bg-[#FFFBEB]"
+                      onClick={() => handleQuickAction(editingRow, "request_receipt")}
+                    >
+                      <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
+                      Pedir nuevo comprobante
+                    </Button>
+                  </SheetClose>
+                ) : null}
+                {!editingPaymentApproved ? (
+                  <SheetClose asChild>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="h-10 w-full rounded-xl border-[#A7F3D0] text-[#047857] hover:bg-[#ECFDF5]"
+                      onClick={() => handleQuickAction(editingRow, "approve")}
+                    >
+                      <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />
+                      Aprobar
+                    </Button>
+                  </SheetClose>
+                ) : null}
                 <Button
                   type="button"
                   variant="default"
                   onClick={handleSaveEditPayment}
                   disabled={savingEdit}
-                  className="h-10 rounded-2xl bg-[#2356B8] text-white hover:bg-[#1D4ED8]"
+                  className="h-10 w-full rounded-xl bg-[#2356B8] text-white hover:bg-[#1D4ED8]"
                 >
                   {savingEdit ? (
                     <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />

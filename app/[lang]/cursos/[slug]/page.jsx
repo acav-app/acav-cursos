@@ -3,18 +3,18 @@ import { notFound } from "next/navigation";
 import {
   ArrowLeft,
   BadgeCheck,
-  BookOpen,
   Briefcase,
   Building2,
   CheckCircle2,
   Check,
   Clock3,
+  ExternalLink,
   FileText,
   Film,
   MapPin,
   PlayCircle,
   ShieldCheck,
-  Sparkles,
+  Users,
   Wallet,
 } from "lucide-react";
 import FlyerPreviewLightbox from "@/components/courses/flyer-preview-lightbox";
@@ -73,7 +73,6 @@ function PriceTier({
   value,
   highlight = false,
   badge,
-  benefits,
   titleId,
   priceId,
 }) {
@@ -83,19 +82,19 @@ function PriceTier({
       aria-labelledby={titleId}
       aria-describedby={`${titleId}-desc`}
       className={[
-        "relative w-full rounded-[18px] p-4 md:p-5 transition-all duration-300 outline-none",
+        "relative w-full rounded-[14px] px-3 py-2.5 transition-all duration-300 outline-none",
         "focus-visible:ring-2 focus-visible:ring-[#2356B8]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-white",
         highlight
-          ? "border-2 border-[#2356B8]/70 bg-gradient-to-br from-[#EEF4FF] via-white to-white shadow-[0_10px_24px_rgba(35,86,184,0.10)]"
+          ? "border-2 border-[#2356B8]/70 bg-gradient-to-br from-[#EEF4FF] via-white to-white"
           : "border border-slate-200/90 bg-white",
       ].join(" ")}
     >
       <div className="flex items-center justify-between gap-3">
-        <div className="flex flex-col gap-1">
+        <div className="flex flex-col gap-0.5">
           {badge ? (
             <span
               className={[
-                "inline-flex w-max items-center rounded-full px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-[0.16em]",
+                "inline-flex w-max items-center rounded-full px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-[0.14em]",
                 highlight
                   ? "bg-[#2356B8] text-white"
                   : "bg-slate-100 text-slate-500",
@@ -104,58 +103,38 @@ function PriceTier({
               {badge}
             </span>
           ) : null}
-          <h3 id={titleId} className="text-[13px] font-bold tracking-[-0.01em] text-[#1B2B50]">
+          <h3 id={titleId} className="text-[12px] font-bold tracking-[-0.01em] text-[#1B2B50]">
             {label}
           </h3>
-          <p id={`${titleId}-desc`} className="text-[11px] leading-5 text-slate-500">
+          <p id={`${titleId}-desc`} className="text-[10px] leading-4 text-slate-500">
             {subtitle}
           </p>
         </div>
-        {highlight ? (
-          <span
-            aria-hidden="true"
-            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#2356B8] text-white shadow-[0_8px_16px_rgba(35,86,184,0.28)]"
-          >
-            <Check className="h-4 w-4" strokeWidth={3} />
-          </span>
-        ) : null}
-      </div>
-
-      <div className="mt-4 flex items-end justify-between gap-3">
-        <div className="min-w-0">
-          <div
-            id={priceId}
-            className={[
-              "text-[28px] font-semibold tracking-[-0.03em] leading-none",
-              highlight ? "text-[#133778]" : "text-[#1B2B50]",
-            ].join(" ")}
-          >
-            {value}
+        <div className="flex items-center gap-2">
+          <div className="min-w-0 text-right">
+            <div
+              id={priceId}
+              className={[
+                "text-[20px] font-semibold tracking-[-0.02em] leading-none",
+                highlight ? "text-[#133778]" : "text-[#1B2B50]",
+              ].join(" ")}
+            >
+              {value}
+            </div>
+            <div className="mt-0.5 text-[9px] font-medium uppercase tracking-[0.14em] text-slate-400">
+              Por persona
+            </div>
           </div>
-          <div className="mt-1 text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">
-            Por persona
-          </div>
+          {highlight ? (
+            <span
+              aria-hidden="true"
+              className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#2356B8] text-white shadow-[0_6px_12px_rgba(35,86,184,0.24)]"
+            >
+              <Check className="h-3 w-3" strokeWidth={3} />
+            </span>
+          ) : null}
         </div>
       </div>
-
-      {benefits.length ? (
-        <ul className="mt-4 grid gap-2" aria-label={`Beneficios de ${label}`}>
-          {benefits.map((text, idx) => (
-            <li key={`${titleId}-benefit-${idx}`} className="flex items-start gap-2">
-              <span
-                aria-hidden="true"
-                className={[
-                  "mt-[3px] inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full",
-                  highlight ? "bg-[#2356B8]/10 text-[#2356B8]" : "bg-slate-100 text-slate-500",
-                ].join(" ")}
-              >
-                <Check className="h-3 w-3" strokeWidth={3} />
-              </span>
-              <span className="text-[12px] leading-5 text-slate-600">{text}</span>
-            </li>
-          ))}
-        </ul>
-      ) : null}
     </article>
   );
 }
@@ -234,17 +213,7 @@ export default async function CursoDetailPage({ params: { lang, slug } }) {
       ? formatCurrency(course.oldPrice)
       : "";
   const showPublicTier = Boolean(course?.freeCourse || course?.oldPrice);
-  const learningObjectives = Array.isArray(course?.learningObjectives) ? course.learningObjectives.filter(Boolean) : [];
   const targetAudience = Array.isArray(course?.targetAudience) ? course.targetAudience.filter(Boolean) : [];
-  const curriculum = Array.isArray(course?.curriculum)
-    ? course.curriculum.filter((item) => item?.title || item?.description || item?.lessons?.length)
-    : [];
-  const modules = Array.isArray(course?.modules) ? course.modules.filter((item) => item?.title || item?.description || item?.lessons?.length) : [];
-  const totalSections = curriculum.length || modules.length;
-  const totalLessons = curriculum.length
-    ? curriculum.reduce((total, section) => total + (Array.isArray(section?.lessons) ? section.lessons.length : 0), 0)
-    : modules.reduce((total, section) => total + (Array.isArray(section?.lessons) ? section.lessons.filter(Boolean).length : 0), 0);
-  const hasFinalEvaluation = Boolean(course?.finalEvaluation?.enabled);
   const modalityLabel = course?.modalityLabel || course?.modality || course?.modalidad || "A definir";
   const durationLabel = course?.durationLabel || course?.duration || course?.contractType || "A definir";
   const academyLabel = course?.instructorName || course?.institutionName || course?.companyName || "ACAV Cursos";
@@ -295,62 +264,7 @@ export default async function CursoDetailPage({ params: { lang, slug } }) {
                 </div>
               </CardSection>
 
-              {learningObjectives.length ? (
-                <MotionStaggerItem>
-                  <CardSection icon={Sparkles} title="¿Qué aprenderás?">
-                    <ul className="grid gap-3 text-[15px] leading-7 text-slate-600 md:grid-cols-2">
-                      {learningObjectives.map((item) => (
-                        <li key={item} className="flex gap-3">
-                          <CheckCircle2 className="mt-1 h-4 w-4 shrink-0 text-[#2356B8]" />
-                          <span>{item}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </CardSection>
-                </MotionStaggerItem>
-              ) : null}
 
-              {responsibilities.length ? (
-                <MotionStaggerItem>
-                  <CardSection icon={Briefcase} title="Programa y objetivos">
-                    <ul className="grid gap-3 text-[15px] leading-7 text-slate-600">
-                      {responsibilities.map((item) => (
-                        <li key={item} className="flex gap-3">
-                          <CheckCircle2 className="mt-1 h-4 w-4 shrink-0 text-[#2356B8]" />
-                          <span>{item}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </CardSection>
-                </MotionStaggerItem>
-              ) : null}
-
-              {(totalSections || totalLessons || hasFinalEvaluation) ? (
-                <MotionStaggerItem>
-                  <CardSection icon={BookOpen} title="Estructura general">
-                    <div className="grid gap-3 md:grid-cols-3">
-                      <div className="rounded-[20px] border border-slate-200 bg-[#FBFCFE] p-5">
-                        <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">Módulos</div>
-                        <div className="mt-3 text-[28px] font-semibold tracking-[-0.03em] text-[#1B2B50]">{totalSections || "-"}</div>
-                      </div>
-                      <div className="rounded-[20px] border border-slate-200 bg-[#FBFCFE] p-5">
-                        <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">Clases</div>
-                        <div className="mt-3 text-[28px] font-semibold tracking-[-0.03em] text-[#1B2B50]">{totalLessons || "-"}</div>
-                      </div>
-                      <div className="rounded-[20px] border border-slate-200 bg-[#FBFCFE] p-5">
-                        <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">Evaluación</div>
-                        <div className="mt-3 text-sm font-semibold text-[#1B2B50]">
-                          {hasFinalEvaluation ? "Incluye cierre evaluativo" : "Sin examen final obligatorio"}
-                        </div>
-                      </div>
-                    </div>
-                    <p className="mt-4 text-sm leading-7 text-slate-600">
-                      El contenido completo de la cursada, las clases, materiales, actividades y evaluaciones se habilitan
-                      únicamente dentro del dashboard del alumno una vez que la inscripción queda activa.
-                    </p>
-                  </CardSection>
-                </MotionStaggerItem>
-              ) : null}
 
               <MotionStaggerItem>
                 <CardSection icon={ShieldCheck} title="Requisitos y alcance">
@@ -399,25 +313,39 @@ export default async function CursoDetailPage({ params: { lang, slug } }) {
                 </MotionStaggerItem>
               ) : null}
 
-              {course?.videoUrl ? (
+              {(course.videoUrl || course.imageUrl) ? (
                 <MotionStaggerItem>
-                  <CardSection icon={Film} title="Video de presentación">
+                  <CardSection icon={Film} title={course.videoUrl ? "Video de presentación" : "Portada del curso"}>
                     <div className="overflow-hidden rounded-[22px] border border-slate-200 bg-[#0F172A]">
-                      {isYoutubeUrl(course.videoUrl) || isVimeoUrl(course.videoUrl) || isVideoEmbedUrl(course.videoUrl) ? (
-                        <iframe
-                          src={toEmbedUrl(course.videoUrl)}
-                          title="Video de presentación"
-                          className="aspect-video w-full border-0 bg-black"
-                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                          allowFullScreen
-                        />
+                      {course.videoUrl ? (
+                        isYoutubeUrl(course.videoUrl) || isVimeoUrl(course.videoUrl) || isVideoEmbedUrl(course.videoUrl) ? (
+                          <iframe
+                            src={toEmbedUrl(course.videoUrl)}
+                            title="Video de presentación"
+                            className="aspect-video w-full border-0 bg-black"
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                            allowFullScreen
+                          />
+                        ) : (
+                          <video
+                            controls
+                            preload="metadata"
+                            playsInline
+                            className="aspect-video w-full bg-black"
+                            src={course.videoUrl}
+                          />
+                        )
                       ) : (
-                        <video
-                          controls
-                          preload="metadata"
-                          playsInline
-                          className="aspect-video w-full bg-black"
-                          src={course.videoUrl}
+                        <div
+                          className="aspect-video w-full bg-slate-100"
+                          style={{
+                            backgroundImage: `url(${course.imageUrl})`,
+                            backgroundPosition: "center",
+                            backgroundRepeat: "no-repeat",
+                            backgroundSize: "cover",
+                          }}
+                          role="img"
+                          aria-label={`Portada de ${course.title}`}
                         />
                       )}
                     </div>
@@ -438,6 +366,35 @@ export default async function CursoDetailPage({ params: { lang, slug } }) {
                   </CardSection>
                 </MotionStaggerItem>
               ) : null}
+
+              {course.documentationUrl ? (
+                <MotionStaggerItem>
+                  <CardSection icon={ExternalLink} title="Documentación oficial">
+                    <a
+                      href={course.documentationUrl}
+                      target="_blank"
+                      rel="noreferrer noopener"
+                      className="group inline-flex w-full items-center justify-between gap-4 rounded-[20px] border border-slate-200 bg-[#FBFCFE] p-5 transition-all duration-300 hover:border-[#2356B8]/40 hover:bg-[#EEF4FF]/60"
+                    >
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="inline-flex h-9 w-9 items-center justify-center rounded-2xl bg-[#EEF4FF] text-[#2356B8]">
+                            <ExternalLink className="h-4 w-4" />
+                          </span>
+                          <div className="text-sm font-semibold text-[#1B2B50]">Acceder a la documentación del curso</div>
+                        </div>
+                        <div className="mt-2 ml-11 text-xs leading-5 text-slate-500 truncate">
+                          {course.documentationUrl}
+                        </div>
+                      </div>
+                      <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[#1B2B50] px-4 py-2 text-xs font-extrabold text-white transition duration-300 group-hover:bg-[#133778] group-hover:-translate-y-0.5">
+                        Abrir
+                        <ExternalLink className="h-3.5 w-3.5" />
+                      </span>
+                    </a>
+                  </CardSection>
+                </MotionStaggerItem>
+              ) : null}
             </MotionStagger>
 
             <MotionStagger className="space-y-4 lg:sticky lg:top-24" delayChildren={0.12}>
@@ -452,7 +409,7 @@ export default async function CursoDetailPage({ params: { lang, slug } }) {
                   </div>
                   <h2
                     id="sidebar-inscripcion-title"
-                    className="mt-4 text-[22px] font-semibold tracking-[-0.03em] text-[#1B2B50] md:text-[24px]"
+                    className="mt-4 text-lg font-semibold tracking-[-0.02em] text-[#1B2B50] md:text-xl"
                   >
                     Elegí tu tarifa
                   </h2>
@@ -463,7 +420,7 @@ export default async function CursoDetailPage({ params: { lang, slug } }) {
                   <section
                     aria-label="Tarifas del curso"
                     className={[
-                      "mt-6 grid gap-3",
+                      "mt-3 grid gap-2",
                       showPublicTier ? "" : "grid-cols-1",
                     ].join(" ")}
                   >
@@ -475,11 +432,6 @@ export default async function CursoDetailPage({ params: { lang, slug } }) {
                       value={memberPriceText}
                       titleId="price-tier-member"
                       priceId="price-tier-member-value"
-                      benefits={[
-                        "Acceso inmediato al campus",
-                        "Certificado oficial al finalizar",
-                        "Materiales y clases disponibles 24/7",
-                      ]}
                     />
                     {showPublicTier ? (
                       <PriceTier
@@ -488,39 +440,47 @@ export default async function CursoDetailPage({ params: { lang, slug } }) {
                         value={publicPriceText || "Consultar valor"}
                         titleId="price-tier-public"
                         priceId="price-tier-public-value"
-                        benefits={[
-                          "Acceso inmediato al campus",
-                          "Certificado oficial al finalizar",
-                          "Materiales y clases disponibles 24/7",
-                        ]}
                       />
                     ) : null}
                   </section>
 
-                  <div className="mt-5 rounded-[18px] border border-slate-200 bg-[#FBFCFE] p-4">
-                    <div className="grid gap-3 text-sm text-slate-600">
-                      <div className="flex items-start gap-3">
-                        <PlayCircle className="mt-0.5 h-4 w-4 shrink-0 text-[#2356B8]" />
-                        <span>{durationLabel}</span>
+                  <div className="mt-3 rounded-[14px] border border-slate-200 bg-[#FBFCFE] p-2.5">
+                    <div className="grid grid-cols-2 gap-2 text-xs text-slate-600">
+                      <div className="flex items-start gap-2">
+                        <PlayCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#2356B8]" />
+                        <span className="leading-5">{durationLabel}</span>
                       </div>
-                      <div className="flex items-start gap-3">
-                        <Clock3 className="mt-0.5 h-4 w-4 shrink-0 text-[#F08A00]" />
-                        <span>{course.expiresLabel}</span>
+                      <div className="flex items-start gap-2">
+                        <Clock3 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#F08A00]" />
+                        <span className="leading-5">{course.expiresLabel}</span>
                       </div>
                     </div>
                   </div>
 
-                  <CourseEnrollButton
-                    lang={lang}
-                    jobId={course.id}
-                    slug={course.slug}
-                    scroll={false}
-                    className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-[16px] bg-[#1B2B50] px-5 py-3.5 text-sm font-extrabold text-white shadow-[0_12px_28px_rgba(13,43,100,.14)] transition duration-500 hover:-translate-y-1 hover:bg-[#133778] focus-visible:ring-2 focus-visible:ring-[#2356B8]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-white outline-none"
-                    appliedClassName="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-[16px] border border-slate-300 bg-slate-200 px-5 py-3.5 text-sm font-extrabold text-slate-600"
-                    loadingClassName="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-[16px] border border-slate-200 bg-slate-100 px-5 py-3.5 text-sm font-extrabold text-slate-500"
-                  />
+                  <div className="mt-4 flex flex-col gap-2.5">
+                    <CourseEnrollButton
+                      lang={lang}
+                      jobId={course.id}
+                      slug={course.slug}
+                      scroll={false}
+                      className="inline-flex w-full items-center justify-center gap-2 rounded-[14px] bg-[#1B2B50] px-5 py-3.5 text-base font-extrabold text-white shadow-[0_14px_28px_rgba(13,43,100,.22)] transition duration-500 hover:-translate-y-0.5 hover:bg-[#133778] focus-visible:ring-2 focus-visible:ring-[#2356B8]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-white outline-none"
+                      appliedClassName="inline-flex w-full items-center justify-center gap-2 rounded-[14px] border border-slate-300 bg-slate-200 px-5 py-3.5 text-base font-extrabold text-slate-600"
+                      loadingClassName="inline-flex w-full items-center justify-center gap-2 rounded-[14px] border border-slate-200 bg-slate-100 px-5 py-3.5 text-base font-extrabold text-slate-500"
+                    />
 
-                  <div className="mt-4 flex items-center gap-2 text-xs text-slate-500">
+                    <a
+                      href="https://www.acav.com"
+                      target="_blank"
+                      rel="noreferrer noopener"
+                      className="inline-flex w-full items-center justify-center gap-2 rounded-[14px] border border-[#2356B8]/25 bg-[#EEF4FF] px-5 py-3 text-sm font-extrabold text-[#1B2B50] shadow-[0_8px_18px_rgba(35,86,184,0.08)] transition-all duration-500 hover:-translate-y-0.5 hover:bg-[#E0EAFE] hover:border-[#2356B8]/50 focus-visible:ring-2 focus-visible:ring-[#2356B8]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-white outline-none"
+                    >
+                      <Users className="h-4 w-4" />
+                      Inscribirme como socio
+                      <ExternalLink className="h-3.5 w-3.5" />
+                    </a>
+                  </div>
+
+                  <div className="mt-3 flex items-center gap-2 text-xs text-slate-500">
                     <ShieldCheck className="h-3.5 w-3.5 text-[#7A9FE8]" />
                     Tu información está protegida
                   </div>

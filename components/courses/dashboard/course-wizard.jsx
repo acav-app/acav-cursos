@@ -92,30 +92,97 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
-
 const COURSE_DRAFT_STORAGE_KEY = "acav:courses:wizard-draft-v2";
 const APP_TIME_ZONE = "America/Argentina/Buenos_Aires";
 
 const TAB_ITEMS = [
-  { id: "general", label: "Información", description: "Base del curso", icon: BookOpen },
-  { id: "content", label: "Contenido", description: "Estructura y clases", icon: Layers },
-  { id: "resources", label: "Recursos", description: "Portada y adjuntos", icon: Film },
-  { id: "pricing", label: "Ventas", description: "Precio y beneficios", icon: Settings2 },
-  { id: "publish", label: "Publicación", description: "Estado y visibilidad", icon: Rocket },
+  {
+    id: "general",
+    label: "Información",
+    description: "Base del curso",
+    icon: BookOpen,
+  },
+  {
+    id: "content",
+    label: "Contenido",
+    description: "Estructura y clases",
+    icon: Layers,
+  },
+  {
+    id: "resources",
+    label: "Recursos",
+    description: "Portada y adjuntos",
+    icon: Film,
+  },
+  {
+    id: "pricing",
+    label: "Ventas",
+    description: "Precio y beneficios",
+    icon: Settings2,
+  },
+  {
+    id: "forum",
+    label: "Foro",
+    description: "Preguntas y respuestas",
+    icon: HelpCircle,
+  },
+  {
+    id: "publish",
+    label: "Publicación",
+    description: "Estado y visibilidad",
+    icon: Rocket,
+  },
 ];
 
 const PUBLICATION_STATUS_OPTIONS = [
-  { value: "borrador", label: "Borrador", tone: "secondary", description: "Solo visible para administradores. Ideal para editar sin que nadie lo vea." },
-  { value: "pendiente_revision", label: "En revisión", tone: "info", description: "Curso enviado a validación. El equipo admin aprueba antes de publicarlo." },
-  { value: "activa", label: "Publicado", tone: "success", description: "Visible en el catálogo. Los alumnos pueden inscribirse." },
-  { value: "pausada", label: "Oculto", tone: "warning", description: "Quitado del catálogo público. Las inscripciones ya confirmadas siguen activas." },
-  { value: "cerrada", label: "Finalizado", tone: "destructive", description: "Cerrado definitivamente. No admite nuevas inscripciones." },
+  {
+    value: "borrador",
+    label: "Borrador",
+    tone: "secondary",
+    description:
+      "Solo visible para administradores. Ideal para editar sin que nadie lo vea.",
+  },
+  {
+    value: "pendiente_revision",
+    label: "En revisión",
+    tone: "info",
+    description:
+      "Curso enviado a validación. El equipo admin aprueba antes de publicarlo.",
+  },
+  {
+    value: "activa",
+    label: "Publicado",
+    tone: "success",
+    description: "Visible en el catálogo. Los alumnos pueden inscribirse.",
+  },
+  {
+    value: "pausada",
+    label: "Oculto",
+    tone: "warning",
+    description:
+      "Quitado del catálogo público. Las inscripciones ya confirmadas siguen activas.",
+  },
+  {
+    value: "cerrada",
+    label: "Finalizado",
+    tone: "destructive",
+    description: "Cerrado definitivamente. No admite nuevas inscripciones.",
+  },
 ];
 
 const TAB_FIELD_MAP = {
   general: ["title", "slug", "category", "level", "modality", "language"],
-  content: ["shortDescription", "description", "learningObjectives", "requirements", "targetAudience", "curriculum", "finalEvaluation", "duration"],
-  resources: ["coverImage", "thumbnail", "promoVideo", "attachments"],
+  content: [
+    "shortDescription",
+    "description",
+    "learningObjectives",
+    "requirements",
+    "targetAudience",
+    "curriculum",
+    "finalEvaluation",
+    "duration",
+  ],
+  resources: ["coverImage", "thumbnail", "promoVideo", "attachments", "documentationUrl"],
   pricing: [
     "price",
     "oldPrice",
@@ -126,7 +193,14 @@ const TAB_FIELD_MAP = {
     "recordedClasses",
     "support",
   ],
-  publish: ["featured", "allowEnrollment", "showOnHome", "status", "expiresAtDate"],
+  publish: [
+    "featured",
+    "allowEnrollment",
+    "showOnHome",
+    "status",
+    "expiresAtDate",
+  ],
+  forum: ["forumQuestions"],
 };
 
 const schema = z
@@ -138,14 +212,25 @@ const schema = z
     level: z.string().min(1, "El nivel es obligatorio"),
     modality: z.string().min(1, "La modalidad es obligatoria"),
     language: z.string().min(1, "El idioma es obligatorio"),
-    shortDescription: z.string().max(180, "La descripción corta admite hasta 180 caracteres").optional(),
-    description: z.string().min(20, "La descripción completa debe tener al menos 20 caracteres"),
+    shortDescription: z
+      .string()
+      .max(180, "La descripción corta admite hasta 180 caracteres")
+      .optional(),
+    description: z
+      .string()
+      .min(20, "La descripción completa debe tener al menos 20 caracteres"),
     learningObjectives: z.preprocess(
       (value) => sanitizeList(value),
-      z.array(z.string().min(1)).min(1, "Agrega al menos un aprendizaje")
+      z.array(z.string().min(1)).min(1, "Agrega al menos un aprendizaje"),
     ),
-    requirements: z.preprocess((value) => sanitizeList(value), z.array(z.string().min(1)).default([])),
-    targetAudience: z.preprocess((value) => sanitizeList(value), z.array(z.string().min(1)).default([])),
+    requirements: z.preprocess(
+      (value) => sanitizeList(value),
+      z.array(z.string().min(1)).default([]),
+    ),
+    targetAudience: z.preprocess(
+      (value) => sanitizeList(value),
+      z.array(z.string().min(1)).default([]),
+    ),
     modules: z.preprocess(
       (value) =>
         (Array.isArray(value) ? value : [])
@@ -155,7 +240,10 @@ const schema = z
             description: String(module?.description || "").trim(),
             lessons: sanitizeList(module?.lessons),
           }))
-          .filter((module) => module.title || module.description || module.lessons.length > 0),
+          .filter(
+            (module) =>
+              module.title || module.description || module.lessons.length > 0,
+          ),
       z
         .array(
           z.object({
@@ -163,9 +251,9 @@ const schema = z
             title: z.string().min(1, "El título del módulo es obligatorio"),
             description: z.string().optional(),
             lessons: z.array(z.string().min(1)).default([]),
-          })
+          }),
         )
-        .default([])
+        .default([]),
     ),
     curriculum: z.preprocess(
       (value) => sanitizeCurriculum(value),
@@ -179,9 +267,18 @@ const schema = z
               .array(
                 z.object({
                   id: z.string().min(1),
-                  title: z.string().min(1, "El título de la clase es obligatorio"),
+                  title: z
+                    .string()
+                    .min(1, "El título de la clase es obligatorio"),
                   description: z.string().optional(),
-                  lessonType: z.enum(["video", "text", "live", "quiz", "assignment", "download"]),
+                  lessonType: z.enum([
+                    "video",
+                    "text",
+                    "live",
+                    "quiz",
+                    "assignment",
+                    "download",
+                  ]),
                   durationMinutes: z.number().min(0).optional(),
                   videoUrl: z.string().url().optional().or(z.literal("")),
                   thumbnailUrl: z.string().url().optional().or(z.literal("")),
@@ -190,12 +287,23 @@ const schema = z
                   resources: z.array(
                     z.object({
                       id: z.string().min(1),
-                      label: z.string().min(1, "El nombre del recurso es obligatorio"),
+                      label: z
+                        .string()
+                        .min(1, "El nombre del recurso es obligatorio"),
                       url: z.string().url("La URL del recurso no es válida"),
-                      kind: z.enum(["video", "document", "image", "archive", "link", "file"]).optional(),
+                      kind: z
+                        .enum([
+                          "video",
+                          "document",
+                          "image",
+                          "archive",
+                          "link",
+                          "file",
+                        ])
+                        .optional(),
                       mimeType: z.string().optional(),
                       fileSize: z.number().min(0).optional(),
-                    })
+                    }),
                   ),
                   videoAsset: z
                     .object({
@@ -204,7 +312,9 @@ const schema = z
                       mimeType: z.string().optional(),
                       fileSize: z.number().min(0).optional(),
                       durationSeconds: z.number().min(0).optional(),
-                      status: z.enum(["pending", "uploading", "ready", "corrupt"]).optional(),
+                      status: z
+                        .enum(["pending", "uploading", "ready", "corrupt"])
+                        .optional(),
                       checksum: z.string().optional(),
                       uploadedAt: z.string().optional(),
                       qualities: z
@@ -214,7 +324,7 @@ const schema = z
                             url: z.string().url(),
                             width: z.number().int().min(0).optional(),
                             height: z.number().int().min(0).optional(),
-                          })
+                          }),
                         )
                         .optional(),
                       subtitles: z
@@ -224,19 +334,19 @@ const schema = z
                             label: z.string().min(1),
                             srclang: z.string().min(2),
                             default: z.boolean().optional(),
-                          })
+                          }),
                         )
                         .optional(),
                     })
                     .optional()
                     .nullable(),
                   evaluation: CourseEvaluationSchema.optional(),
-                })
+                }),
               )
               .min(1, "Cada sección debe tener al menos una clase"),
-          })
+          }),
         )
-        .min(1, "Agrega al menos una sección con contenido")
+        .min(1, "Agrega al menos una sección con contenido"),
     ),
     finalEvaluation: z.preprocess(
       (value) => sanitizeFinalEvaluation(value),
@@ -250,20 +360,91 @@ const schema = z
           z.object({
             id: z.string().min(1),
             prompt: z.string().min(1, "La pregunta es obligatoria"),
-            type: z.enum(["single_choice", "multiple_choice", "true_false", "short_answer"]),
+            type: z.enum([
+              "single_choice",
+              "multiple_choice",
+              "true_false",
+              "short_answer",
+            ]),
             options: z.array(z.string().min(1)).default([]),
             correctAnswers: z.array(z.string().min(1)).default([]),
             explanation: z.string().optional(),
-          })
+          }),
         ),
-      })
+      }),
     ),
     duration: z.string().min(1, "La duración es obligatoria"),
-    classesCount: z.number().int().min(1, "La cantidad de clases debe ser mayor a 0"),
-    coverImage: z.string().url("La portada debe ser una URL válida").optional().or(z.literal("")),
-    thumbnail: z.string().url("La miniatura debe ser una URL válida").optional().or(z.literal("")),
-    promoVideo: z.string().url("El video debe ser una URL válida").optional().or(z.literal("")),
+    classesCount: z
+      .number()
+      .int()
+      .min(1, "La cantidad de clases debe ser mayor a 0"),
+    coverImage: z
+      .string()
+      .url("La portada debe ser una URL válida")
+      .optional()
+      .or(z.literal("")),
+    thumbnail: z
+      .string()
+      .url("La miniatura debe ser una URL válida")
+      .optional()
+      .or(z.literal("")),
+    promoVideo: z
+      .string()
+      .url("El video debe ser una URL válida")
+      .optional()
+      .or(z.literal("")),
     promoVideoFileName: z.string().optional(),
+    documentationUrl: z
+      .string()
+      .url("La URL de documentación no es válida")
+      .optional()
+      .or(z.literal("")),
+    forumQuestions: z.preprocess(
+      (value) => {
+        const list = Array.isArray(value) ? value : [];
+        return list
+          .map((raw, index) => ({
+            id: String(raw?.id || `forum-q-${Date.now()}-${index}`).trim(),
+            title: String(raw?.title || "").trim(),
+            description: String(raw?.description || "").trim(),
+            createdAt:
+              String(raw?.createdAt || new Date().toISOString()).trim() ||
+              new Date().toISOString(),
+            createdBy: String(raw?.createdBy || "admin").trim() || "admin",
+            createdByName: String(raw?.createdByName || "").trim() || undefined,
+            order: Number.isFinite(Number(raw?.order)) ? Number(raw.order) : index,
+            answers: Array.isArray(raw?.answers) ? raw.answers : [],
+          }))
+          .filter((q) => q.title);
+      },
+      z
+        .array(
+          z.object({
+            id: z.string().min(1),
+            title: z.string().min(1, "El título de la pregunta es obligatorio"),
+            description: z.string().optional(),
+            createdAt: z.string().min(1),
+            createdBy: z.string().min(1),
+            createdByName: z.string().optional(),
+            order: z.number().int().min(0).default(0),
+            answers: z
+              .array(
+                z.object({
+                  id: z.string().min(1),
+                  userId: z.string().min(1),
+                  userEmail: z.string().email(),
+                  userFullName: z.string().optional(),
+                  enrollmentId: z.string().min(1),
+                  answer: z.string().min(1),
+                  createdAt: z.string().min(1),
+                  updatedAt: z.string().optional(),
+                })
+              )
+              .default([]),
+          })
+        )
+        .default([])
+    ),
     promoVideoMimeType: z.string().optional(),
     promoVideoSizeBytes: z.number().optional(),
     promoVideoDurationSeconds: z.number().optional(),
@@ -284,7 +465,7 @@ const schema = z
               url: z.string().url(),
               width: z.number().int().min(0).optional(),
               height: z.number().int().min(0).optional(),
-            })
+            }),
           )
           .optional(),
         subtitles: z
@@ -294,7 +475,7 @@ const schema = z
               label: z.string().min(1),
               srclang: z.string().min(2),
               default: z.boolean().optional(),
-            })
+            }),
           )
           .optional(),
       })
@@ -308,7 +489,9 @@ const schema = z
         url: z.string().url().or(z.literal("")).optional(),
         sizeBytes: z.number().optional(),
         fileSize: z.number().min(0).optional(),
-        kind: z.enum(["video", "document", "image", "archive", "file", "link"]).optional(),
+        kind: z
+          .enum(["video", "document", "image", "archive", "file", "link"])
+          .optional(),
         subKind: z.string().optional(),
         status: z.enum(["pending", "uploading", "ready", "corrupt"]).optional(),
         mimeType: z.string().optional(),
@@ -316,10 +499,13 @@ const schema = z
         checksum: z.string().optional(),
         uploadedAt: z.string().optional(),
         previewUrl: z.string().url().optional().or(z.literal("")),
-      })
+      }),
     ),
     price: z.number().min(0, "El precio no puede ser negativo"),
-    oldPrice: z.number().min(0, "El precio no socios no puede ser negativo").optional(),
+    oldPrice: z
+      .number()
+      .min(0, "El precio no socios no puede ser negativo")
+      .optional(),
     freeCourse: z.boolean(),
     certificate: z.boolean(),
     lifetimeAccess: z.boolean(),
@@ -335,19 +521,36 @@ const schema = z
   .superRefine((values, ctx) => {
     const validSections = sanitizeCurriculum(values.curriculum);
     if (validSections.length === 0) {
-      ctx.addIssue({ code: "custom", message: "Agrega al menos una sección con clases.", path: ["curriculum"] });
+      ctx.addIssue({
+        code: "custom",
+        message: "Agrega al menos una sección con clases.",
+        path: ["curriculum"],
+      });
     }
     const lessonsCount = countCurriculumLessons(validSections);
     if (lessonsCount <= 0) {
-      ctx.addIssue({ code: "custom", message: "El curso necesita al menos una clase cargada.", path: ["curriculum"] });
+      ctx.addIssue({
+        code: "custom",
+        message: "El curso necesita al menos una clase cargada.",
+        path: ["curriculum"],
+      });
     }
 
     const finalEvaluation = sanitizeFinalEvaluation(values.finalEvaluation);
     if (finalEvaluation.enabled) {
       if (!String(finalEvaluation.title || "").trim()) {
-        ctx.addIssue({ code: "custom", message: "Define un título para la evaluación final.", path: ["finalEvaluation", "title"] });
+        ctx.addIssue({
+          code: "custom",
+          message: "Define un título para la evaluación final.",
+          path: ["finalEvaluation", "title"],
+        });
       }
-      if ((Array.isArray(finalEvaluation.questions) ? finalEvaluation.questions : []).length === 0) {
+      if (
+        (Array.isArray(finalEvaluation.questions)
+          ? finalEvaluation.questions
+          : []
+        ).length === 0
+      ) {
         ctx.addIssue({
           code: "custom",
           message: "Agrega al menos una pregunta en la evaluación final.",
@@ -355,17 +558,33 @@ const schema = z
         });
       }
 
-      (Array.isArray(finalEvaluation.questions) ? finalEvaluation.questions : []).forEach((question, index) => {
-        const optionsCount = Array.isArray(question.options) ? question.options.length : 0;
-        const answersCount = Array.isArray(question.correctAnswers) ? question.correctAnswers.length : 0;
-        if (["single_choice", "multiple_choice"].includes(question.type) && optionsCount < 2) {
+      (Array.isArray(finalEvaluation.questions)
+        ? finalEvaluation.questions
+        : []
+      ).forEach((question, index) => {
+        const optionsCount = Array.isArray(question.options)
+          ? question.options.length
+          : 0;
+        const answersCount = Array.isArray(question.correctAnswers)
+          ? question.correctAnswers.length
+          : 0;
+        if (
+          ["single_choice", "multiple_choice"].includes(question.type) &&
+          optionsCount < 2
+        ) {
           ctx.addIssue({
             code: "custom",
-            message: "Las preguntas de opción deben tener al menos dos respuestas posibles.",
+            message:
+              "Las preguntas de opción deben tener al menos dos respuestas posibles.",
             path: ["finalEvaluation", "questions", index, "options"],
           });
         }
-        if (["single_choice", "multiple_choice", "true_false"].includes(question.type) && answersCount === 0) {
+        if (
+          ["single_choice", "multiple_choice", "true_false"].includes(
+            question.type,
+          ) &&
+          answersCount === 0
+        ) {
           ctx.addIssue({
             code: "custom",
             message: "Define al menos una respuesta correcta.",
@@ -375,25 +594,48 @@ const schema = z
       });
     }
     if (!values.freeCourse && Number(values.price || 0) <= 0) {
-      ctx.addIssue({ code: "custom", message: "Indica un precio o marca el curso como gratuito", path: ["price"] });
+      ctx.addIssue({
+        code: "custom",
+        message: "Indica un precio o marca el curso como gratuito",
+        path: ["price"],
+      });
     }
-    if (Number.isFinite(Number(values.oldPrice || 0)) && Number(values.oldPrice || 0) < Number(values.price || 0)) {
-      ctx.addIssue({ code: "custom", message: "El precio no socios debe ser mayor o igual al precio socios", path: ["oldPrice"] });
+    if (
+      Number.isFinite(Number(values.oldPrice || 0)) &&
+      Number(values.oldPrice || 0) < Number(values.price || 0)
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        message: "El precio no socios debe ser mayor o igual al precio socios",
+        path: ["oldPrice"],
+      });
     }
     if (values.promoVideo) {
-      const external = isExternalVideoOnly({ url: String(values.promoVideo || ""), mimeType: undefined });
+      const external = isExternalVideoOnly({
+        url: String(values.promoVideo || ""),
+        mimeType: undefined,
+      });
       if (!external) {
         const hasAsset =
           values.promoVideoAsset &&
           typeof values.promoVideoAsset === "object" &&
           (values.promoVideoAsset.url || values.promoVideoAsset.storageKey);
-        const assetOriginal = hasAsset ? values.promoVideoAsset.originalName : undefined;
-        const assetStorage = hasAsset ? values.promoVideoAsset.storageKey : undefined;
+        const assetOriginal = hasAsset
+          ? values.promoVideoAsset.originalName
+          : undefined;
+        const assetStorage = hasAsset
+          ? values.promoVideoAsset.storageKey
+          : undefined;
         const pathForName = hasAsset
-          ? values.promoVideoAsset.url || values.promoVideoAsset.storageKey || values.promoVideo
+          ? values.promoVideoAsset.url ||
+            values.promoVideoAsset.storageKey ||
+            values.promoVideo
           : values.promoVideo;
         const inferredFromPath =
-          String(pathForName || "").split("/").pop()?.split("?")[0] || "";
+          String(pathForName || "")
+            .split("/")
+            .pop()
+            ?.split("?")[0] || "";
         const fileName =
           String(values.promoVideoFileName || "").trim() ||
           String(assetOriginal || "").trim() ||
@@ -401,28 +643,56 @@ const schema = z
           inferredFromPath;
         const mimeType =
           String(values.promoVideoMimeType || "").trim() ||
-          String(hasAsset ? values.promoVideoAsset.mimeType || "" : "").trim() ||
-          (fileName && ["mp4", "m4v"].includes(fileName.split(".").pop()?.toLowerCase() || "")
+          String(
+            hasAsset ? values.promoVideoAsset.mimeType || "" : "",
+          ).trim() ||
+          (fileName &&
+          ["mp4", "m4v"].includes(
+            fileName.split(".").pop()?.toLowerCase() || "",
+          )
             ? "video/mp4"
-            : fileName && ["webm"].includes(fileName.split(".").pop()?.toLowerCase() || "")
+            : fileName &&
+                ["webm"].includes(
+                  fileName.split(".").pop()?.toLowerCase() || "",
+                )
               ? "video/webm"
-              : fileName && ["mov", "qt"].includes(fileName.split(".").pop()?.toLowerCase() || "")
+              : fileName &&
+                  ["mov", "qt"].includes(
+                    fileName.split(".").pop()?.toLowerCase() || "",
+                  )
                 ? "video/quicktime"
-                : fileName && ["mkv"].includes(fileName.split(".").pop()?.toLowerCase() || "")
+                : fileName &&
+                    ["mkv"].includes(
+                      fileName.split(".").pop()?.toLowerCase() || "",
+                    )
                   ? "video/x-matroska"
                   : "");
         const sizeBytes = Number(
-          values.promoVideoSizeBytes ?? (hasAsset ? values.promoVideoAsset.fileSize : undefined) ?? 0
+          values.promoVideoSizeBytes ??
+            (hasAsset ? values.promoVideoAsset.fileSize : undefined) ??
+            0,
         );
 
         if (!fileName) {
-          ctx.addIssue({ code: "custom", message: "Falta el nombre del video cargado", path: ["promoVideo"] });
+          ctx.addIssue({
+            code: "custom",
+            message: "Falta el nombre del video cargado",
+            path: ["promoVideo"],
+          });
         }
         if (!COURSE_VIDEO_ALLOWED_TYPES.includes(mimeType)) {
-          ctx.addIssue({ code: "custom", message: "Formato de video inválido", path: ["promoVideo"] });
+          ctx.addIssue({
+            code: "custom",
+            message: "Formato de video inválido",
+            path: ["promoVideo"],
+          });
         }
         if (sizeBytes > COURSE_VIDEO_MAX_SIZE_BYTES) {
-          ctx.addIssue({ code: "custom", message: "El video excede el tamaño permitido", path: ["promoVideo"] });
+          ctx.addIssue({
+            code: "custom",
+            message: "El video excede el tamaño permitido",
+            path: ["promoVideo"],
+          });
         }
       }
     }
@@ -524,7 +794,9 @@ function extractVideoMetadata(file) {
     const media = document.createElement("video");
     media.preload = "metadata";
     media.onloadedmetadata = () => {
-      const durationSeconds = Number.isFinite(media.duration) ? Math.round(media.duration) : 0;
+      const durationSeconds = Number.isFinite(media.duration)
+        ? Math.round(media.duration)
+        : 0;
       URL.revokeObjectURL(objectUrl);
       resolve({ durationSeconds });
     };
@@ -538,7 +810,10 @@ function extractVideoMetadata(file) {
 
 function buildDraftStorageKey(actor, jobId) {
   const scope = String(jobId || "new").trim() || "new";
-  const userId = String(actor?.uid || actor?.email || actor?.companyId || "anonymous").trim() || "anonymous";
+  const userId =
+    String(
+      actor?.uid || actor?.email || actor?.companyId || "anonymous",
+    ).trim() || "anonymous";
   return `${COURSE_DRAFT_STORAGE_KEY}:${userId}:${scope}`;
 }
 
@@ -550,20 +825,45 @@ function isCustomSlugForTitle(title, slug) {
 
 function normalizeFormValues(values = {}, defaultValues) {
   const curriculum = sanitizeCurriculum(values?.curriculum);
-  const baseCurriculum = curriculum.length ? curriculum : sanitizeCurriculum(defaultValues?.curriculum);
+  const baseCurriculum = curriculum.length
+    ? curriculum
+    : sanitizeCurriculum(defaultValues?.curriculum);
   return {
     ...defaultValues,
     ...values,
     modality: resolveSalesModalityForForm(values),
-    learningObjectives: sanitizeList(values?.learningObjectives).length ? sanitizeList(values.learningObjectives) : sanitizeList(defaultValues?.learningObjectives),
-    requirements: sanitizeList(values?.requirements).length ? sanitizeList(values.requirements) : sanitizeList(defaultValues?.requirements),
-    targetAudience: sanitizeList(values?.targetAudience).length ? sanitizeList(values.targetAudience) : sanitizeList(defaultValues?.targetAudience),
-    curriculum: baseCurriculum.length ? baseCurriculum : defaultValues.curriculum,
-    modules: buildLegacyModulesFromCurriculum(baseCurriculum.length ? baseCurriculum : defaultValues.curriculum),
-    finalEvaluation: sanitizeFinalEvaluation(values?.finalEvaluation ?? defaultValues.finalEvaluation),
-    attachments: sanitizeAttachments(values?.attachments ?? defaultValues.attachments),
-    expiresAtDate: clampDateInputToTodayOrFuture(values?.expiresAtDate ?? defaultValues?.expiresAtDate),
-    classesCount: countCurriculumLessons(baseCurriculum) || Number(values?.classesCount ?? values?.classes ?? defaultValues.classesCount ?? 1),
+    learningObjectives: sanitizeList(values?.learningObjectives).length
+      ? sanitizeList(values.learningObjectives)
+      : sanitizeList(defaultValues?.learningObjectives),
+    requirements: sanitizeList(values?.requirements).length
+      ? sanitizeList(values.requirements)
+      : sanitizeList(defaultValues?.requirements),
+    targetAudience: sanitizeList(values?.targetAudience).length
+      ? sanitizeList(values.targetAudience)
+      : sanitizeList(defaultValues?.targetAudience),
+    curriculum: baseCurriculum.length
+      ? baseCurriculum
+      : defaultValues.curriculum,
+    modules: buildLegacyModulesFromCurriculum(
+      baseCurriculum.length ? baseCurriculum : defaultValues.curriculum,
+    ),
+    finalEvaluation: sanitizeFinalEvaluation(
+      values?.finalEvaluation ?? defaultValues.finalEvaluation,
+    ),
+    attachments: sanitizeAttachments(
+      values?.attachments ?? defaultValues.attachments,
+    ),
+    expiresAtDate: clampDateInputToTodayOrFuture(
+      values?.expiresAtDate ?? defaultValues?.expiresAtDate,
+    ),
+    classesCount:
+      countCurriculumLessons(baseCurriculum) ||
+      Number(
+        values?.classesCount ??
+          values?.classes ??
+          defaultValues.classesCount ??
+          1,
+      ),
   };
 }
 
@@ -582,7 +882,9 @@ function hasMeaningfulDraftContent(values) {
     values.duration,
     values.promoVideo,
     meaningfulCurriculum.length ? "curriculum" : "",
-    meaningfulEvaluation.enabled && meaningfulEvaluation.questions.length ? "evaluation" : "",
+    meaningfulEvaluation.enabled && meaningfulEvaluation.questions.length
+      ? "evaluation"
+      : "",
   ].some((value) => {
     if (Array.isArray(value)) return value.length > 0;
     return Boolean(String(value || "").trim());
@@ -591,16 +893,22 @@ function hasMeaningfulDraftContent(values) {
 
 function hasNestedFieldError(value) {
   if (!value) return false;
-  if (typeof value === "object" && "message" in value && value.message) return true;
-  if (Array.isArray(value)) return value.some((item) => hasNestedFieldError(item));
-  if (typeof value === "object") return Object.values(value).some((item) => hasNestedFieldError(item));
+  if (typeof value === "object" && "message" in value && value.message)
+    return true;
+  if (Array.isArray(value))
+    return value.some((item) => hasNestedFieldError(item));
+  if (typeof value === "object")
+    return Object.values(value).some((item) => hasNestedFieldError(item));
   return false;
 }
 
 function findFirstTabWithErrors(formErrors) {
   return (
-    TAB_ITEMS.find((tab) => (TAB_FIELD_MAP[tab.id] || []).some((field) => hasNestedFieldError(formErrors?.[field])))?.id ||
-    "general"
+    TAB_ITEMS.find((tab) =>
+      (TAB_FIELD_MAP[tab.id] || []).some((field) =>
+        hasNestedFieldError(formErrors?.[field]),
+      ),
+    )?.id || "general"
   );
 }
 
@@ -608,7 +916,12 @@ function findFirstErrorMessage(formErrors) {
   if (!formErrors || typeof formErrors !== "object") return "";
   for (const value of Object.values(formErrors)) {
     if (!value) continue;
-    if (typeof value === "object" && "message" in value && typeof value.message === "string" && value.message.trim()) {
+    if (
+      typeof value === "object" &&
+      "message" in value &&
+      typeof value.message === "string" &&
+      value.message.trim()
+    ) {
       return value.message.trim();
     }
     if (typeof value === "object") {
@@ -648,15 +961,37 @@ function createEntityId(prefix) {
 
 function normalizeResourceKind(kind, hint = {}) {
   const valid = ["video", "document", "image", "archive", "link"];
-  const raw = String(kind || "").trim().toLowerCase();
+  const raw = String(kind || "")
+    .trim()
+    .toLowerCase();
   if (valid.includes(raw)) return raw;
   if (raw === "file" || raw === "embed") {
     const url = String(hint?.url || hint?.href || "").toLowerCase();
     const mime = String(hint?.mimeType || hint?.type || "").toLowerCase();
-    const name = String(hint?.name || hint?.label || hint?.title || "").toLowerCase();
-    if (mime.startsWith("video/") || /\.(mp4|webm|mov|m4v)$/i.test(url) || /\.(mp4|webm|mov|m4v)$/i.test(name)) return "video";
-    if (mime.startsWith("image/") || /\.(jpe?g|png|webp|gif|svg)$/i.test(url) || /\.(jpe?g|png|webp)$/i.test(name)) return "image";
-    if (/\.(zip|rar|7z|tar|gz)$/i.test(url) || /\.(zip|rar|7z|tar|gz)$/i.test(name) || mime.includes("zip") || mime.includes("rar") || mime.includes("compressed") || mime.includes("archive")) return "archive";
+    const name = String(
+      hint?.name || hint?.label || hint?.title || "",
+    ).toLowerCase();
+    if (
+      mime.startsWith("video/") ||
+      /\.(mp4|webm|mov|m4v)$/i.test(url) ||
+      /\.(mp4|webm|mov|m4v)$/i.test(name)
+    )
+      return "video";
+    if (
+      mime.startsWith("image/") ||
+      /\.(jpe?g|png|webp|gif|svg)$/i.test(url) ||
+      /\.(jpe?g|png|webp)$/i.test(name)
+    )
+      return "image";
+    if (
+      /\.(zip|rar|7z|tar|gz)$/i.test(url) ||
+      /\.(zip|rar|7z|tar|gz)$/i.test(name) ||
+      mime.includes("zip") ||
+      mime.includes("rar") ||
+      mime.includes("compressed") ||
+      mime.includes("archive")
+    )
+      return "archive";
     return "document";
   }
   if (valid.length === 0) return undefined;
@@ -666,21 +1001,36 @@ function normalizeResourceKind(kind, hint = {}) {
 function sanitizeLessonResources(resources) {
   return (Array.isArray(resources) ? resources : [])
     .map((resource, index) => {
-      const label = String(resource?.label || resource?.name || resource?.title || "").trim();
-      const url = String(resource?.url || resource?.href || resource?.link || "").trim();
+      const label = String(
+        resource?.label || resource?.name || resource?.title || "",
+      ).trim();
+      const url = String(
+        resource?.url || resource?.href || resource?.link || "",
+      ).trim();
       if (!label && !url) return null;
       const kind = normalizeResourceKind(resource?.kind, {
         url,
         mimeType: resource?.mimeType || resource?.type,
         name: resource?.name || resource?.label || resource?.title,
       });
-      const mimeTypeRaw = String(resource?.mimeType || resource?.type || "").trim() || undefined;
+      const mimeTypeRaw =
+        String(resource?.mimeType || resource?.type || "").trim() || undefined;
       const fileSizeRaw = Number(resource?.fileSize || resource?.size);
-      const fileSize = Number.isFinite(fileSizeRaw) && fileSizeRaw > 0 ? fileSizeRaw : undefined;
+      const fileSize =
+        Number.isFinite(fileSizeRaw) && fileSizeRaw > 0
+          ? fileSizeRaw
+          : undefined;
       const statusRaw = String(resource?.status || "");
-      const hasExplicitStatus = ["pending", "uploading", "ready", "corrupt"].includes(statusRaw);
+      const hasExplicitStatus = [
+        "pending",
+        "uploading",
+        "ready",
+        "corrupt",
+      ].includes(statusRaw);
       const status = hasExplicitStatus
-        ? (statusRaw === "pending" && url ? "ready" : statusRaw)
+        ? statusRaw === "pending" && url
+          ? "ready"
+          : statusRaw
         : url
           ? "ready"
           : undefined;
@@ -696,9 +1046,15 @@ function sanitizeLessonResources(resources) {
         ...(status ? { status } : {}),
         ...(subKind ? { subKind } : {}),
         ...(resource?.checksum ? { checksum: String(resource.checksum) } : {}),
-        ...(resource?.storageKey ? { storageKey: String(resource.storageKey) } : {}),
-        ...(resource?.uploadedAt ? { uploadedAt: String(resource.uploadedAt) } : {}),
-        ...(resource?.previewUrl ? { previewUrl: String(resource.previewUrl) } : {}),
+        ...(resource?.storageKey
+          ? { storageKey: String(resource.storageKey) }
+          : {}),
+        ...(resource?.uploadedAt
+          ? { uploadedAt: String(resource.uploadedAt) }
+          : {}),
+        ...(resource?.previewUrl
+          ? { previewUrl: String(resource.previewUrl) }
+          : {}),
       };
     })
     .filter((resource) => resource?.label && resource?.url);
@@ -707,18 +1063,27 @@ function sanitizeLessonResources(resources) {
 function sanitizeLessonEvaluationQuestions(questions) {
   return (Array.isArray(questions) ? questions : [])
     .map((question, index) => {
-      const type = String(question?.type || "single_choice").trim() || "single_choice";
-      const prompt = String(question?.prompt || question?.enunciado || "").trim();
-      const optionsRaw = Array.isArray(question?.options) ? question.options : [];
+      const type =
+        String(question?.type || "single_choice").trim() || "single_choice";
+      const prompt = String(
+        question?.prompt || question?.enunciado || "",
+      ).trim();
+      const optionsRaw = Array.isArray(question?.options)
+        ? question.options
+        : [];
       const options = optionsRaw.map((option) => String(option || "").trim());
       if (options.length < 2) options.push("", "");
       const nonEmptyOptions = options.filter((option) => Boolean(option));
       const correctAnswersRaw =
-        question?.correctAnswer !== undefined && question?.correctAnswers === undefined
+        question?.correctAnswer !== undefined &&
+        question?.correctAnswers === undefined
           ? question.correctAnswer
           : question?.correctAnswers;
       const correctAnswers = sanitizeCorrectAnswers(correctAnswersRaw);
-      const hasCorrect = Array.isArray(correctAnswers) && correctAnswers.length > 0 && correctAnswers.some((c) => String(c || "").trim());
+      const hasCorrect =
+        Array.isArray(correctAnswers) &&
+        correctAnswers.length > 0 &&
+        correctAnswers.some((c) => String(c || "").trim());
       const points = Number(question?.points || 0);
       const isEffectivelyConfigured =
         Boolean(prompt) &&
@@ -733,11 +1098,18 @@ function sanitizeLessonEvaluationQuestions(questions) {
         correctAnswers,
         hasCorrect: Boolean(hasCorrect),
         isEffectivelyConfigured: Boolean(isEffectivelyConfigured),
-        explanation: question?.explanation ? String(question.explanation) : undefined,
+        explanation: question?.explanation
+          ? String(question.explanation)
+          : undefined,
         points: Number.isFinite(points) && points > 0 ? points : undefined,
       };
     })
-    .filter((question) => question?.prompt || (Array.isArray(question?.options) && question.options.some((option) => option)));
+    .filter(
+      (question) =>
+        question?.prompt ||
+        (Array.isArray(question?.options) &&
+          question.options.some((option) => option)),
+    );
 }
 
 function sanitizeCurriculum(curriculum) {
@@ -773,64 +1145,134 @@ function sanitizeCurriculum(curriculum) {
           }
           const lessonTitle = String(lesson?.title || "").trim();
           const lessonDescription = String(lesson?.description || "").trim();
-          const lessonType = String(lesson?.lessonType || lesson?.type || "video").trim() || "video";
+          const lessonType =
+            String(lesson?.lessonType || lesson?.type || "video").trim() ||
+            "video";
           const durationMinutes = Number(lesson?.durationMinutes || 0);
           const videoAssetRaw = lesson?.videoAsset;
-          const hasVideoAssetShape = videoAssetRaw && typeof videoAssetRaw === "object" && (videoAssetRaw.url || videoAssetRaw.storageKey);
-          const videoAssetPurged = hasVideoAssetShape && videoAssetRaw.__purged === true;
-          const videoAsset = hasVideoAssetShape && !videoAssetPurged
-            ? {
-                url: String(videoAssetRaw.url || "").trim() || undefined,
-                storageKey: videoAssetRaw.storageKey ? String(videoAssetRaw.storageKey) : undefined,
-                mimeType: videoAssetRaw.mimeType ? String(videoAssetRaw.mimeType) : undefined,
-                fileSize: Number.isFinite(Number(videoAssetRaw.fileSize)) ? Number(videoAssetRaw.fileSize) : undefined,
-                durationSeconds: Number.isFinite(Number(videoAssetRaw.durationSeconds)) ? Number(videoAssetRaw.durationSeconds) : undefined,
-                status: ["pending", "uploading", "ready", "corrupt"].includes(String(videoAssetRaw.status || "")) ? videoAssetRaw.status : undefined,
-                checksum: videoAssetRaw.checksum ? String(videoAssetRaw.checksum) : undefined,
-                uploadedAt: videoAssetRaw.uploadedAt ? String(videoAssetRaw.uploadedAt) : undefined,
-                qualities: Array.isArray(videoAssetRaw.qualities)
-                  ? videoAssetRaw.qualities.map((quality) => ({
-                      label: String(quality?.label || ""),
-                      url: String(quality?.url || ""),
-                      width: Number.isFinite(Number(quality?.width)) ? Number(quality?.width) : undefined,
-                      height: Number.isFinite(Number(quality?.height)) ? Number(quality?.height) : undefined,
-                    }))
-                  : undefined,
-                subtitles: Array.isArray(videoAssetRaw.subtitles)
-                  ? videoAssetRaw.subtitles.map((subtitle) => ({
-                      src: String(subtitle?.src || ""),
-                      label: String(subtitle?.label || ""),
-                      srclang: String(subtitle?.srclang || ""),
-                      default: typeof subtitle?.default === "boolean" ? subtitle.default : undefined,
-                    }))
-                  : undefined,
-              }
-            : undefined;
-          const videoUrlCandidate = String(lesson?.videoUrl || lesson?.url || "").trim();
-          const videoAssetUrl = videoAsset?.url ? String(videoAsset.url).trim() : "";
+          const hasVideoAssetShape =
+            videoAssetRaw &&
+            typeof videoAssetRaw === "object" &&
+            (videoAssetRaw.url || videoAssetRaw.storageKey);
+          const videoAssetPurged =
+            hasVideoAssetShape && videoAssetRaw.__purged === true;
+          const videoAsset =
+            hasVideoAssetShape && !videoAssetPurged
+              ? {
+                  url: String(videoAssetRaw.url || "").trim() || undefined,
+                  storageKey: videoAssetRaw.storageKey
+                    ? String(videoAssetRaw.storageKey)
+                    : undefined,
+                  mimeType: videoAssetRaw.mimeType
+                    ? String(videoAssetRaw.mimeType)
+                    : undefined,
+                  fileSize: Number.isFinite(Number(videoAssetRaw.fileSize))
+                    ? Number(videoAssetRaw.fileSize)
+                    : undefined,
+                  durationSeconds: Number.isFinite(
+                    Number(videoAssetRaw.durationSeconds),
+                  )
+                    ? Number(videoAssetRaw.durationSeconds)
+                    : undefined,
+                  status: ["pending", "uploading", "ready", "corrupt"].includes(
+                    String(videoAssetRaw.status || ""),
+                  )
+                    ? videoAssetRaw.status
+                    : undefined,
+                  checksum: videoAssetRaw.checksum
+                    ? String(videoAssetRaw.checksum)
+                    : undefined,
+                  uploadedAt: videoAssetRaw.uploadedAt
+                    ? String(videoAssetRaw.uploadedAt)
+                    : undefined,
+                  qualities: Array.isArray(videoAssetRaw.qualities)
+                    ? videoAssetRaw.qualities.map((quality) => ({
+                        label: String(quality?.label || ""),
+                        url: String(quality?.url || ""),
+                        width: Number.isFinite(Number(quality?.width))
+                          ? Number(quality?.width)
+                          : undefined,
+                        height: Number.isFinite(Number(quality?.height))
+                          ? Number(quality?.height)
+                          : undefined,
+                      }))
+                    : undefined,
+                  subtitles: Array.isArray(videoAssetRaw.subtitles)
+                    ? videoAssetRaw.subtitles.map((subtitle) => ({
+                        src: String(subtitle?.src || ""),
+                        label: String(subtitle?.label || ""),
+                        srclang: String(subtitle?.srclang || ""),
+                        default:
+                          typeof subtitle?.default === "boolean"
+                            ? subtitle.default
+                            : undefined,
+                      }))
+                    : undefined,
+                }
+              : undefined;
+          const videoUrlCandidate = String(
+            lesson?.videoUrl || lesson?.url || "",
+          ).trim();
+          const videoAssetUrl = videoAsset?.url
+            ? String(videoAsset.url).trim()
+            : "";
           const videoUrl = videoUrlCandidate || videoAssetUrl;
-          const thumbnailUrl = String(lesson?.thumbnailUrl || lesson?.thumbnail || "").trim();
+          const thumbnailUrl = String(
+            lesson?.thumbnailUrl || lesson?.thumbnail || "",
+          ).trim();
           const content = String(lesson?.content || lesson?.body || "").trim();
-          const resources = sanitizeLessonResources(lesson?.resources || lesson?.attachments);
+          const resources = sanitizeLessonResources(
+            lesson?.resources || lesson?.attachments,
+          );
           const evaluationRaw = lesson?.evaluation;
           const evaluation =
-            evaluationRaw && typeof evaluationRaw === "object" && (evaluationRaw.enabled || Array.isArray(evaluationRaw.questions))
+            evaluationRaw &&
+            typeof evaluationRaw === "object" &&
+            (evaluationRaw.enabled || Array.isArray(evaluationRaw.questions))
               ? {
                   enabled: Boolean(evaluationRaw.enabled),
-                  title: evaluationRaw.title ? String(evaluationRaw.title) : undefined,
-                  description: evaluationRaw.description ? String(evaluationRaw.description) : undefined,
-                  passingScore: Number.isFinite(Number(evaluationRaw.passingScore)) ? Number(evaluationRaw.passingScore) : undefined,
-                  maxAttempts: Number.isFinite(Number(evaluationRaw.maxAttempts)) ? Number(evaluationRaw.maxAttempts) : undefined,
-                  durationMinutes: Number.isFinite(Number(evaluationRaw.durationMinutes)) ? Number(evaluationRaw.durationMinutes) : undefined,
-                  locked: typeof evaluationRaw.locked === "boolean" ? evaluationRaw.locked : undefined,
-                  questions: Array.isArray(evaluationRaw.questions) ? sanitizeLessonEvaluationQuestions(evaluationRaw.questions) : [],
+                  title: evaluationRaw.title
+                    ? String(evaluationRaw.title)
+                    : undefined,
+                  description: evaluationRaw.description
+                    ? String(evaluationRaw.description)
+                    : undefined,
+                  passingScore: Number.isFinite(
+                    Number(evaluationRaw.passingScore),
+                  )
+                    ? Number(evaluationRaw.passingScore)
+                    : undefined,
+                  maxAttempts: Number.isFinite(
+                    Number(evaluationRaw.maxAttempts),
+                  )
+                    ? Number(evaluationRaw.maxAttempts)
+                    : undefined,
+                  durationMinutes: Number.isFinite(
+                    Number(evaluationRaw.durationMinutes),
+                  )
+                    ? Number(evaluationRaw.durationMinutes)
+                    : undefined,
+                  locked:
+                    typeof evaluationRaw.locked === "boolean"
+                      ? evaluationRaw.locked
+                      : undefined,
+                  questions: Array.isArray(evaluationRaw.questions)
+                    ? sanitizeLessonEvaluationQuestions(evaluationRaw.questions)
+                    : [],
                 }
               : undefined;
           const hasAnyValue = Boolean(
-            lessonTitle || lessonDescription || content || videoUrl || (resources && resources.length) || evaluation
+            lessonTitle ||
+            lessonDescription ||
+            content ||
+            videoUrl ||
+            (resources && resources.length) ||
+            evaluation,
           );
           if (!hasAnyValue) {
-            const id = lesson?.id ? String(lesson.id || "") : createEntityId(`lesson-${sectionIndex}-${lessonIndex}`);
+            const id = lesson?.id
+              ? String(lesson.id || "")
+              : createEntityId(`lesson-${sectionIndex}-${lessonIndex}`);
             if (lesson?.id) {
               return {
                 id,
@@ -849,11 +1291,17 @@ function sanitizeCurriculum(curriculum) {
             return null;
           }
           return {
-            id: String(lesson?.id || createEntityId(`lesson-${sectionIndex}-${lessonIndex}`)),
+            id: String(
+              lesson?.id ||
+                createEntityId(`lesson-${sectionIndex}-${lessonIndex}`),
+            ),
             title: lessonTitle,
             description: lessonDescription || undefined,
             lessonType,
-            durationMinutes: Number.isFinite(durationMinutes) && durationMinutes > 0 ? durationMinutes : undefined,
+            durationMinutes:
+              Number.isFinite(durationMinutes) && durationMinutes > 0
+                ? durationMinutes
+                : undefined,
             videoUrl: videoUrl || undefined,
             videoAsset,
             thumbnailUrl: thumbnailUrl || undefined,
@@ -873,7 +1321,12 @@ function sanitizeCurriculum(curriculum) {
         lessons,
       };
     })
-    .filter((section) => section?.title && Array.isArray(section?.lessons) && section.lessons.length > 0);
+    .filter(
+      (section) =>
+        section?.title &&
+        Array.isArray(section?.lessons) &&
+        section.lessons.length > 0,
+    );
 }
 
 function sanitizeQuestionOptions(options) {
@@ -892,24 +1345,35 @@ function sanitizeCorrectAnswers(value) {
 }
 
 function sanitizeFinalEvaluation(finalEvaluation) {
-  const source = finalEvaluation && typeof finalEvaluation === "object" ? finalEvaluation : {};
+  const source =
+    finalEvaluation && typeof finalEvaluation === "object"
+      ? finalEvaluation
+      : {};
   const enabled = Boolean(source?.enabled);
   const questions = (Array.isArray(source?.questions) ? source.questions : [])
     .map((question, index) => {
       const prompt = String(question?.prompt || "").trim();
-      const type = String(question?.type || "single_choice").trim() || "single_choice";
+      const type =
+        String(question?.type || "single_choice").trim() || "single_choice";
       const options = sanitizeQuestionOptions(question?.options);
       const correctAnswers =
         type === "true_false"
           ? sanitizeCorrectAnswers(question?.correctAnswers).slice(0, 1)
           : sanitizeCorrectAnswers(question?.correctAnswers);
       const explanation = String(question?.explanation || "").trim();
-      if (!prompt && options.length === 0 && correctAnswers.length === 0 && !explanation) return null;
+      if (
+        !prompt &&
+        options.length === 0 &&
+        correctAnswers.length === 0 &&
+        !explanation
+      )
+        return null;
       return {
         id: String(question?.id || createEntityId(`question-${index}`)),
         prompt,
         type,
-        options: type === "short_answer" || type === "true_false" ? options : options,
+        options:
+          type === "short_answer" || type === "true_false" ? options : options,
         correctAnswers,
         explanation: explanation || undefined,
       };
@@ -920,14 +1384,22 @@ function sanitizeFinalEvaluation(finalEvaluation) {
     enabled,
     title: String(source?.title || "").trim() || undefined,
     description: String(source?.description || "").trim() || undefined,
-    passingScore: Number.isFinite(Number(source?.passingScore)) ? Number(source.passingScore) : undefined,
-    maxAttempts: Number.isFinite(Number(source?.maxAttempts)) ? Number(source.maxAttempts) : undefined,
+    passingScore: Number.isFinite(Number(source?.passingScore))
+      ? Number(source.passingScore)
+      : undefined,
+    maxAttempts: Number.isFinite(Number(source?.maxAttempts))
+      ? Number(source.maxAttempts)
+      : undefined,
     questions,
   };
 }
 
 function countCurriculumLessons(curriculum) {
-  return sanitizeCurriculum(curriculum).reduce((total, section) => total + (Array.isArray(section?.lessons) ? section.lessons.length : 0), 0);
+  return sanitizeCurriculum(curriculum).reduce(
+    (total, section) =>
+      total + (Array.isArray(section?.lessons) ? section.lessons.length : 0),
+    0,
+  );
 }
 
 function buildCurriculumFromModules(modules) {
@@ -961,13 +1433,26 @@ function buildCurriculumFromModules(modules) {
             const title = String(lesson?.title || lesson?.name || "").trim();
             if (!title) return null;
             return {
-              id: String(lesson?.id || createEntityId(`lesson-${sectionIndex}-${lessonIndex}`)),
+              id: String(
+                lesson?.id ||
+                  createEntityId(`lesson-${sectionIndex}-${lessonIndex}`),
+              ),
               title,
-              description: String(lesson?.description || "").trim() || undefined,
-              lessonType: String(lesson?.lessonType || lesson?.type || "video").trim() || "video",
-              durationMinutes: Number.isFinite(Number(lesson?.durationMinutes)) ? Number(lesson.durationMinutes) : undefined,
-              videoUrl: String(lesson?.videoUrl || lesson?.url || "").trim() || undefined,
-              thumbnailUrl: String(lesson?.thumbnailUrl || lesson?.thumbnail || "").trim() || undefined,
+              description:
+                String(lesson?.description || "").trim() || undefined,
+              lessonType:
+                String(lesson?.lessonType || lesson?.type || "video").trim() ||
+                "video",
+              durationMinutes: Number.isFinite(Number(lesson?.durationMinutes))
+                ? Number(lesson.durationMinutes)
+                : undefined,
+              videoUrl:
+                String(lesson?.videoUrl || lesson?.url || "").trim() ||
+                undefined,
+              thumbnailUrl:
+                String(
+                  lesson?.thumbnailUrl || lesson?.thumbnail || "",
+                ).trim() || undefined,
               content: String(lesson?.content || "").trim() || undefined,
               isPreview: Boolean(lesson?.isPreview || lesson?.preview),
               resources: sanitizeLessonResources(lesson?.resources),
@@ -976,11 +1461,18 @@ function buildCurriculumFromModules(modules) {
           .filter(Boolean),
       };
     })
-    .filter((section) => section.title && Array.isArray(section.lessons) && section.lessons.length > 0);
+    .filter(
+      (section) =>
+        section.title &&
+        Array.isArray(section.lessons) &&
+        section.lessons.length > 0,
+    );
 }
 
 function resolveSalesModalityForForm(current) {
-  const raw = String(current?.modality || current?.initialModality || current?.workMode || "").trim();
+  const raw = String(
+    current?.modality || current?.initialModality || current?.workMode || "",
+  ).trim();
   if (!raw) return "100% Online";
   if (COURSE_SALES_MODALITIES.includes(raw)) return raw;
   if (raw === "Virtual") return "100% Online";
@@ -993,7 +1485,9 @@ function resolveCurriculumForForm(current, defaultValues) {
   const normalizedCurriculum = sanitizeCurriculum(current?.curriculum);
   if (normalizedCurriculum.length) return normalizedCurriculum;
 
-  const normalizedModulesCurriculum = sanitizeCurriculum(buildCurriculumFromModules(current?.modules));
+  const normalizedModulesCurriculum = sanitizeCurriculum(
+    buildCurriculumFromModules(current?.modules),
+  );
   if (normalizedModulesCurriculum.length) return normalizedModulesCurriculum;
 
   return defaultValues.curriculum;
@@ -1004,18 +1498,26 @@ function buildLegacyModulesFromCurriculum(curriculum) {
     id: String(section?.id || createEntityId(`module-${index}`)),
     title: String(section?.title || "").trim(),
     description: String(section?.description || "").trim() || undefined,
-    lessons: (Array.isArray(section?.lessons) ? section.lessons : []).map((lesson) => String(lesson?.title || "").trim()).filter(Boolean),
+    lessons: (Array.isArray(section?.lessons) ? section.lessons : [])
+      .map((lesson) => String(lesson?.title || "").trim())
+      .filter(Boolean),
   }));
 }
 
 function sanitizeAttachments(attachments) {
   return (Array.isArray(attachments) ? attachments : [])
     .map((attachment) => {
-      const id = String(attachment?.id || "").trim() || createEntityId("attachment");
-      const legacyName = String(attachment?.name || attachment?.label || "").trim();
+      const id =
+        String(attachment?.id || "").trim() || createEntityId("attachment");
+      const legacyName = String(
+        attachment?.name || attachment?.label || "",
+      ).trim();
       const legacyUrl = String(attachment?.url || "").trim();
       const hasLegacy = legacyName && legacyUrl;
-      const hasNewShape = ["ready", "uploading", "pending", "corrupt"].includes(String(attachment?.status || "")) || Boolean(attachment?.kind);
+      const hasNewShape =
+        ["ready", "uploading", "pending", "corrupt"].includes(
+          String(attachment?.status || ""),
+        ) || Boolean(attachment?.kind);
       if (!hasLegacy && !hasNewShape) return null;
       const normalizedKind = normalizeResourceKind(attachment?.kind, {
         url: attachment?.url || legacyUrl,
@@ -1025,17 +1527,28 @@ function sanitizeAttachments(attachments) {
       const normalizedStatusRaw = String(attachment?.status || "");
       const attachmentHasUrl = Boolean(attachment?.url || legacyUrl);
       let normalizedStatus;
-      if (["uploading", "ready", "corrupt"].includes(normalizedStatusRaw)) normalizedStatus = normalizedStatusRaw;
-      else if (normalizedStatusRaw === "pending" && attachmentHasUrl) normalizedStatus = "ready";
-      else if (!normalizedStatusRaw && attachmentHasUrl) normalizedStatus = "ready";
+      if (["uploading", "ready", "corrupt"].includes(normalizedStatusRaw))
+        normalizedStatus = normalizedStatusRaw;
+      else if (normalizedStatusRaw === "pending" && attachmentHasUrl)
+        normalizedStatus = "ready";
+      else if (!normalizedStatusRaw && attachmentHasUrl)
+        normalizedStatus = "ready";
       else normalizedStatus = normalizedStatusRaw || "pending";
       return {
         id,
         name: attachment?.name || legacyName || undefined,
         label: attachment?.label || legacyName || undefined,
         url: attachment?.url || legacyUrl || "",
-        fileSize: Number.isFinite(Number(attachment?.fileSize ?? attachment?.sizeBytes)) ? Number(attachment?.fileSize ?? attachment?.sizeBytes) : undefined,
-        sizeBytes: Number.isFinite(Number(attachment?.sizeBytes ?? attachment?.fileSize)) ? Number(attachment?.sizeBytes ?? attachment?.fileSize) : undefined,
+        fileSize: Number.isFinite(
+          Number(attachment?.fileSize ?? attachment?.sizeBytes),
+        )
+          ? Number(attachment?.fileSize ?? attachment?.sizeBytes)
+          : undefined,
+        sizeBytes: Number.isFinite(
+          Number(attachment?.sizeBytes ?? attachment?.fileSize),
+        )
+          ? Number(attachment?.sizeBytes ?? attachment?.fileSize)
+          : undefined,
         kind: normalizedKind || "document",
         subKind: attachment?.subKind || undefined,
         status: normalizedStatus,
@@ -1051,11 +1564,16 @@ function sanitizeAttachments(attachments) {
 
 function getCourseLoadErrorMessage(error) {
   const code = String(error?.message || "").trim();
-  if (!code) return "No se pudo cargar el curso. Revisa tu conexión e intenta nuevamente.";
-  if (code === "course_not_found") return "No encontramos el curso solicitado o ya no está disponible para edición.";
-  if (code === "forbidden") return "No tienes permisos para editar este curso con la cuenta actual.";
-  if (code === "unauthorized" || code === "auth_required") return "Tu sesión venció. Vuelve a iniciar sesión para continuar.";
-  if (code === "request_failed") return "La solicitud no pudo completarse. Intenta nuevamente en unos segundos.";
+  if (!code)
+    return "No se pudo cargar el curso. Revisa tu conexión e intenta nuevamente.";
+  if (code === "course_not_found")
+    return "No encontramos el curso solicitado o ya no está disponible para edición.";
+  if (code === "forbidden")
+    return "No tienes permisos para editar este curso con la cuenta actual.";
+  if (code === "unauthorized" || code === "auth_required")
+    return "Tu sesión venció. Vuelve a iniciar sesión para continuar.";
+  if (code === "request_failed")
+    return "La solicitud no pudo completarse. Intenta nuevamente en unos segundos.";
   return code;
 }
 
@@ -1064,8 +1582,8 @@ function normalizeCategoryOptions(items = []) {
     new Set(
       (Array.isArray(items) ? items : [])
         .map((item) => String(item || "").trim())
-        .filter(Boolean)
-    )
+        .filter(Boolean),
+    ),
   ).sort((a, b) => a.localeCompare(b, "es"));
 }
 
@@ -1086,22 +1604,32 @@ function mapCourseToFormValues(current, defaultValues) {
     shortDescription: current.shortDescription || "",
     description: current.description || "",
     learningObjectives:
-      Array.isArray(current.learningObjectives) && current.learningObjectives.length
+      Array.isArray(current.learningObjectives) &&
+      current.learningObjectives.length
         ? sanitizeList(current.learningObjectives)
-        : typeof current.learningObjectives === "string" && current.learningObjectives.trim()
-          ? current.learningObjectives.split("\n").map((item) => item.trim()).filter(Boolean)
+        : typeof current.learningObjectives === "string" &&
+            current.learningObjectives.trim()
+          ? current.learningObjectives
+              .split("\n")
+              .map((item) => item.trim())
+              .filter(Boolean)
           : [],
     requirements:
       Array.isArray(current.requirements) && current.requirements.length
         ? sanitizeList(current.requirements)
-        : typeof current.requirements === "string" && current.requirements.trim()
+        : typeof current.requirements === "string" &&
+            current.requirements.trim()
           ? current.requirements.split("\n").filter(Boolean)
           : [],
     targetAudience:
       Array.isArray(current.targetAudience) && current.targetAudience.length
         ? sanitizeList(current.targetAudience)
-        : typeof current.targetAudience === "string" && current.targetAudience.trim()
-          ? current.targetAudience.split("\n").map((item) => item.trim()).filter(Boolean)
+        : typeof current.targetAudience === "string" &&
+            current.targetAudience.trim()
+          ? current.targetAudience
+              .split("\n")
+              .map((item) => item.trim())
+              .filter(Boolean)
           : [],
     curriculum: resolvedCurriculum,
     modules:
@@ -1120,8 +1648,12 @@ function mapCourseToFormValues(current, defaultValues) {
     promoVideoDurationSeconds: current.videoDurationSeconds || undefined,
     promoVideoAsset: current.videoAsset || current.promoVideoAsset || null,
     attachments: sanitizeAttachments(current.attachments),
+    documentationUrl: current.documentationUrl || "",
+    forumQuestions: Array.isArray(current.forumQuestions) ? current.forumQuestions : [],
     price: Number(current.price || 0),
-    oldPrice: Number.isFinite(Number(current.oldPrice)) ? Number(current.oldPrice) : undefined,
+    oldPrice: Number.isFinite(Number(current.oldPrice))
+      ? Number(current.oldPrice)
+      : undefined,
     freeCourse: Boolean(current.freeCourse),
     certificate: Boolean(current.includesCertificate),
     lifetimeAccess: Boolean(current.lifetimeAccess),
@@ -1132,7 +1664,9 @@ function mapCourseToFormValues(current, defaultValues) {
     allowEnrollment: current.allowEnrollment !== false,
     showOnHome: Boolean(current.showOnHome),
     status: current.publicationStatus || current.status || "borrador",
-    expiresAtDate: clampDateInputToTodayOrFuture(dateInputFromIso(current.expiresAt)),
+    expiresAtDate: clampDateInputToTodayOrFuture(
+      dateInputFromIso(current.expiresAt),
+    ),
   };
 }
 
@@ -1146,7 +1680,11 @@ function SectionCard({ title, description, children }) {
     <div className="rounded-[28px] border border-border/60 bg-card p-5 md:p-6">
       <div className="mb-5">
         <h3 className="text-base font-semibold text-foreground">{title}</h3>
-        {description ? <p className="mt-1 text-sm leading-6 text-muted-foreground">{description}</p> : null}
+        {description ? (
+          <p className="mt-1 text-sm leading-6 text-muted-foreground">
+            {description}
+          </p>
+        ) : null}
       </div>
       <div className="grid gap-5">{children}</div>
     </div>
@@ -1162,7 +1700,9 @@ function WorkspaceSidebar({ activeTab, onSelect, values, errors }) {
   return (
     <aside className="rounded-[28px] border border-border/60 bg-card p-4 shadow-[0_18px_50px_rgba(15,23,42,0.04)]">
       <div className="mb-4 flex items-center justify-between px-1">
-        <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Navegación</div>
+        <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+          Navegación
+        </div>
       </div>
 
       <div className="grid gap-2">
@@ -1177,7 +1717,7 @@ function WorkspaceSidebar({ activeTab, onSelect, values, errors }) {
                   modality: errors.modality,
                   language: errors.language,
                 }
-              : errors[item.id]
+              : errors[item.id],
           );
           const isActive = activeTab === item.id;
           return (
@@ -1194,28 +1734,47 @@ function WorkspaceSidebar({ activeTab, onSelect, values, errors }) {
                 >
                   <span
                     className={`inline-flex h-10 w-10 items-center justify-center rounded-2xl ${
-                      isActive ? "bg-white/12 text-white" : "bg-[#F4F6FA] text-[#1B2B50]"
+                      isActive
+                        ? "bg-white/12 text-white"
+                        : "bg-[#F4F6FA] text-[#1B2B50]"
                     }`}
                   >
                     <Icon className="h-4 w-4" />
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="flex items-center gap-2">
-                      <span className="text-sm font-semibold">{item.label}</span>
-                      {state === "warning" ? <AlertCircle className={`h-3.5 w-3.5 ${isActive ? "text-white" : "text-amber-500"}`} /> : null}
-                      {state === "ready" && !hasNestedFieldError(errors[item.id]) ? (
-                        <CheckCircle2 className={`h-3.5 w-3.5 ${isActive ? "text-white" : "text-emerald-500"}`} />
+                      <span className="text-sm font-semibold">
+                        {item.label}
+                      </span>
+                      {state === "warning" ? (
+                        <AlertCircle
+                          className={`h-3.5 w-3.5 ${isActive ? "text-white" : "text-amber-500"}`}
+                        />
+                      ) : null}
+                      {state === "ready" &&
+                      !hasNestedFieldError(errors[item.id]) ? (
+                        <CheckCircle2
+                          className={`h-3.5 w-3.5 ${isActive ? "text-white" : "text-emerald-500"}`}
+                        />
                       ) : null}
                     </span>
-                    <span className={`mt-0.5 block text-xs ${isActive ? "text-white/70" : "text-muted-foreground"}`}>{item.description}</span>
+                    <span
+                      className={`mt-0.5 block text-xs ${isActive ? "text-white/70" : "text-muted-foreground"}`}
+                    >
+                      {item.description}
+                    </span>
                   </span>
-                  <ChevronRight className={`h-4 w-4 ${isActive ? "text-white" : "text-muted-foreground"}`} />
+                  <ChevronRight
+                    className={`h-4 w-4 ${isActive ? "text-white" : "text-muted-foreground"}`}
+                  />
                 </button>
               </TooltipTrigger>
               <TooltipContent side="right">
                 <div className="max-w-[200px] leading-5">
                   <div className="font-semibold">{item.label}</div>
-                  <div className="mt-1 text-[11px] text-slate-100/90">{item.description}</div>
+                  <div className="mt-1 text-[11px] text-slate-100/90">
+                    {item.description}
+                  </div>
                 </div>
               </TooltipContent>
             </Tooltip>
@@ -1227,26 +1786,63 @@ function WorkspaceSidebar({ activeTab, onSelect, values, errors }) {
 }
 
 function WorkspaceSummary({ values, course, publicHref }) {
-  const sectionsCount = Array.isArray(values.curriculum) ? values.curriculum.length : 0;
+  const sectionsCount = Array.isArray(values.curriculum)
+    ? values.curriculum.length
+    : 0;
   const lessonsCount = countCurriculumLessons(values.curriculum);
-  const resourcesCount = (Array.isArray(values.attachments) ? values.attachments.length : 0)
-    + sanitizeCurriculum(values.curriculum).reduce(
-      (total, section) => total + (Array.isArray(section?.lessons) ? section.lessons.reduce((sum, lesson) => sum + (Array.isArray(lesson?.resources) ? lesson.resources.length : 0), 0) : 0),
-      0
+  const resourcesCount =
+    (Array.isArray(values.attachments) ? values.attachments.length : 0) +
+    sanitizeCurriculum(values.curriculum).reduce(
+      (total, section) =>
+        total +
+        (Array.isArray(section?.lessons)
+          ? section.lessons.reduce(
+              (sum, lesson) =>
+                sum +
+                (Array.isArray(lesson?.resources)
+                  ? lesson.resources.length
+                  : 0),
+              0,
+            )
+          : 0),
+      0,
     );
   const completionItems = [
-    { label: "Información", done: Boolean(values.title && values.category && values.level) },
+    {
+      label: "Información",
+      done: Boolean(values.title && values.category && values.level),
+    },
     { label: "Contenido", done: sectionsCount > 0 && lessonsCount > 0 },
-    { label: "Examen", done: !values.finalEvaluation?.enabled || Boolean(values.finalEvaluation?.questions?.length) },
-    { label: "Precio", done: Boolean(values.freeCourse || Number(values.price || 0) > 0) },
-    { label: "Publicación", done: Boolean(values.status && values.expiresAtDate) },
+    {
+      label: "Examen",
+      done:
+        !values.finalEvaluation?.enabled ||
+        Boolean(values.finalEvaluation?.questions?.length),
+    },
+    {
+      label: "Precio",
+      done: Boolean(values.freeCourse || Number(values.price || 0) > 0),
+    },
+    {
+      label: "Publicación",
+      done: Boolean(values.status && values.expiresAtDate),
+    },
   ];
   const completedCount = completionItems.filter((i) => i.done).length;
-  const progressPct = Math.max(0, Math.min(100, Math.round((completedCount / completionItems.length) * 100)));
-
+  const progressPct = Math.max(
+    0,
+    Math.min(100, Math.round((completedCount / completionItems.length) * 100)),
+  );
 }
 
-function ChipListField({ label, description, items, onChange, placeholder, error }) {
+function ChipListField({
+  label,
+  description,
+  items,
+  onChange,
+  placeholder,
+  error,
+}) {
   const safeItems = Array.isArray(items) ? items.filter(Boolean) : [];
   const [draft, setDraft] = useState("");
 
@@ -1265,14 +1861,23 @@ function ChipListField({ label, description, items, onChange, placeholder, error
     <div className="grid gap-3">
       <div>
         <Label>{label}</Label>
-        {description ? <p className="mt-1 text-sm text-muted-foreground">{description}</p> : null}
+        {description ? (
+          <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+        ) : null}
       </div>
       <div className="rounded-[22px] border border-border/60 bg-background p-3">
         <div className="flex flex-wrap gap-2">
           {safeItems.map((item, index) => (
-            <span key={`${item}-${index}`} className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-card px-3 py-1.5 text-sm">
+            <span
+              key={`${item}-${index}`}
+              className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-card px-3 py-1.5 text-sm"
+            >
               {item}
-              <button type="button" className="text-muted-foreground" onClick={() => removeItem(index)}>
+              <button
+                type="button"
+                className="text-muted-foreground"
+                onClick={() => removeItem(index)}
+              >
                 <Trash2 className="h-3.5 w-3.5" />
               </button>
             </span>
@@ -1302,7 +1907,14 @@ function ChipListField({ label, description, items, onChange, placeholder, error
   );
 }
 
-function DynamicListField({ label, description, items, onChange, placeholder, error }) {
+function DynamicListField({
+  label,
+  description,
+  items,
+  onChange,
+  placeholder,
+  error,
+}) {
   const safeItems = Array.isArray(items) ? items : [];
 
   const updateItem = (index, value) => {
@@ -1323,20 +1935,39 @@ function DynamicListField({ label, description, items, onChange, placeholder, er
     <div className="grid gap-3">
       <div>
         <Label>{label}</Label>
-        {description ? <p className="mt-1 text-sm text-muted-foreground">{description}</p> : null}
+        {description ? (
+          <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+        ) : null}
       </div>
       <div className="grid gap-3">
         {safeItems.map((item, index) => (
-          <div key={`${label}-${index}`} className="flex items-start gap-3 rounded-2xl border border-border/60 bg-background px-4 py-3">
+          <div
+            key={`${label}-${index}`}
+            className="flex items-start gap-3 rounded-2xl border border-border/60 bg-background px-4 py-3"
+          >
             <GripVertical className="mt-1 h-4 w-4 text-muted-foreground" />
-            <Input value={item} onChange={(event) => updateItem(index, event.target.value)} placeholder={placeholder} />
-            <Button type="button" variant="ghost" size="icon" onClick={() => removeItem(index)}>
+            <Input
+              value={item}
+              onChange={(event) => updateItem(index, event.target.value)}
+              placeholder={placeholder}
+            />
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={() => removeItem(index)}
+            >
               <Trash2 className="h-4 w-4" />
             </Button>
           </div>
         ))}
       </div>
-      <Button type="button" variant="outline" onClick={addItem} className="justify-start">
+      <Button
+        type="button"
+        variant="outline"
+        onClick={addItem}
+        className="justify-start"
+      >
         <Plus className="mr-2 h-4 w-4" />
         Agregar ítem
       </Button>
@@ -1363,14 +1994,26 @@ function resourceKindBadge(kind) {
 function resourceStatusBadge(status) {
   switch (status) {
     case "ready":
-      return { label: "Listo", tone: "bg-emerald-50 text-emerald-700 border border-emerald-100" };
+      return {
+        label: "Listo",
+        tone: "bg-emerald-50 text-emerald-700 border border-emerald-100",
+      };
     case "uploading":
-      return { label: "Subiendo…", tone: "bg-sky-50 text-sky-700 border border-sky-100" };
+      return {
+        label: "Subiendo…",
+        tone: "bg-sky-50 text-sky-700 border border-sky-100",
+      };
     case "corrupt":
-      return { label: "Corrupto", tone: "bg-destructive/10 text-destructive border border-destructive/20" };
+      return {
+        label: "Corrupto",
+        tone: "bg-destructive/10 text-destructive border border-destructive/20",
+      };
     case "pending":
     default:
-      return { label: "Pendiente", tone: "bg-slate-100 text-slate-600 border border-slate-200" };
+      return {
+        label: "Pendiente",
+        tone: "bg-slate-100 text-slate-600 border border-slate-200",
+      };
   }
 }
 
@@ -1385,8 +2028,8 @@ function LessonResourcesField({ resources, onChange }) {
   const updateResource = (index, patch) => {
     onChange(
       safeResources.map((r, currentIndex) =>
-        currentIndex === index && r ? { ...r, ...patch } : r
-      )
+        currentIndex === index && r ? { ...r, ...patch } : r,
+      ),
     );
   };
 
@@ -1425,35 +2068,59 @@ function LessonResourcesField({ resources, onChange }) {
       {safeResources.length ? (
         <div className="grid gap-3">
           {safeResources.map((resource, index) => {
-            const { icon: Icon, tone: iconTone } = resourceKindBadge(resource.kind);
+            const { icon: Icon, tone: iconTone } = resourceKindBadge(
+              resource.kind,
+            );
             const resourceHasUrl = Boolean(resource.url);
-            const statusRaw = ["pending", "uploading", "ready", "corrupt"].includes(resource.status)
+            const statusRaw = [
+              "pending",
+              "uploading",
+              "ready",
+              "corrupt",
+            ].includes(resource.status)
               ? resource.status
               : undefined;
-            const statusValue = statusRaw === "ready" || statusRaw === "uploading" || statusRaw === "corrupt"
-              ? statusRaw
-              : resourceHasUrl
-                ? "ready"
-                : (statusRaw || "pending");
+            const statusValue =
+              statusRaw === "ready" ||
+              statusRaw === "uploading" ||
+              statusRaw === "corrupt"
+                ? statusRaw
+                : resourceHasUrl
+                  ? "ready"
+                  : statusRaw || "pending";
             const statusBadge = resourceStatusBadge(statusValue);
             const sizeLabel = resourceFormatSize(resource.fileSize);
-            const subKindOptions = ["Materiales del curso", "Material complementario", "Apunte", "Ejercicio", "Examen"];
+            const subKindOptions = [
+              "Materiales del curso",
+              "Material complementario",
+              "Apunte",
+              "Ejercicio",
+              "Examen",
+            ];
             return (
               <div
                 key={resource.id || index}
                 className="grid items-start gap-3 rounded-2xl border border-border/60 bg-card px-4 py-3 md:grid-cols-[auto_minmax(0,1fr)_auto]"
               >
-                <span className={`inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${iconTone}`}>
+                <span
+                  className={`inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${iconTone}`}
+                >
                   <Icon className="h-5 w-5" />
                 </span>
                 <div className="grid gap-2">
                   <div className="flex flex-wrap items-center gap-1.5">
                     <span className="truncate text-sm font-medium text-foreground">
-                      {resource.label || resource.name || "(Recurso sin nombre)"}
+                      {resource.label ||
+                        resource.name ||
+                        "(Recurso sin nombre)"}
                     </span>
                     <Select
                       value={resource.subKind || "__none__"}
-                      onValueChange={(val) => updateResource(index, { subKind: val === "__none__" ? undefined : val })}
+                      onValueChange={(val) =>
+                        updateResource(index, {
+                          subKind: val === "__none__" ? undefined : val,
+                        })
+                      }
                     >
                       <SelectTrigger className="h-5 w-auto min-w-[120px] rounded-full border border-border/70 px-2 py-0 text-[10px] uppercase tracking-wide">
                         <SelectValue placeholder="Tipo de material" />
@@ -1469,12 +2136,14 @@ function LessonResourcesField({ resources, onChange }) {
                     </Select>
                     <Select
                       value={statusValue}
-                      onValueChange={(val) => updateResource(index, { status: val })}
+                      onValueChange={(val) =>
+                        updateResource(index, { status: val })
+                      }
                     >
                       <SelectTrigger
                         className={cn(
                           "h-5 w-auto min-w-[92px] rounded-full px-2 py-0 text-[10px] font-medium border",
-                          statusBadge.tone
+                          statusBadge.tone,
                         )}
                       >
                         <SelectValue />
@@ -1488,8 +2157,14 @@ function LessonResourcesField({ resources, onChange }) {
                     </Select>
                   </div>
                   <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
-                    {sizeLabel ? <span className="rounded-full bg-slate-100 px-2 py-0.5 font-medium">{sizeLabel}</span> : null}
-                    {resource.mimeType ? <span className="truncate">{resource.mimeType}</span> : null}
+                    {sizeLabel ? (
+                      <span className="rounded-full bg-slate-100 px-2 py-0.5 font-medium">
+                        {sizeLabel}
+                      </span>
+                    ) : null}
+                    {resource.mimeType ? (
+                      <span className="truncate">{resource.mimeType}</span>
+                    ) : null}
                     {resource.checksum ? (
                       <Tooltip>
                         <TooltipTrigger asChild>
@@ -1540,7 +2215,12 @@ function LessonResourcesField({ resources, onChange }) {
   );
 }
 
-function LessonEditorHeader({ selectedSection, selectedLesson, onRemove, disabled }) {
+function LessonEditorHeader({
+  selectedSection,
+  selectedLesson,
+  onRemove,
+  disabled,
+}) {
   const summary = summarizeLessonResources(selectedLesson);
   const tone = readinessTone(summary);
   const toneMap = {
@@ -1567,9 +2247,18 @@ function LessonEditorHeader({ selectedSection, selectedLesson, onRemove, disable
               {readinessProgressText(summary)}
             </Badge>
           ) : null}
-          {selectedLesson?.isPreview ? <Badge variant="outline">Clase abierta</Badge> : null}
+          {selectedLesson?.isPreview ? (
+            <Badge variant="outline">Clase abierta</Badge>
+          ) : null}
         </div>
-        <Button type="button" variant="ghost" size="icon" onClick={onRemove} disabled={disabled} className="shrink-0">
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          onClick={onRemove}
+          disabled={disabled}
+          className="shrink-0"
+        >
           <Trash2 className="h-4 w-4" />
         </Button>
       </div>
@@ -1583,20 +2272,38 @@ function toEmbedUrl(url) {
   try {
     const parsed = new URL(raw);
     const host = parsed.hostname.toLowerCase().replace(/^www\./, "");
-    if (host === "youtube.com" || host === "m.youtube.com" || host === "music.youtube.com") {
+    if (
+      host === "youtube.com" ||
+      host === "m.youtube.com" ||
+      host === "music.youtube.com"
+    ) {
       if (parsed.pathname.toLowerCase().startsWith("/embed/")) return raw;
       const videoId = parsed.searchParams.get("v");
       if (videoId) {
         const clean = new URL(`https://www.youtube.com/embed/${videoId}`);
         for (const [k, v] of parsed.searchParams.entries()) {
           if (k.toLowerCase() === "v") continue;
-          if (["t", "start", "end", "rel", "controls", "autoplay", "mute", "loop", "playlist"].includes(k.toLowerCase())) {
+          if (
+            [
+              "t",
+              "start",
+              "end",
+              "rel",
+              "controls",
+              "autoplay",
+              "mute",
+              "loop",
+              "playlist",
+            ].includes(k.toLowerCase())
+          ) {
             clean.searchParams.set(k, v);
           }
         }
         return clean.toString();
       }
-      const shortsMatch = parsed.pathname.match(/^\/shorts\/([A-Za-z0-9_-]{6,})/i);
+      const shortsMatch = parsed.pathname.match(
+        /^\/shorts\/([A-Za-z0-9_-]{6,})/i,
+      );
       if (shortsMatch) return `https://www.youtube.com/embed/${shortsMatch[1]}`;
       const liveMatch = parsed.pathname.match(/^\/live\/([A-Za-z0-9_-]{6,})/i);
       if (liveMatch) return `https://www.youtube.com/embed/${liveMatch[1]}`;
@@ -1608,7 +2315,19 @@ function toEmbedUrl(url) {
       if (id) {
         const clean = new URL(`https://www.youtube.com/embed/${id}`);
         for (const [k, v] of parsed.searchParams.entries()) {
-          if (["t", "start", "end", "rel", "controls", "autoplay", "mute", "loop", "playlist"].includes(k.toLowerCase())) {
+          if (
+            [
+              "t",
+              "start",
+              "end",
+              "rel",
+              "controls",
+              "autoplay",
+              "mute",
+              "loop",
+              "playlist",
+            ].includes(k.toLowerCase())
+          ) {
             clean.searchParams.set(k, v);
           }
         }
@@ -1617,7 +2336,8 @@ function toEmbedUrl(url) {
     }
     if (host === "vimeo.com") {
       const idMatch = parsed.pathname.match(/^\/(\d{5,})(?:\/|$)/);
-      if (idMatch) return `https://player.vimeo.com/video/${idMatch[1]}${parsed.search || ""}`;
+      if (idMatch)
+        return `https://player.vimeo.com/video/${idMatch[1]}${parsed.search || ""}`;
     }
     if (host === "player.vimeo.com") return raw;
   } catch {
@@ -1627,31 +2347,66 @@ function toEmbedUrl(url) {
 }
 
 function isEmbedUrl(url) {
-  const u = String(url || "").trim().toLowerCase();
+  const u = String(url || "")
+    .trim()
+    .toLowerCase();
   if (!u) return false;
-  return u.includes("youtube.com") || u.includes("youtu.be") || u.includes("vimeo.com") || u.includes("dailymotion.com") || u.includes("loom.com") || u.includes("player.") || u.startsWith("https://") || u.startsWith("http://");
+  return (
+    u.includes("youtube.com") ||
+    u.includes("youtu.be") ||
+    u.includes("vimeo.com") ||
+    u.includes("dailymotion.com") ||
+    u.includes("loom.com") ||
+    u.includes("player.") ||
+    u.startsWith("https://") ||
+    u.startsWith("http://")
+  );
 }
 
 function isExternalVideoOnly(video) {
   if (!video) return false;
-  if (typeof video === "object" && (video.storageKey || video.checksum)) return false;
+  if (typeof video === "object" && (video.storageKey || video.checksum))
+    return false;
   const url = typeof video === "string" ? video : video?.url;
   if (!url) return false;
-  if (video.mimeType && /^video\//i.test(String(video.mimeType || ""))) return false;
+  if (video.mimeType && /^video\//i.test(String(video.mimeType || "")))
+    return false;
   return isEmbedUrl(url);
 }
 
-function LessonVideoSection({ videoUrl, videoAsset, onVideoUrlChange, onVideoAssetChange, onVideoChangeCombined }) {
-  const hasAsset = videoAsset && typeof videoAsset === "object" && (videoAsset.url || videoAsset.storageKey);
+function LessonVideoSection({
+  videoUrl,
+  videoAsset,
+  onVideoUrlChange,
+  onVideoAssetChange,
+  onVideoChangeCombined,
+}) {
+  const hasAsset =
+    videoAsset &&
+    typeof videoAsset === "object" &&
+    (videoAsset.url || videoAsset.storageKey);
   const rawUrl = String(videoUrl || "").trim();
   const hasUrl = Boolean(rawUrl);
   const urlSource = rawUrl || (hasAsset ? String(videoAsset?.url || "") : "");
-  const displayValueUrl = urlSource ? (isEmbedUrl(urlSource) ? toEmbedUrl(urlSource) : urlSource) : "";
-  const isExternalOnly = Boolean(displayValueUrl) && !hasAsset && isExternalVideoOnly({ url: displayValueUrl, mimeType: undefined });
+  const displayValueUrl = urlSource
+    ? isEmbedUrl(urlSource)
+      ? toEmbedUrl(urlSource)
+      : urlSource
+    : "";
+  const isExternalOnly =
+    Boolean(displayValueUrl) &&
+    !hasAsset &&
+    isExternalVideoOnly({ url: displayValueUrl, mimeType: undefined });
   const state = hasAsset
-    ? { tone: resourceStatusBadge(videoAsset.status || "ready").tone, label: "Asset subido" }
+    ? {
+        tone: resourceStatusBadge(videoAsset.status || "ready").tone,
+        label: "Asset subido",
+      }
     : displayValueUrl
-      ? { tone: resourceStatusBadge("pending").tone, label: isExternalOnly ? "URL externa" : "URL activa" }
+      ? {
+          tone: resourceStatusBadge("pending").tone,
+          label: isExternalOnly ? "URL externa" : "URL activa",
+        }
       : null;
 
   const applyPatch = (patch) => {
@@ -1659,15 +2414,21 @@ function LessonVideoSection({ videoUrl, videoAsset, onVideoUrlChange, onVideoAss
       onVideoChangeCombined(patch);
       return;
     }
-    if (Object.prototype.hasOwnProperty.call(patch, "videoUrl")) onVideoUrlChange(patch.videoUrl);
-    if (Object.prototype.hasOwnProperty.call(patch, "videoAsset")) onVideoAssetChange(patch.videoAsset);
+    if (Object.prototype.hasOwnProperty.call(patch, "videoUrl"))
+      onVideoUrlChange(patch.videoUrl);
+    if (Object.prototype.hasOwnProperty.call(patch, "videoAsset"))
+      onVideoAssetChange(patch.videoAsset);
   };
 
   const handleCombinedChange = (nextUrl, assetData, extras) => {
     const urlRaw = String(nextUrl || "").trim();
     const url = urlRaw ? toEmbedUrl(urlRaw) : "";
     const clearing = !url;
-    const hasAssetParam = Boolean(assetData && typeof assetData === "object" && (assetData.url || assetData.storageKey));
+    const hasAssetParam = Boolean(
+      assetData &&
+      typeof assetData === "object" &&
+      (assetData.url || assetData.storageKey),
+    );
     const externalNoAsset = extras === null && url;
 
     if (clearing) {
@@ -1685,13 +2446,18 @@ function LessonVideoSection({ videoUrl, videoAsset, onVideoUrlChange, onVideoAss
         videoUrl: url,
         videoAsset: {
           url: assetData.url || url || videoAsset?.url || "",
-          storageKey: assetData.storageKey || videoAsset?.storageKey || undefined,
+          storageKey:
+            assetData.storageKey || videoAsset?.storageKey || undefined,
           mimeType: assetData.mimeType || videoAsset?.mimeType || undefined,
           fileSize: assetData.fileSize ?? videoAsset?.fileSize ?? undefined,
           status: assetData.status || videoAsset?.status || "ready",
           checksum: assetData.checksum || videoAsset?.checksum || undefined,
-          uploadedAt: assetData.uploadedAt || videoAsset?.uploadedAt || new Date().toISOString(),
-          originalName: assetData.originalName || videoAsset?.originalName || undefined,
+          uploadedAt:
+            assetData.uploadedAt ||
+            videoAsset?.uploadedAt ||
+            new Date().toISOString(),
+          originalName:
+            assetData.originalName || videoAsset?.originalName || undefined,
         },
       });
     } else {
@@ -1707,7 +2473,9 @@ function LessonVideoSection({ videoUrl, videoAsset, onVideoUrlChange, onVideoAss
             <FileVideo className="h-4 w-4 text-[#1B2B50]" />
             Video de la clase
           </Label>
-          <p className="mt-1 text-xs text-muted-foreground">Pegá una URL de YouTube / Vimeo o el enlace directo al video.</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Pegá una URL de YouTube / Vimeo o el enlace directo al video.
+          </p>
         </div>
         {state ? (
           <Badge variant="outline" className={cn(state.tone)}>
@@ -1730,14 +2498,24 @@ function LessonVideoSection({ videoUrl, videoAsset, onVideoUrlChange, onVideoAss
 }
 
 function PerClassEvaluationField({ value, onChange, resourcesSummary }) {
-  const evaluation = value && typeof value === "object" ? value : { enabled: false, questions: [] };
-  const questions = Array.isArray(evaluation.questions) ? evaluation.questions : [];
+  const evaluation =
+    value && typeof value === "object"
+      ? value
+      : { enabled: false, questions: [] };
+  const questions = Array.isArray(evaluation.questions)
+    ? evaluation.questions
+    : [];
   const [selectedQuestionId, setSelectedQuestionId] = useState("");
-  const allResourcesReady = resourcesSummary?.hasAny ? resourcesSummary.allReady : true;
+  const allResourcesReady = resourcesSummary?.hasAny
+    ? resourcesSummary.allReady
+    : true;
 
   useEffect(() => {
     const firstQuestion = questions[0];
-    const exists = questions.some((question) => String(question?.id || "") === String(selectedQuestionId || ""));
+    const exists = questions.some(
+      (question) =>
+        String(question?.id || "") === String(selectedQuestionId || ""),
+    );
     if (!exists && firstQuestion?.id) {
       setSelectedQuestionId(String(firstQuestion.id));
     }
@@ -1770,7 +2548,9 @@ function PerClassEvaluationField({ value, onChange, resourcesSummary }) {
   };
 
   const removeQuestion = (index) => {
-    updateField({ questions: questions.filter((_, currentIndex) => currentIndex !== index) });
+    updateField({
+      questions: questions.filter((_, currentIndex) => currentIndex !== index),
+    });
   };
 
   const updateQuestionOptions = (index, nextOptions) => {
@@ -1778,11 +2558,21 @@ function PerClassEvaluationField({ value, onChange, resourcesSummary }) {
   };
 
   const selectedQuestion =
-    questions.find((question) => String(question?.id || "") === String(selectedQuestionId || "")) || questions[0] || null;
-  const selectedQuestionIndex = questions.findIndex((question) => String(question?.id || "") === String(selectedQuestion?.id || ""));
+    questions.find(
+      (question) =>
+        String(question?.id || "") === String(selectedQuestionId || ""),
+    ) ||
+    questions[0] ||
+    null;
+  const selectedQuestionIndex = questions.findIndex(
+    (question) =>
+      String(question?.id || "") === String(selectedQuestion?.id || ""),
+  );
 
   const totalQuestions = questions.length;
-  const configuredQuestions = questions.filter((q) => q?.isEffectivelyConfigured === true).length;
+  const configuredQuestions = questions.filter(
+    (q) => q?.isEffectivelyConfigured === true,
+  ).length;
   const withCorrect = questions.filter((q) => q?.hasCorrect === true).length;
   const isFullyConfigured =
     Boolean(evaluation.enabled) &&
@@ -1795,30 +2585,51 @@ function PerClassEvaluationField({ value, onChange, resourcesSummary }) {
     if (!isFullyConfigured) {
       const missingReasons = [];
       if (totalQuestions === 0) missingReasons.push("sin preguntas");
-      else if (configuredQuestions < totalQuestions) missingReasons.push(`${totalQuestions - configuredQuestions} sin configurar`);
-      if (withCorrect < totalQuestions && totalQuestions > 0) missingReasons.push(`${totalQuestions - withCorrect} sin respuesta correcta`);
+      else if (configuredQuestions < totalQuestions)
+        missingReasons.push(
+          `${totalQuestions - configuredQuestions} sin configurar`,
+        );
+      if (withCorrect < totalQuestions && totalQuestions > 0)
+        missingReasons.push(
+          `${totalQuestions - withCorrect} sin respuesta correcta`,
+        );
       resourceState = {
         tone: "bg-amber-50 text-amber-700 border-amber-100",
         label: `Pendiente${missingReasons.length ? ` · ${missingReasons.join(", ")}` : ""}`,
       };
     } else if (!allResourcesReady) {
-      resourceState = { tone: "bg-amber-50 text-amber-700 border-amber-100", label: "Bloqueada · recursos pendientes" };
+      resourceState = {
+        tone: "bg-amber-50 text-amber-700 border-amber-100",
+        label: "Bloqueada · recursos pendientes",
+      };
     } else {
-      resourceState = { tone: "bg-emerald-50 text-emerald-700 border-emerald-100", label: "Habilitada" };
+      resourceState = {
+        tone: "bg-emerald-50 text-emerald-700 border-emerald-100",
+        label: "Habilitada",
+      };
     }
   } else {
-    resourceState = { tone: "bg-slate-100 text-slate-600 border-slate-200", label: "Deshabilitada" };
+    resourceState = {
+      tone: "bg-slate-100 text-slate-600 border-slate-200",
+      label: "Deshabilitada",
+    };
   }
-  const missingQuestionsList = totalQuestions > 0 ? questions
-    .map((q, i) => ({ q, i }))
-    .filter(({ q }) => !q?.isEffectivelyConfigured || !q?.hasCorrect)
-    .map(({ q, i }) => {
-      const label = (String(q?.prompt || "").trim().slice(0, 40)) || `Pregunta ${i + 1}`;
-      const parts = [];
-      if (!q?.isEffectivelyConfigured) parts.push("incompleta");
-      if (!q?.hasCorrect) parts.push("sin respuesta correcta");
-      return `${i + 1}. ${label} (${parts.join(" + ")})`;
-    }) : [];
+  const missingQuestionsList =
+    totalQuestions > 0
+      ? questions
+          .map((q, i) => ({ q, i }))
+          .filter(({ q }) => !q?.isEffectivelyConfigured || !q?.hasCorrect)
+          .map(({ q, i }) => {
+            const label =
+              String(q?.prompt || "")
+                .trim()
+                .slice(0, 40) || `Pregunta ${i + 1}`;
+            const parts = [];
+            if (!q?.isEffectivelyConfigured) parts.push("incompleta");
+            if (!q?.hasCorrect) parts.push("sin respuesta correcta");
+            return `${i + 1}. ${label} (${parts.join(" + ")})`;
+          })
+      : [];
 
   return (
     <div className="grid gap-4 rounded-[20px] border border-border/60 bg-background p-4">
@@ -1828,11 +2639,15 @@ function PerClassEvaluationField({ value, onChange, resourcesSummary }) {
             <Award className="h-4 w-4 text-purple-600" />
             Evaluación de la clase
           </Label>
-          <p className="mt-0.5 text-xs text-muted-foreground">Preguntas por clase. Requiere recursos listos.</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Preguntas por clase. Requiere recursos listos.
+          </p>
         </div>
         <div className="flex items-center gap-2">
           {resourceState ? (
-            <Badge variant="outline" className={resourceState.tone}>{resourceState.label}</Badge>
+            <Badge variant="outline" className={resourceState.tone}>
+              {resourceState.label}
+            </Badge>
           ) : null}
           <Switch
             checked={Boolean(evaluation.enabled)}
@@ -1875,7 +2690,11 @@ function PerClassEvaluationField({ value, onChange, resourcesSummary }) {
             min="0"
             max="100"
             value={evaluation.passingScore ?? 75}
-            onChange={(event) => updateField({ passingScore: Number(event.target.value || 0) || undefined })}
+            onChange={(event) =>
+              updateField({
+                passingScore: Number(event.target.value || 0) || undefined,
+              })
+            }
             className="h-9 text-sm"
             disabled={!evaluation.enabled}
           />
@@ -1886,7 +2705,11 @@ function PerClassEvaluationField({ value, onChange, resourcesSummary }) {
             type="number"
             min="1"
             value={evaluation.maxAttempts ?? 3}
-            onChange={(event) => updateField({ maxAttempts: Number(event.target.value || 0) || undefined })}
+            onChange={(event) =>
+              updateField({
+                maxAttempts: Number(event.target.value || 0) || undefined,
+              })
+            }
             className="h-9 text-sm"
             disabled={!evaluation.enabled}
           />
@@ -1918,20 +2741,31 @@ function PerClassEvaluationField({ value, onChange, resourcesSummary }) {
                   <button
                     key={question.id || index}
                     type="button"
-                    onClick={() => setSelectedQuestionId(String(question.id || ""))}
+                    onClick={() =>
+                      setSelectedQuestionId(String(question.id || ""))
+                    }
                     className={cn(
                       "flex items-center justify-between gap-2 rounded-xl border px-3 py-2 text-left text-xs min-w-0",
-                      String(selectedQuestion?.id || "") === String(question.id || "")
+                      String(selectedQuestion?.id || "") ===
+                        String(question.id || "")
                         ? "border-purple-200 bg-purple-50 text-purple-900"
-                        : "border-border/60 bg-background hover:bg-slate-50"
+                        : "border-border/60 bg-background hover:bg-slate-50",
                     )}
                     disabled={!evaluation.enabled}
                   >
                     <span className="truncate min-w-0">
-                      {index + 1}. {question.prompt || "(Pregunta sin redactar)"}
+                      {index + 1}.{" "}
+                      {question.prompt || "(Pregunta sin redactar)"}
                     </span>
-                    <Badge variant="outline" className="h-5 px-2 text-[10px] uppercase shrink-0">
-                      {question.type === "multiple_choice" ? "Multiple" : question.type === "boolean" ? "V/F" : "Simple"}
+                    <Badge
+                      variant="outline"
+                      className="h-5 px-2 text-[10px] uppercase shrink-0"
+                    >
+                      {question.type === "multiple_choice"
+                        ? "Multiple"
+                        : question.type === "boolean"
+                          ? "V/F"
+                          : "Simple"}
                     </Badge>
                   </button>
                 ))}
@@ -1951,7 +2785,11 @@ function PerClassEvaluationField({ value, onChange, resourcesSummary }) {
                 <Label className="text-xs">Pregunta</Label>
                 <Input
                   value={selectedQuestion.prompt || ""}
-                  onChange={(event) => updateQuestion(selectedQuestionIndex, { prompt: event.target.value })}
+                  onChange={(event) =>
+                    updateQuestion(selectedQuestionIndex, {
+                      prompt: event.target.value,
+                    })
+                  }
                   placeholder="¿Cuál era el objetivo de esta clase?"
                   className="h-9 text-sm"
                   disabled={!evaluation.enabled}
@@ -1966,7 +2804,11 @@ function PerClassEvaluationField({ value, onChange, resourcesSummary }) {
                       updateQuestion(selectedQuestionIndex, {
                         type: "boolean",
                         options: ["Verdadero", "Falso"],
-                        correctAnswers: Array.isArray(selectedQuestion.correctAnswers) ? selectedQuestion.correctAnswers.slice(0, 1) : [],
+                        correctAnswers: Array.isArray(
+                          selectedQuestion.correctAnswers,
+                        )
+                          ? selectedQuestion.correctAnswers.slice(0, 1)
+                          : [],
                       });
                       return;
                     }
@@ -1979,7 +2821,9 @@ function PerClassEvaluationField({ value, onChange, resourcesSummary }) {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="single_choice">Opción simple</SelectItem>
-                    <SelectItem value="multiple_choice">Múltiple opción</SelectItem>
+                    <SelectItem value="multiple_choice">
+                      Múltiple opción
+                    </SelectItem>
                     <SelectItem value="boolean">Verdadero / Falso</SelectItem>
                   </SelectContent>
                 </Select>
@@ -1987,14 +2831,19 @@ function PerClassEvaluationField({ value, onChange, resourcesSummary }) {
               <div className="grid gap-1.5">
                 <Label className="text-xs">Opciones</Label>
                 <div className="grid gap-1.5">
-                  {Array.isArray(selectedQuestion.options) && selectedQuestion.options.length
+                  {Array.isArray(selectedQuestion.options) &&
+                  selectedQuestion.options.length
                     ? selectedQuestion.options.map((opt, optIndex) => {
-                        const selectedAnswers = Array.isArray(selectedQuestion.correctAnswers)
+                        const selectedAnswers = Array.isArray(
+                          selectedQuestion.correctAnswers,
+                        )
                           ? selectedQuestion.correctAnswers
                           : [];
                         const isCorrect =
-                          selectedQuestion.type === "boolean" || selectedQuestion.type === "single_choice"
-                            ? String(selectedAnswers[0] ?? "") === String(optIndex)
+                          selectedQuestion.type === "boolean" ||
+                          selectedQuestion.type === "single_choice"
+                            ? String(selectedAnswers[0] ?? "") ===
+                              String(optIndex)
                             : selectedAnswers.includes(String(optIndex));
                         return (
                           <div
@@ -2006,13 +2855,25 @@ function PerClassEvaluationField({ value, onChange, resourcesSummary }) {
                               variant="ghost"
                               size="icon"
                               onClick={() => {
-                                const nextOptions = [...(selectedQuestion.options || [])];
+                                const nextOptions = [
+                                  ...(selectedQuestion.options || []),
+                                ];
                                 nextOptions.splice(optIndex, 1);
-                                updateQuestionOptions(selectedQuestionIndex, nextOptions);
-                                const filtered = (selectedAnswers || []).filter((a) => String(a) !== String(optIndex));
-                                updateQuestion(selectedQuestionIndex, { correctAnswers: filtered });
+                                updateQuestionOptions(
+                                  selectedQuestionIndex,
+                                  nextOptions,
+                                );
+                                const filtered = (selectedAnswers || []).filter(
+                                  (a) => String(a) !== String(optIndex),
+                                );
+                                updateQuestion(selectedQuestionIndex, {
+                                  correctAnswers: filtered,
+                                });
                               }}
-                              disabled={!evaluation.enabled || selectedQuestion.type === "boolean"}
+                              disabled={
+                                !evaluation.enabled ||
+                                selectedQuestion.type === "boolean"
+                              }
                               className="h-6 w-6 shrink-0 text-muted-foreground"
                             >
                               <Trash2 className="h-3.5 w-3.5" />
@@ -2020,9 +2881,14 @@ function PerClassEvaluationField({ value, onChange, resourcesSummary }) {
                             <Input
                               value={opt}
                               onChange={(event) => {
-                                const nextOptions = [...(selectedQuestion.options || [])];
+                                const nextOptions = [
+                                  ...(selectedQuestion.options || []),
+                                ];
                                 nextOptions[optIndex] = event.target.value;
-                                updateQuestionOptions(selectedQuestionIndex, nextOptions);
+                                updateQuestionOptions(
+                                  selectedQuestionIndex,
+                                  nextOptions,
+                                );
                               }}
                               className="h-8 border-0 bg-transparent px-0 text-sm focus-visible:ring-0"
                               disabled={!evaluation.enabled}
@@ -2032,13 +2898,23 @@ function PerClassEvaluationField({ value, onChange, resourcesSummary }) {
                                 <button
                                   type="button"
                                   onClick={() => {
-                                    if (selectedQuestion.type === "multiple_choice") {
-                                      const set = new Set(selectedAnswers.map((a) => String(a)));
-                                      if (set.has(String(optIndex))) set.delete(String(optIndex));
+                                    if (
+                                      selectedQuestion.type ===
+                                      "multiple_choice"
+                                    ) {
+                                      const set = new Set(
+                                        selectedAnswers.map((a) => String(a)),
+                                      );
+                                      if (set.has(String(optIndex)))
+                                        set.delete(String(optIndex));
                                       else set.add(String(optIndex));
-                                      updateQuestion(selectedQuestionIndex, { correctAnswers: [...set.values()] });
+                                      updateQuestion(selectedQuestionIndex, {
+                                        correctAnswers: [...set.values()],
+                                      });
                                     } else {
-                                      updateQuestion(selectedQuestionIndex, { correctAnswers: [String(optIndex)] });
+                                      updateQuestion(selectedQuestionIndex, {
+                                        correctAnswers: [String(optIndex)],
+                                      });
                                     }
                                   }}
                                   disabled={!evaluation.enabled}
@@ -2046,7 +2922,7 @@ function PerClassEvaluationField({ value, onChange, resourcesSummary }) {
                                     "inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border transition-colors",
                                     isCorrect
                                       ? "border-emerald-400 bg-emerald-500 text-white"
-                                      : "border-slate-200 bg-white text-slate-400 hover:border-emerald-300 hover:text-emerald-600"
+                                      : "border-slate-200 bg-white text-slate-400 hover:border-emerald-300 hover:text-emerald-600",
                                   )}
                                 >
                                   <CheckCircle2 className="h-3.5 w-3.5" />
@@ -2070,7 +2946,10 @@ function PerClassEvaluationField({ value, onChange, resourcesSummary }) {
                       variant="outline"
                       size="sm"
                       onClick={() =>
-                        updateQuestionOptions(selectedQuestionIndex, [...(selectedQuestion.options || []), ""])
+                        updateQuestionOptions(selectedQuestionIndex, [
+                          ...(selectedQuestion.options || []),
+                          "",
+                        ])
                       }
                       disabled={!evaluation.enabled}
                       className="mt-1 h-8 justify-start px-2.5 text-xs"
@@ -2086,7 +2965,11 @@ function PerClassEvaluationField({ value, onChange, resourcesSummary }) {
                 <Textarea
                   rows={2}
                   value={selectedQuestion.explanation || ""}
-                  onChange={(event) => updateQuestion(selectedQuestionIndex, { explanation: event.target.value })}
+                  onChange={(event) =>
+                    updateQuestion(selectedQuestionIndex, {
+                      explanation: event.target.value,
+                    })
+                  }
                   placeholder="Mostrar al alumno al finalizar el intento."
                   className="text-xs"
                   disabled={!evaluation.enabled}
@@ -2129,15 +3012,32 @@ function CoursePromoVideoSection({
   onPromoMetadataChange,
   errors,
 }) {
-  const hasAsset = promoVideoAsset && typeof promoVideoAsset === "object" && (promoVideoAsset.url || promoVideoAsset.storageKey);
+  const hasAsset =
+    promoVideoAsset &&
+    typeof promoVideoAsset === "object" &&
+    (promoVideoAsset.url || promoVideoAsset.storageKey);
   const rawUrl = String(promoVideo || "").trim();
-  const urlSource = rawUrl || (hasAsset ? String(promoVideoAsset?.url || "") : "");
-  const displayValueUrl = urlSource ? (isEmbedUrl(urlSource) ? toEmbedUrl(urlSource) : urlSource) : "";
-  const onlyExternal = Boolean(displayValueUrl) && !hasAsset && isExternalVideoOnly({ url: displayValueUrl, mimeType: undefined });
+  const urlSource =
+    rawUrl || (hasAsset ? String(promoVideoAsset?.url || "") : "");
+  const displayValueUrl = urlSource
+    ? isEmbedUrl(urlSource)
+      ? toEmbedUrl(urlSource)
+      : urlSource
+    : "";
+  const onlyExternal =
+    Boolean(displayValueUrl) &&
+    !hasAsset &&
+    isExternalVideoOnly({ url: displayValueUrl, mimeType: undefined });
   const state = hasAsset
-    ? { tone: resourceStatusBadge(promoVideoAsset.status || "ready").tone, label: "Asset subido" }
+    ? {
+        tone: resourceStatusBadge(promoVideoAsset.status || "ready").tone,
+        label: "Asset subido",
+      }
     : displayValueUrl
-      ? { tone: resourceStatusBadge("pending").tone, label: onlyExternal ? "URL externa" : "URL activa" }
+      ? {
+          tone: resourceStatusBadge("pending").tone,
+          label: onlyExternal ? "URL externa" : "URL activa",
+        }
       : null;
 
   const handleCombinedChange = async (nextUrl, assetData, extras) => {
@@ -2145,7 +3045,10 @@ function CoursePromoVideoSection({
     const url = urlRaw ? toEmbedUrl(urlRaw) : "";
     const clearing = !url;
     const file = extras && extras.file ? extras.file : null;
-    const isReplacingWithExternalOnly = Boolean(url) && !assetData && isExternalVideoOnly({ url, mimeType: undefined });
+    const isReplacingWithExternalOnly =
+      Boolean(url) &&
+      !assetData &&
+      isExternalVideoOnly({ url, mimeType: undefined });
     const externalNoAsset = extras === null && url;
     const forcedClearingAsset = clearing || (extras === null && !url);
 
@@ -2190,7 +3093,10 @@ function CoursePromoVideoSection({
     if (file && typeof extractVideoMetadata === "function") {
       try {
         const info = await extractVideoMetadata(file).catch(() => null);
-        durationSeconds = info && Number.isFinite(Number(info.durationSeconds)) ? Number(info.durationSeconds) : undefined;
+        durationSeconds =
+          info && Number.isFinite(Number(info.durationSeconds))
+            ? Number(info.durationSeconds)
+            : undefined;
       } catch {
         durationSeconds = undefined;
       }
@@ -2199,13 +3105,18 @@ function CoursePromoVideoSection({
     if (assetData && !forcedClearingAsset && typeof assetData === "object") {
       const nextAsset = {
         url: assetData.url || url || promoVideoAsset?.url || "",
-        storageKey: assetData.storageKey || promoVideoAsset?.storageKey || undefined,
+        storageKey:
+          assetData.storageKey || promoVideoAsset?.storageKey || undefined,
         mimeType: assetData.mimeType || promoVideoAsset?.mimeType || undefined,
         fileSize: assetData.fileSize ?? promoVideoAsset?.fileSize ?? undefined,
         status: assetData.status || promoVideoAsset?.status || "ready",
         checksum: assetData.checksum || promoVideoAsset?.checksum || undefined,
-        uploadedAt: assetData.uploadedAt || promoVideoAsset?.uploadedAt || new Date().toISOString(),
-        originalName: assetData.originalName || promoVideoAsset?.originalName || undefined,
+        uploadedAt:
+          assetData.uploadedAt ||
+          promoVideoAsset?.uploadedAt ||
+          new Date().toISOString(),
+        originalName:
+          assetData.originalName || promoVideoAsset?.originalName || undefined,
         qualities: promoVideoAsset?.qualities || [],
         subtitles: promoVideoAsset?.subtitles || [],
       };
@@ -2213,13 +3124,17 @@ function CoursePromoVideoSection({
       const inferredFileName =
         nextAsset.originalName ||
         promoVideoFileName ||
-        (finalUrl ? String(finalUrl).split("/").pop()?.split("?")[0] || "" : "");
+        (finalUrl
+          ? String(finalUrl).split("/").pop()?.split("?")[0] || ""
+          : "");
       onVideoAssetChange(nextAsset);
       onVideoUrlChange(finalUrl);
       onPromoMetadataChange?.({
         promoVideoFileName: inferredFileName || undefined,
         promoVideoMimeType: nextAsset.mimeType || undefined,
-        promoVideoSizeBytes: Number.isFinite(Number(nextAsset.fileSize)) ? nextAsset.fileSize : undefined,
+        promoVideoSizeBytes: Number.isFinite(Number(nextAsset.fileSize))
+          ? nextAsset.fileSize
+          : undefined,
         promoVideoDurationSeconds: durationSeconds,
         sourceFile: file,
       });
@@ -2266,7 +3181,9 @@ function CoursePromoVideoSection({
             <FileVideo className="h-4 w-4 text-[#1B2B50]" />
             Video promocional
           </Label>
-          <p className="mt-1 text-xs text-muted-foreground">Pegá una URL de YouTube / Vimeo o el enlace directo al video.</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Pegá una URL de YouTube / Vimeo o el enlace directo al video.
+          </p>
         </div>
         {state ? (
           <Badge variant="outline" className={cn(state.tone)}>
@@ -2307,7 +3224,9 @@ function CourseAttachmentsField({ attachments, onChange, error }) {
 
   const updateAttachment = (index, patch) => {
     onChange(
-      safeAttachments.map((a, i) => (i === index && a ? { ...a, ...patch } : a))
+      safeAttachments.map((a, i) =>
+        i === index && a ? { ...a, ...patch } : a,
+      ),
     );
   };
 
@@ -2338,36 +3257,62 @@ function CourseAttachmentsField({ attachments, onChange, error }) {
       {safeAttachments.length ? (
         <div className="grid gap-3">
           {safeAttachments.map((attachment, index) => {
-            const { icon: Icon, tone: iconTone } = resourceKindBadge(attachment.kind);
+            const { icon: Icon, tone: iconTone } = resourceKindBadge(
+              attachment.kind,
+            );
             const attachmentHasUrl = Boolean(attachment.url);
-            const attachStatusRaw = ["pending", "uploading", "ready", "corrupt"].includes(attachment.status)
+            const attachStatusRaw = [
+              "pending",
+              "uploading",
+              "ready",
+              "corrupt",
+            ].includes(attachment.status)
               ? attachment.status
               : undefined;
-            const statusValue = attachStatusRaw === "ready" || attachStatusRaw === "uploading" || attachStatusRaw === "corrupt"
-              ? attachStatusRaw
-              : attachmentHasUrl
-                ? "ready"
-                : (attachStatusRaw || "pending");
+            const statusValue =
+              attachStatusRaw === "ready" ||
+              attachStatusRaw === "uploading" ||
+              attachStatusRaw === "corrupt"
+                ? attachStatusRaw
+                : attachmentHasUrl
+                  ? "ready"
+                  : attachStatusRaw || "pending";
             const statusBadge = resourceStatusBadge(statusValue);
-            const sizeLabel = resourceFormatSize(attachment.fileSize ?? attachment.sizeBytes);
+            const sizeLabel = resourceFormatSize(
+              attachment.fileSize ?? attachment.sizeBytes,
+            );
             const url = attachment.url || "";
-            const subKindOptions = ["Materiales del curso", "Material complementario", "Apunte", "Ejercicio", "Examen"];
+            const subKindOptions = [
+              "Materiales del curso",
+              "Material complementario",
+              "Apunte",
+              "Ejercicio",
+              "Examen",
+            ];
             return (
               <div
                 key={attachment.id || index}
                 className="grid items-start gap-3 rounded-2xl border border-border/60 bg-card px-4 py-3 md:grid-cols-[auto_minmax(0,1fr)_auto]"
               >
-                <span className={`inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${iconTone}`}>
+                <span
+                  className={`inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${iconTone}`}
+                >
                   <Icon className="h-5 w-5" />
                 </span>
                 <div className="grid gap-2">
                   <div className="flex flex-wrap items-center gap-1.5">
                     <span className="truncate text-sm font-medium text-foreground">
-                      {attachment.label || attachment.name || "(Archivo sin nombre)"}
+                      {attachment.label ||
+                        attachment.name ||
+                        "(Archivo sin nombre)"}
                     </span>
                     <Select
                       value={attachment.subKind || "__none__"}
-                      onValueChange={(val) => updateAttachment(index, { subKind: val === "__none__" ? undefined : val })}
+                      onValueChange={(val) =>
+                        updateAttachment(index, {
+                          subKind: val === "__none__" ? undefined : val,
+                        })
+                      }
                     >
                       <SelectTrigger className="h-5 w-auto min-w-[120px] rounded-full border border-border/70 px-2 py-0 text-[10px] uppercase tracking-wide">
                         <SelectValue placeholder="Tipo de material" />
@@ -2383,12 +3328,14 @@ function CourseAttachmentsField({ attachments, onChange, error }) {
                     </Select>
                     <Select
                       value={statusValue}
-                      onValueChange={(val) => updateAttachment(index, { status: val })}
+                      onValueChange={(val) =>
+                        updateAttachment(index, { status: val })
+                      }
                     >
                       <SelectTrigger
                         className={cn(
                           "h-5 w-auto min-w-[92px] rounded-full px-2 py-0 text-[10px] font-medium border",
-                          statusBadge.tone
+                          statusBadge.tone,
                         )}
                       >
                         <SelectValue />
@@ -2402,8 +3349,14 @@ function CourseAttachmentsField({ attachments, onChange, error }) {
                     </Select>
                   </div>
                   <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
-                    {sizeLabel ? <span className="rounded-full bg-slate-100 px-2 py-0.5 font-medium">{sizeLabel}</span> : null}
-                    {attachment.mimeType ? <span className="truncate">{attachment.mimeType}</span> : null}
+                    {sizeLabel ? (
+                      <span className="rounded-full bg-slate-100 px-2 py-0.5 font-medium">
+                        {sizeLabel}
+                      </span>
+                    ) : null}
+                    {attachment.mimeType ? (
+                      <span className="truncate">{attachment.mimeType}</span>
+                    ) : null}
                     {attachment.checksum ? (
                       <Tooltip>
                         <TooltipTrigger asChild>
@@ -2467,17 +3420,36 @@ function CurriculumField({ curriculum, onChange, error }) {
 
   useEffect(() => {
     const firstSection = safeCurriculum[0];
-    const firstLesson = Array.isArray(firstSection?.lessons) ? firstSection.lessons[0] : null;
-    const sectionExists = safeCurriculum.some((section) => String(section?.id || "") === String(selectedSectionId || ""));
+    const firstLesson = Array.isArray(firstSection?.lessons)
+      ? firstSection.lessons[0]
+      : null;
+    const sectionExists = safeCurriculum.some(
+      (section) =>
+        String(section?.id || "") === String(selectedSectionId || ""),
+    );
     if (!sectionExists && firstSection?.id) {
       setSelectedSectionId(String(firstSection.id));
     }
-    const currentSection = safeCurriculum.find((section) => String(section?.id || "") === String(selectedSectionId || "")) || firstSection;
+    const currentSection =
+      safeCurriculum.find(
+        (section) =>
+          String(section?.id || "") === String(selectedSectionId || ""),
+      ) || firstSection;
     const lessonExists = Array.isArray(currentSection?.lessons)
-      ? currentSection.lessons.some((lesson) => String(lesson?.id || "") === String(selectedLessonId || ""))
+      ? currentSection.lessons.some(
+          (lesson) =>
+            String(lesson?.id || "") === String(selectedLessonId || ""),
+        )
       : false;
     if (!lessonExists && firstLesson?.id) {
-      setSelectedLessonId(String((Array.isArray(currentSection?.lessons) ? currentSection.lessons[0] : firstLesson)?.id || ""));
+      setSelectedLessonId(
+        String(
+          (Array.isArray(currentSection?.lessons)
+            ? currentSection.lessons[0]
+            : firstLesson
+          )?.id || "",
+        ),
+      );
     }
   }, [safeCurriculum, selectedLessonId, selectedSectionId]);
 
@@ -2513,7 +3485,9 @@ function CurriculumField({ curriculum, onChange, error }) {
   };
 
   const removeSection = (sectionIndex) => {
-    onChange(safeCurriculum.filter((_, currentIndex) => currentIndex !== sectionIndex));
+    onChange(
+      safeCurriculum.filter((_, currentIndex) => currentIndex !== sectionIndex),
+    );
   };
 
   const updateLesson = (sectionIndex, lessonIndex, patch) => {
@@ -2522,13 +3496,22 @@ function CurriculumField({ curriculum, onChange, error }) {
     const prev = lessons[lessonIndex] || { id: createEntityId("lesson") };
     const isNew = !lessons[lessonIndex];
 
-    const nextAssetRaw = Object.prototype.hasOwnProperty.call(patch, "videoAsset") ? patch.videoAsset : prev.videoAsset;
+    const nextAssetRaw = Object.prototype.hasOwnProperty.call(
+      patch,
+      "videoAsset",
+    )
+      ? patch.videoAsset
+      : prev.videoAsset;
     const incomingAssetObject =
-      nextAssetRaw && typeof nextAssetRaw === "object" && (nextAssetRaw.url || nextAssetRaw.storageKey);
+      nextAssetRaw &&
+      typeof nextAssetRaw === "object" &&
+      (nextAssetRaw.url || nextAssetRaw.storageKey);
     const clearingAsset =
       Object.prototype.hasOwnProperty.call(patch, "videoAsset") &&
       (patch.videoAsset === undefined || patch.videoAsset === null);
-    const nextUrlRaw = Object.prototype.hasOwnProperty.call(patch, "videoUrl") ? String(patch.videoUrl || "").trim() : String(prev.videoUrl || "").trim();
+    const nextUrlRaw = Object.prototype.hasOwnProperty.call(patch, "videoUrl")
+      ? String(patch.videoUrl || "").trim()
+      : String(prev.videoUrl || "").trim();
     const clearingVideoUrl =
       Object.prototype.hasOwnProperty.call(patch, "videoUrl") && !nextUrlRaw;
 
@@ -2545,7 +3528,10 @@ function CurriculumField({ curriculum, onChange, error }) {
       resources: [],
     };
     const baseNext = { ...defaults, ...prev, ...patch };
-    const finalAssetIncoming = incomingAssetObject && !clearingAsset ? { ...(prev.videoAsset || {}), ...nextAssetRaw } : undefined;
+    const finalAssetIncoming =
+      incomingAssetObject && !clearingAsset
+        ? { ...(prev.videoAsset || {}), ...nextAssetRaw }
+        : undefined;
     baseNext.videoAsset = finalAssetIncoming;
     baseNext.videoUrl = String(baseNext.videoUrl || "").trim();
 
@@ -2562,13 +3548,25 @@ function CurriculumField({ curriculum, onChange, error }) {
 
     const safeNext = baseNext;
     safeNext.title = String(safeNext.title || "").trim() || prev.title || "";
-    safeNext.description = safeNext.description ? String(safeNext.description || "").trim() : undefined;
-    safeNext.lessonType = String(safeNext.lessonType || "video").trim() || "video";
-    safeNext.thumbnailUrl = safeNext.thumbnailUrl ? String(safeNext.thumbnailUrl || "").trim() : undefined;
-    safeNext.content = safeNext.content ? String(safeNext.content || "").trim() : undefined;
+    safeNext.description = safeNext.description
+      ? String(safeNext.description || "").trim()
+      : undefined;
+    safeNext.lessonType =
+      String(safeNext.lessonType || "video").trim() || "video";
+    safeNext.thumbnailUrl = safeNext.thumbnailUrl
+      ? String(safeNext.thumbnailUrl || "").trim()
+      : undefined;
+    safeNext.content = safeNext.content
+      ? String(safeNext.content || "").trim()
+      : undefined;
     safeNext.isPreview = Boolean(safeNext.isPreview);
-    safeNext.resources = Array.isArray(safeNext.resources) ? safeNext.resources : [];
-    if (!Number.isFinite(Number(safeNext.durationMinutes)) || Number(safeNext.durationMinutes) <= 0) {
+    safeNext.resources = Array.isArray(safeNext.resources)
+      ? safeNext.resources
+      : [];
+    if (
+      !Number.isFinite(Number(safeNext.durationMinutes)) ||
+      Number(safeNext.durationMinutes) <= 0
+    ) {
       safeNext.durationMinutes = undefined;
     }
 
@@ -2603,23 +3601,40 @@ function CurriculumField({ curriculum, onChange, error }) {
   const removeLesson = (sectionIndex, lessonIndex) => {
     const section = safeCurriculum[sectionIndex] || {};
     const lessons = Array.isArray(section.lessons) ? [...section.lessons] : [];
-    updateSection(
-      sectionIndex,
-      { lessons: lessons.filter((_, currentIndex) => currentIndex !== lessonIndex) }
-    );
+    updateSection(sectionIndex, {
+      lessons: lessons.filter(
+        (_, currentIndex) => currentIndex !== lessonIndex,
+      ),
+    });
   };
 
   const selectedSection =
-    safeCurriculum.find((section) => String(section?.id || "") === String(selectedSectionId || "")) || safeCurriculum[0] || null;
-  const selectedSectionIndex = safeCurriculum.findIndex((section) => String(section?.id || "") === String(selectedSection?.id || ""));
-  const selectedLesson =
-    (Array.isArray(selectedSection?.lessons) ? selectedSection.lessons : []).find(
-      (lesson) => String(lesson?.id || "") === String(selectedLessonId || "")
+    safeCurriculum.find(
+      (section) =>
+        String(section?.id || "") === String(selectedSectionId || ""),
     ) ||
-    (Array.isArray(selectedSection?.lessons) ? selectedSection.lessons[0] : null) ||
+    safeCurriculum[0] ||
+    null;
+  const selectedSectionIndex = safeCurriculum.findIndex(
+    (section) =>
+      String(section?.id || "") === String(selectedSection?.id || ""),
+  );
+  const selectedLesson =
+    (Array.isArray(selectedSection?.lessons)
+      ? selectedSection.lessons
+      : []
+    ).find(
+      (lesson) => String(lesson?.id || "") === String(selectedLessonId || ""),
+    ) ||
+    (Array.isArray(selectedSection?.lessons)
+      ? selectedSection.lessons[0]
+      : null) ||
     null;
   const selectedLessonIndex = Array.isArray(selectedSection?.lessons)
-    ? selectedSection.lessons.findIndex((lesson) => String(lesson?.id || "") === String(selectedLesson?.id || ""))
+    ? selectedSection.lessons.findIndex(
+        (lesson) =>
+          String(lesson?.id || "") === String(selectedLesson?.id || ""),
+      )
     : -1;
 
   return (
@@ -2629,10 +3644,20 @@ function CurriculumField({ curriculum, onChange, error }) {
           <div className="rounded-[24px] border border-border/60 bg-background p-4 min-w-0 overflow-hidden">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <div className="text-sm font-semibold text-foreground">Estructura del curso</div>
-                <p className="mt-1 text-xs leading-5 text-muted-foreground">Selecciona una clase para editarla.</p>
+                <div className="text-sm font-semibold text-foreground">
+                  Estructura del curso
+                </div>
+                <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                  Selecciona una clase para editarla.
+                </p>
               </div>
-              <Button type="button" variant="outline" size="sm" onClick={addSection} className="shrink-0">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={addSection}
+                className="shrink-0"
+              >
                 <Plus className="mr-2 h-4 w-4" />
                 Sección
               </Button>
@@ -2640,38 +3665,68 @@ function CurriculumField({ curriculum, onChange, error }) {
 
             <div className="mt-4 grid gap-3 max-h-[calc(100vh-170px)] overflow-auto pr-1 min-w-0">
               {safeCurriculum.map((section, sectionIndex) => {
-                const lessonCount = Array.isArray(section.lessons) ? section.lessons.length : 0;
-                const durationCount = Array.isArray(section.lessons)
-                  ? section.lessons.reduce((sum, lesson) => sum + Number(lesson?.durationMinutes || 0), 0)
+                const lessonCount = Array.isArray(section.lessons)
+                  ? section.lessons.length
                   : 0;
-                const isSelectedSection = String(section?.id || "") === String(selectedSection?.id || "");
+                const durationCount = Array.isArray(section.lessons)
+                  ? section.lessons.reduce(
+                      (sum, lesson) =>
+                        sum + Number(lesson?.durationMinutes || 0),
+                      0,
+                    )
+                  : 0;
+                const isSelectedSection =
+                  String(section?.id || "") ===
+                  String(selectedSection?.id || "");
 
                 return (
-                  <div key={section.id || sectionIndex} className="rounded-[22px] border border-border/60 bg-card p-3 min-w-0 overflow-hidden">
+                  <div
+                    key={section.id || sectionIndex}
+                    className="rounded-[22px] border border-border/60 bg-card p-3 min-w-0 overflow-hidden"
+                  >
                     <div className="flex items-start justify-between gap-3 min-w-0">
                       <button
                         type="button"
                         onClick={() => {
                           setSelectedSectionId(String(section.id || ""));
-                          setSelectedLessonId(String((section.lessons?.[0] || {}).id || ""));
+                          setSelectedLessonId(
+                            String((section.lessons?.[0] || {}).id || ""),
+                          );
                         }}
                         className={`min-w-0 flex-1 rounded-2xl px-3 py-2 text-left transition overflow-hidden ${
-                          isSelectedSection ? "bg-[#1B2B50] text-white" : "hover:bg-[#F6F8FC]"
+                          isSelectedSection
+                            ? "bg-[#1B2B50] text-white"
+                            : "hover:bg-[#F6F8FC]"
                         }`}
                       >
-                        <div className="truncate text-sm font-semibold">{section.title || `Sección ${sectionIndex + 1}`}</div>
-                        <div className={`mt-1 text-xs ${isSelectedSection ? "text-white/70" : "text-muted-foreground"}`}>
+                        <div className="truncate text-sm font-semibold">
+                          {section.title || `Sección ${sectionIndex + 1}`}
+                        </div>
+                        <div
+                          className={`mt-1 text-xs ${isSelectedSection ? "text-white/70" : "text-muted-foreground"}`}
+                        >
                           {lessonCount} clases · {durationCount || 0} min
                         </div>
                       </button>
-                      <Button type="button" variant="ghost" size="icon" onClick={() => removeSection(sectionIndex)} className="shrink-0">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => removeSection(sectionIndex)}
+                        className="shrink-0"
+                      >
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
 
                     <div className="mt-3 grid gap-2 min-w-0">
-                      {(Array.isArray(section.lessons) ? section.lessons : []).map((lesson, lessonIndex) => {
-                        const isSelectedLesson = String(lesson?.id || "") === String(selectedLesson?.id || "");
+                      {(Array.isArray(section.lessons)
+                        ? section.lessons
+                        : []
+                      ).map((lesson, lessonIndex) => {
+                        const isSelectedLesson =
+                          String(lesson?.id || "") ===
+                          String(selectedLesson?.id || "");
                         return (
                           <button
                             key={lesson.id || lessonIndex}
@@ -2687,9 +3742,12 @@ function CurriculumField({ curriculum, onChange, error }) {
                             }`}
                           >
                             <span className="min-w-0 overflow-hidden">
-                              <span className="block truncate text-sm font-medium text-foreground">{lesson.title || `Clase ${lessonIndex + 1}`}</span>
+                              <span className="block truncate text-sm font-medium text-foreground">
+                                {lesson.title || `Clase ${lessonIndex + 1}`}
+                              </span>
                               <span className="mt-0.5 block truncate text-xs text-muted-foreground">
-                                {lesson.lessonType || "video"} · {lesson.durationMinutes || 0} min
+                                {lesson.lessonType || "video"} ·{" "}
+                                {lesson.durationMinutes || 0} min
                               </span>
                             </span>
                             <GripVertical className="h-4 w-4 shrink-0 text-muted-foreground" />
@@ -2698,7 +3756,13 @@ function CurriculumField({ curriculum, onChange, error }) {
                       })}
                     </div>
 
-                    <Button type="button" variant="ghost" size="sm" onClick={() => addLesson(sectionIndex)} className="mt-3 w-full justify-start">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => addLesson(sectionIndex)}
+                      className="mt-3 w-full justify-start"
+                    >
                       <Plus className="mr-2 h-4 w-4" />
                       Agregar clase
                     </Button>
@@ -2715,28 +3779,38 @@ function CurriculumField({ curriculum, onChange, error }) {
               <LessonEditorHeader
                 selectedSection={selectedSection}
                 selectedLesson={selectedLesson}
-                onRemove={() => removeLesson(selectedSectionIndex, selectedLessonIndex)}
+                onRemove={() =>
+                  removeLesson(selectedSectionIndex, selectedLessonIndex)
+                }
                 disabled={selectedSectionIndex < 0 || selectedLessonIndex < 0}
               />
 
               <div className="grid gap-4 md:grid-cols-2 min-w-0">
-                  <div className="grid gap-2 min-w-0">
-                    <Label>Título de la sección</Label>
-                    <Input
-                      value={selectedSection.title || ""}
-                      onChange={(event) => updateSection(selectedSectionIndex, { title: event.target.value })}
-                      placeholder="Ej: Módulo 1 · Fundamentos"
-                    />
-                  </div>
-                  <div className="grid gap-2 min-w-0">
-                    <Label>Descripción de la sección</Label>
-                    <Input
-                      value={selectedSection.description || ""}
-                      onChange={(event) => updateSection(selectedSectionIndex, { description: event.target.value })}
-                      placeholder="Qué objetivo cubre este bloque"
-                    />
-                  </div>
+                <div className="grid gap-2 min-w-0">
+                  <Label>Título de la sección</Label>
+                  <Input
+                    value={selectedSection.title || ""}
+                    onChange={(event) =>
+                      updateSection(selectedSectionIndex, {
+                        title: event.target.value,
+                      })
+                    }
+                    placeholder="Ej: Módulo 1 · Fundamentos"
+                  />
                 </div>
+                <div className="grid gap-2 min-w-0">
+                  <Label>Descripción de la sección</Label>
+                  <Input
+                    value={selectedSection.description || ""}
+                    onChange={(event) =>
+                      updateSection(selectedSectionIndex, {
+                        description: event.target.value,
+                      })
+                    }
+                    placeholder="Qué objetivo cubre este bloque"
+                  />
+                </div>
+              </div>
 
               <div className="grid gap-4 rounded-[22px] border border-border/60 bg-card p-4 min-w-0 overflow-hidden">
                 <div className="grid gap-4 md:grid-cols-[1.2fr_0.8fr_0.5fr] min-w-0">
@@ -2744,7 +3818,13 @@ function CurriculumField({ curriculum, onChange, error }) {
                     <Label>Título de la clase</Label>
                     <Input
                       value={selectedLesson.title || ""}
-                      onChange={(event) => updateLesson(selectedSectionIndex, selectedLessonIndex, { title: event.target.value })}
+                      onChange={(event) =>
+                        updateLesson(
+                          selectedSectionIndex,
+                          selectedLessonIndex,
+                          { title: event.target.value },
+                        )
+                      }
                       placeholder="Ej: Primer proyecto"
                     />
                   </div>
@@ -2752,7 +3832,13 @@ function CurriculumField({ curriculum, onChange, error }) {
                     <Label>Tipo</Label>
                     <Select
                       value={selectedLesson.lessonType || "video"}
-                      onValueChange={(value) => updateLesson(selectedSectionIndex, selectedLessonIndex, { lessonType: value })}
+                      onValueChange={(value) =>
+                        updateLesson(
+                          selectedSectionIndex,
+                          selectedLessonIndex,
+                          { lessonType: value },
+                        )
+                      }
                     >
                       <SelectTrigger className="w-full">
                         <SelectValue placeholder="Tipo de clase" />
@@ -2774,9 +3860,14 @@ function CurriculumField({ curriculum, onChange, error }) {
                       min="0"
                       value={selectedLesson.durationMinutes ?? ""}
                       onChange={(event) =>
-                        updateLesson(selectedSectionIndex, selectedLessonIndex, {
-                          durationMinutes: Number(event.target.value || 0) || undefined,
-                        })
+                        updateLesson(
+                          selectedSectionIndex,
+                          selectedLessonIndex,
+                          {
+                            durationMinutes:
+                              Number(event.target.value || 0) || undefined,
+                          },
+                        )
                       }
                       placeholder="15"
                     />
@@ -2788,7 +3879,11 @@ function CurriculumField({ curriculum, onChange, error }) {
                   <Textarea
                     rows={3}
                     value={selectedLesson.description || ""}
-                    onChange={(event) => updateLesson(selectedSectionIndex, selectedLessonIndex, { description: event.target.value })}
+                    onChange={(event) =>
+                      updateLesson(selectedSectionIndex, selectedLessonIndex, {
+                        description: event.target.value,
+                      })
+                    }
                     placeholder="Resume la clase y su objetivo."
                   />
                 </div>
@@ -2798,7 +3893,11 @@ function CurriculumField({ curriculum, onChange, error }) {
                   <Textarea
                     rows={5}
                     value={selectedLesson.content || ""}
-                    onChange={(event) => updateLesson(selectedSectionIndex, selectedLessonIndex, { content: event.target.value })}
+                    onChange={(event) =>
+                      updateLesson(selectedSectionIndex, selectedLessonIndex, {
+                        content: event.target.value,
+                      })
+                    }
                     placeholder="Describe la clase, instrucciones, actividades o teoría."
                   />
                 </div>
@@ -2807,7 +3906,9 @@ function CurriculumField({ curriculum, onChange, error }) {
                   videoUrl={selectedLesson.videoUrl || ""}
                   videoAsset={selectedLesson.videoAsset}
                   onVideoUrlChange={(nextVideoUrl) =>
-                    updateLesson(selectedSectionIndex, selectedLessonIndex, { videoUrl: nextVideoUrl || "" })
+                    updateLesson(selectedSectionIndex, selectedLessonIndex, {
+                      videoUrl: nextVideoUrl || "",
+                    })
                   }
                   onVideoAssetChange={(nextVideoAsset) =>
                     updateLesson(selectedSectionIndex, selectedLessonIndex, {
@@ -2816,30 +3917,56 @@ function CurriculumField({ curriculum, onChange, error }) {
                   }
                   onVideoChangeCombined={(patch) =>
                     updateLesson(selectedSectionIndex, selectedLessonIndex, {
-                      ...(Object.prototype.hasOwnProperty.call(patch, "videoUrl") ? { videoUrl: patch.videoUrl || "" } : {}),
-                      ...(Object.prototype.hasOwnProperty.call(patch, "videoAsset") ? { videoAsset: patch.videoAsset || undefined } : {}),
+                      ...(Object.prototype.hasOwnProperty.call(
+                        patch,
+                        "videoUrl",
+                      )
+                        ? { videoUrl: patch.videoUrl || "" }
+                        : {}),
+                      ...(Object.prototype.hasOwnProperty.call(
+                        patch,
+                        "videoAsset",
+                      )
+                        ? { videoAsset: patch.videoAsset || undefined }
+                        : {}),
                     })
                   }
                 />
 
                 <div className="rounded-[18px] border border-border/60 bg-background p-4">
                   <div className="flex items-center justify-between gap-3">
-                    <div className="text-sm font-semibold text-foreground">Clase abierta</div>
+                    <div className="text-sm font-semibold text-foreground">
+                      Clase abierta
+                    </div>
                     <Switch
                       checked={Boolean(selectedLesson.isPreview)}
-                      onCheckedChange={(checked) => updateLesson(selectedSectionIndex, selectedLessonIndex, { isPreview: checked })}
+                      onCheckedChange={(checked) =>
+                        updateLesson(
+                          selectedSectionIndex,
+                          selectedLessonIndex,
+                          { isPreview: checked },
+                        )
+                      }
                     />
                   </div>
                 </div>
 
                 <LessonResourcesField
                   resources={selectedLesson.resources || []}
-                  onChange={(resources) => updateLesson(selectedSectionIndex, selectedLessonIndex, { resources })}
+                  onChange={(resources) =>
+                    updateLesson(selectedSectionIndex, selectedLessonIndex, {
+                      resources,
+                    })
+                  }
                 />
 
                 <PerClassEvaluationField
                   value={selectedLesson.evaluation}
-                  onChange={(evaluation) => updateLesson(selectedSectionIndex, selectedLessonIndex, { evaluation })}
+                  onChange={(evaluation) =>
+                    updateLesson(selectedSectionIndex, selectedLessonIndex, {
+                      evaluation,
+                    })
+                  }
                   resourcesSummary={summarizeLessonResources(selectedLesson)}
                 />
               </div>
@@ -2853,20 +3980,30 @@ function CurriculumField({ curriculum, onChange, error }) {
       </div>
       <FieldError error={error} />
       {!error?.message && hasNestedFieldError(error) ? (
-        <p className="text-sm text-destructive">Revisa los campos incompletos dentro del currículum.</p>
+        <p className="text-sm text-destructive">
+          Revisa los campos incompletos dentro del currículum.
+        </p>
       ) : null}
     </div>
   );
 }
 
 function FinalEvaluationField({ value, onChange, error }) {
-  const evaluation = value && typeof value === "object" ? value : { enabled: false, questions: [] };
-  const questions = Array.isArray(evaluation.questions) ? evaluation.questions : [];
+  const evaluation =
+    value && typeof value === "object"
+      ? value
+      : { enabled: false, questions: [] };
+  const questions = Array.isArray(evaluation.questions)
+    ? evaluation.questions
+    : [];
   const [selectedQuestionId, setSelectedQuestionId] = useState("");
 
   useEffect(() => {
     const firstQuestion = questions[0];
-    const exists = questions.some((question) => String(question?.id || "") === String(selectedQuestionId || ""));
+    const exists = questions.some(
+      (question) =>
+        String(question?.id || "") === String(selectedQuestionId || ""),
+    );
     if (!exists && firstQuestion?.id) {
       setSelectedQuestionId(String(firstQuestion.id));
     }
@@ -2900,7 +4037,9 @@ function FinalEvaluationField({ value, onChange, error }) {
   };
 
   const removeQuestion = (index) => {
-    updateField({ questions: questions.filter((_, currentIndex) => currentIndex !== index) });
+    updateField({
+      questions: questions.filter((_, currentIndex) => currentIndex !== index),
+    });
   };
 
   const updateQuestionOptions = (index, nextOptions) => {
@@ -2908,8 +4047,16 @@ function FinalEvaluationField({ value, onChange, error }) {
   };
 
   const selectedQuestion =
-    questions.find((question) => String(question?.id || "") === String(selectedQuestionId || "")) || questions[0] || null;
-  const selectedQuestionIndex = questions.findIndex((question) => String(question?.id || "") === String(selectedQuestion?.id || ""));
+    questions.find(
+      (question) =>
+        String(question?.id || "") === String(selectedQuestionId || ""),
+    ) ||
+    questions[0] ||
+    null;
+  const selectedQuestionIndex = questions.findIndex(
+    (question) =>
+      String(question?.id || "") === String(selectedQuestion?.id || ""),
+  );
 
   const mapQuestionTypeForPerClassUi = (type) => {
     if (type === "true_false") return "boolean";
@@ -2929,19 +4076,27 @@ function FinalEvaluationField({ value, onChange, error }) {
             Evaluación final
             <Tooltip>
               <TooltipTrigger asChild>
-                <button type="button" className="inline-flex h-4 w-4 items-center justify-center text-slate-400 hover:text-slate-700">
+                <button
+                  type="button"
+                  className="inline-flex h-4 w-4 items-center justify-center text-slate-400 hover:text-slate-700"
+                >
                   <HelpCircle className="h-3.5 w-3.5" />
                 </button>
               </TooltipTrigger>
               <TooltipContent side="right">
                 <div className="max-w-xs text-[11px] leading-5">
-                  Actívala para agregar un examen, quiz o validación al final del curso. El alumno deberá aprobarlo para completar la cursada.
+                  Actívala para agregar un examen, quiz o validación al final
+                  del curso. El alumno deberá aprobarlo para completar la
+                  cursada.
                 </div>
               </TooltipContent>
             </Tooltip>
           </Label>
         </div>
-        <Switch checked={Boolean(evaluation.enabled)} onCheckedChange={(checked) => updateField({ enabled: checked })} />
+        <Switch
+          checked={Boolean(evaluation.enabled)}
+          onCheckedChange={(checked) => updateField({ enabled: checked })}
+        />
       </div>
 
       {evaluation.enabled ? (
@@ -2963,7 +4118,11 @@ function FinalEvaluationField({ value, onChange, error }) {
                 min="0"
                 max="100"
                 value={evaluation.passingScore ?? 60}
-                onChange={(event) => updateField({ passingScore: Number(event.target.value || 0) || undefined })}
+                onChange={(event) =>
+                  updateField({
+                    passingScore: Number(event.target.value || 0) || undefined,
+                  })
+                }
                 className="h-9 text-sm"
               />
             </div>
@@ -2973,7 +4132,11 @@ function FinalEvaluationField({ value, onChange, error }) {
                 type="number"
                 min="1"
                 value={evaluation.maxAttempts ?? 3}
-                onChange={(event) => updateField({ maxAttempts: Number(event.target.value || 0) || undefined })}
+                onChange={(event) =>
+                  updateField({
+                    maxAttempts: Number(event.target.value || 0) || undefined,
+                  })
+                }
                 className="h-9 text-sm"
               />
             </div>
@@ -2984,7 +4147,9 @@ function FinalEvaluationField({ value, onChange, error }) {
             <Textarea
               rows={3}
               value={evaluation.description || ""}
-              onChange={(event) => updateField({ description: event.target.value })}
+              onChange={(event) =>
+                updateField({ description: event.target.value })
+              }
               placeholder="Explica qué valida esta evaluación y cómo se aprueba."
             />
           </div>
@@ -2994,10 +4159,20 @@ function FinalEvaluationField({ value, onChange, error }) {
               <div className="rounded-[22px] border border-border/60 bg-card p-4 min-w-0 overflow-hidden">
                 <div className="flex items-center justify-between gap-3">
                   <div className="min-w-0">
-                    <div className="truncate text-sm font-semibold text-foreground">Preguntas</div>
-                    <p className="mt-1 truncate text-xs text-muted-foreground">Selecciona una para editarla.</p>
+                    <div className="truncate text-sm font-semibold text-foreground">
+                      Preguntas
+                    </div>
+                    <p className="mt-1 truncate text-xs text-muted-foreground">
+                      Selecciona una para editarla.
+                    </p>
                   </div>
-                  <Button type="button" variant="outline" size="sm" onClick={addQuestion} className="shrink-0">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={addQuestion}
+                    className="shrink-0"
+                  >
                     <Plus className="mr-2 h-4 w-4" />
                     Pregunta
                   </Button>
@@ -3005,18 +4180,28 @@ function FinalEvaluationField({ value, onChange, error }) {
 
                 <div className="mt-4 grid gap-2 max-h-[calc(100vh-210px)] overflow-auto pr-1">
                   {questions.map((question, index) => {
-                    const isSelected = String(question?.id || "") === String(selectedQuestion?.id || "");
+                    const isSelected =
+                      String(question?.id || "") ===
+                      String(selectedQuestion?.id || "");
                     return (
                       <button
                         key={question.id || index}
                         type="button"
-                        onClick={() => setSelectedQuestionId(String(question.id || ""))}
+                        onClick={() =>
+                          setSelectedQuestionId(String(question.id || ""))
+                        }
                         className={`rounded-2xl border px-3 py-3 text-left transition min-w-0 ${
-                          isSelected ? "border-[#1B2B50]/15 bg-[#EEF4FF]" : "border-border/60 bg-background hover:bg-[#FAFAFC]"
+                          isSelected
+                            ? "border-[#1B2B50]/15 bg-[#EEF4FF]"
+                            : "border-border/60 bg-background hover:bg-[#FAFAFC]"
                         }`}
                       >
-                        <div className="truncate text-sm font-medium text-foreground">Pregunta {index + 1}</div>
-                        <div className="mt-1 truncate text-xs text-muted-foreground">{question.prompt || "Sin enunciado"}</div>
+                        <div className="truncate text-sm font-medium text-foreground">
+                          Pregunta {index + 1}
+                        </div>
+                        <div className="mt-1 truncate text-xs text-muted-foreground">
+                          {question.prompt || "Sin enunciado"}
+                        </div>
                       </button>
                     );
                   })}
@@ -3031,7 +4216,11 @@ function FinalEvaluationField({ value, onChange, error }) {
                     <Label className="text-xs">Pregunta</Label>
                     <Input
                       value={selectedQuestion.prompt || ""}
-                      onChange={(event) => updateQuestion(selectedQuestionIndex, { prompt: event.target.value })}
+                      onChange={(event) =>
+                        updateQuestion(selectedQuestionIndex, {
+                          prompt: event.target.value,
+                        })
+                      }
                       placeholder="¿Qué objetivo cierra esta evaluación?"
                       className="h-9 text-sm"
                     />
@@ -3039,20 +4228,30 @@ function FinalEvaluationField({ value, onChange, error }) {
                   <div className="grid gap-1.5">
                     <Label className="text-xs">Tipo</Label>
                     <Select
-                      value={mapQuestionTypeForPerClassUi(selectedQuestion.type)}
+                      value={mapQuestionTypeForPerClassUi(
+                        selectedQuestion.type,
+                      )}
                       onValueChange={(value) => {
                         const schemaType = mapQuestionTypeForSchema(value);
                         if (value === "boolean") {
                           updateQuestion(selectedQuestionIndex, {
                             type: schemaType,
                             options: ["Verdadero", "Falso"],
-                            correctAnswers: Array.isArray(selectedQuestion.correctAnswers) ? selectedQuestion.correctAnswers.slice(0, 1) : [],
+                            correctAnswers: Array.isArray(
+                              selectedQuestion.correctAnswers,
+                            )
+                              ? selectedQuestion.correctAnswers.slice(0, 1)
+                              : [],
                           });
                           return;
                         }
                         updateQuestion(selectedQuestionIndex, {
                           type: schemaType,
-                          options: selectedQuestion.options && selectedQuestion.options.length ? selectedQuestion.options : ["", ""],
+                          options:
+                            selectedQuestion.options &&
+                            selectedQuestion.options.length
+                              ? selectedQuestion.options
+                              : ["", ""],
                         });
                       }}
                     >
@@ -3060,24 +4259,37 @@ function FinalEvaluationField({ value, onChange, error }) {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="single_choice">Opción simple</SelectItem>
-                        <SelectItem value="multiple_choice">Múltiple opción</SelectItem>
-                        <SelectItem value="boolean">Verdadero / Falso</SelectItem>
+                        <SelectItem value="single_choice">
+                          Opción simple
+                        </SelectItem>
+                        <SelectItem value="multiple_choice">
+                          Múltiple opción
+                        </SelectItem>
+                        <SelectItem value="boolean">
+                          Verdadero / Falso
+                        </SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                   <div className="grid gap-1.5">
                     <Label className="text-xs">Opciones</Label>
                     <div className="grid gap-1.5">
-                      {Array.isArray(selectedQuestion.options) && selectedQuestion.options.length
+                      {Array.isArray(selectedQuestion.options) &&
+                      selectedQuestion.options.length
                         ? selectedQuestion.options.map((opt, optIndex) => {
-                            const selectedAnswers = Array.isArray(selectedQuestion.correctAnswers)
+                            const selectedAnswers = Array.isArray(
+                              selectedQuestion.correctAnswers,
+                            )
                               ? selectedQuestion.correctAnswers
                               : [];
-                            const perClassUiType = mapQuestionTypeForPerClassUi(selectedQuestion.type);
+                            const perClassUiType = mapQuestionTypeForPerClassUi(
+                              selectedQuestion.type,
+                            );
                             const isCorrect =
-                              perClassUiType === "boolean" || perClassUiType === "single_choice"
-                                ? String(selectedAnswers[0] ?? "") === String(optIndex)
+                              perClassUiType === "boolean" ||
+                              perClassUiType === "single_choice"
+                                ? String(selectedAnswers[0] ?? "") ===
+                                  String(optIndex)
                                 : selectedAnswers.includes(String(optIndex));
                             return (
                               <div
@@ -3089,11 +4301,22 @@ function FinalEvaluationField({ value, onChange, error }) {
                                   variant="ghost"
                                   size="icon"
                                   onClick={() => {
-                                    const nextOptions = [...(selectedQuestion.options || [])];
+                                    const nextOptions = [
+                                      ...(selectedQuestion.options || []),
+                                    ];
                                     nextOptions.splice(optIndex, 1);
-                                    updateQuestionOptions(selectedQuestionIndex, nextOptions);
-                                    const filtered = (selectedAnswers || []).filter((a) => String(a) !== String(optIndex));
-                                    updateQuestion(selectedQuestionIndex, { correctAnswers: filtered });
+                                    updateQuestionOptions(
+                                      selectedQuestionIndex,
+                                      nextOptions,
+                                    );
+                                    const filtered = (
+                                      selectedAnswers || []
+                                    ).filter(
+                                      (a) => String(a) !== String(optIndex),
+                                    );
+                                    updateQuestion(selectedQuestionIndex, {
+                                      correctAnswers: filtered,
+                                    });
                                   }}
                                   disabled={perClassUiType === "boolean"}
                                   className="h-6 w-6 shrink-0 text-muted-foreground"
@@ -3103,9 +4326,14 @@ function FinalEvaluationField({ value, onChange, error }) {
                                 <Input
                                   value={opt}
                                   onChange={(event) => {
-                                    const nextOptions = [...(selectedQuestion.options || [])];
+                                    const nextOptions = [
+                                      ...(selectedQuestion.options || []),
+                                    ];
                                     nextOptions[optIndex] = event.target.value;
-                                    updateQuestionOptions(selectedQuestionIndex, nextOptions);
+                                    updateQuestionOptions(
+                                      selectedQuestionIndex,
+                                      nextOptions,
+                                    );
                                   }}
                                   className="h-8 border-0 bg-transparent px-0 text-sm focus-visible:ring-0"
                                 />
@@ -3114,20 +4342,39 @@ function FinalEvaluationField({ value, onChange, error }) {
                                     <button
                                       type="button"
                                       onClick={() => {
-                                        if (perClassUiType === "multiple_choice") {
-                                          const set = new Set(selectedAnswers.map((a) => String(a)));
-                                          if (set.has(String(optIndex))) set.delete(String(optIndex));
+                                        if (
+                                          perClassUiType === "multiple_choice"
+                                        ) {
+                                          const set = new Set(
+                                            selectedAnswers.map((a) =>
+                                              String(a),
+                                            ),
+                                          );
+                                          if (set.has(String(optIndex)))
+                                            set.delete(String(optIndex));
                                           else set.add(String(optIndex));
-                                          updateQuestion(selectedQuestionIndex, { correctAnswers: [...set.values()] });
+                                          updateQuestion(
+                                            selectedQuestionIndex,
+                                            {
+                                              correctAnswers: [...set.values()],
+                                            },
+                                          );
                                         } else {
-                                          updateQuestion(selectedQuestionIndex, { correctAnswers: [String(optIndex)] });
+                                          updateQuestion(
+                                            selectedQuestionIndex,
+                                            {
+                                              correctAnswers: [
+                                                String(optIndex),
+                                              ],
+                                            },
+                                          );
                                         }
                                       }}
                                       className={cn(
                                         "inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border transition-colors",
                                         isCorrect
                                           ? "border-emerald-400 bg-emerald-500 text-white"
-                                          : "border-slate-200 bg-white text-slate-400 hover:border-emerald-300 hover:text-emerald-600"
+                                          : "border-slate-200 bg-white text-slate-400 hover:border-emerald-300 hover:text-emerald-600",
                                       )}
                                     >
                                       <CheckCircle2 className="h-3.5 w-3.5" />
@@ -3145,13 +4392,17 @@ function FinalEvaluationField({ value, onChange, error }) {
                             );
                           })
                         : null}
-                      {mapQuestionTypeForPerClassUi(selectedQuestion.type) !== "boolean" ? (
+                      {mapQuestionTypeForPerClassUi(selectedQuestion.type) !==
+                      "boolean" ? (
                         <Button
                           type="button"
                           variant="outline"
                           size="sm"
                           onClick={() =>
-                            updateQuestionOptions(selectedQuestionIndex, [...(selectedQuestion.options || []), ""])
+                            updateQuestionOptions(selectedQuestionIndex, [
+                              ...(selectedQuestion.options || []),
+                              "",
+                            ])
                           }
                           className="mt-1 h-8 justify-start px-2.5 text-xs"
                         >
@@ -3166,7 +4417,11 @@ function FinalEvaluationField({ value, onChange, error }) {
                     <Textarea
                       rows={2}
                       value={selectedQuestion.explanation || ""}
-                      onChange={(event) => updateQuestion(selectedQuestionIndex, { explanation: event.target.value })}
+                      onChange={(event) =>
+                        updateQuestion(selectedQuestionIndex, {
+                          explanation: event.target.value,
+                        })
+                      }
                       placeholder="Mostrar al alumno al finalizar el intento."
                       className="text-xs"
                     />
@@ -3196,7 +4451,9 @@ function FinalEvaluationField({ value, onChange, error }) {
 
       <FieldError error={error} />
       {!error?.message && hasNestedFieldError(error) ? (
-        <p className="text-sm text-destructive">Revisa las preguntas y respuestas de la evaluación final.</p>
+        <p className="text-sm text-destructive">
+          Revisa las preguntas y respuestas de la evaluación final.
+        </p>
       ) : null}
     </div>
   );
@@ -3215,7 +4472,9 @@ export default function CourseWizard({ jobId }) {
   const [uploading, setUploading] = useState(false);
   const [activeTab, setActiveTab] = useState("general");
   const [courseLoadAttempt, setCourseLoadAttempt] = useState(0);
-  const [slugTouchedManually, setSlugTouchedManually] = useState(Boolean(jobId));
+  const [slugTouchedManually, setSlugTouchedManually] = useState(
+    Boolean(jobId),
+  );
   const [categoryOptions, setCategoryOptions] = useState([]);
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
   const [newCategoryTitle, setNewCategoryTitle] = useState("");
@@ -3245,8 +4504,10 @@ export default function CourseWizard({ jobId }) {
   const isLastTab = activeTabIndex === TAB_ITEMS.length - 1;
   const isFirstTab = activeTabIndex <= 0;
   const busy = submitting || uploading;
-  const primarySubmitLabel = actor?.role === "empresa" ? "Enviar a revisión" : "Guardar curso";
-  const savingSubmitLabel = actor?.role === "empresa" ? "Enviando curso..." : "Guardando curso...";
+  const primarySubmitLabel =
+    actor?.role === "empresa" ? "Enviar a revisión" : "Guardar curso";
+  const savingSubmitLabel =
+    actor?.role === "empresa" ? "Enviando curso..." : "Guardando curso...";
 
   const defaultValues = useMemo(
     () => ({
@@ -3308,6 +4569,7 @@ export default function CourseWizard({ jobId }) {
       promoVideoDurationSeconds: undefined,
       promoVideoAsset: null,
       attachments: [],
+      documentationUrl: "",
       price: 0,
       oldPrice: undefined,
       freeCourse: false,
@@ -3322,7 +4584,7 @@ export default function CourseWizard({ jobId }) {
       status: "borrador",
       expiresAtDate: dateInputToday(),
     }),
-    []
+    [],
   );
 
   const {
@@ -3347,7 +4609,11 @@ export default function CourseWizard({ jobId }) {
   const onInvalidSubmit = (formErrors) => {
     const nextTab = findFirstTabWithErrors(formErrors);
     setActiveTab(nextTab);
-    toast.error(findFirstErrorMessage(formErrors) || "Revisá los campos pendientes antes de guardar.", { position: "top-right" });
+    toast.error(
+      findFirstErrorMessage(formErrors) ||
+        "Revisá los campos pendientes antes de guardar.",
+      { position: "top-right" },
+    );
   };
 
   useEffect(() => {
@@ -3355,7 +4621,10 @@ export default function CourseWizard({ jobId }) {
     if (slugTouchedManually) return;
     const generatedSlug = slugify(values.title);
     if (values.slug === generatedSlug) return;
-    setValue("slug", generatedSlug, { shouldValidate: true, shouldDirty: true });
+    setValue("slug", generatedSlug, {
+      shouldValidate: true,
+      shouldDirty: true,
+    });
   }, [setValue, slugTouchedManually, values.slug, values.title]);
 
   useEffect(() => {
@@ -3368,9 +4637,13 @@ export default function CourseWizard({ jobId }) {
         });
         if (!res.ok) return;
         const payload = await res.json();
-        const allCourses = Array.isArray(payload?.courses) ? payload.courses : [];
+        const allCourses = Array.isArray(payload?.courses)
+          ? payload.courses
+          : [];
         const existingSubRubros = allCourses
-          .map((course) => String(course?.subRubro || course?.categoryLabel || "").trim())
+          .map((course) =>
+            String(course?.subRubro || course?.categoryLabel || "").trim(),
+          )
           .filter(Boolean);
         if (!alive) return;
         setCategoryOptions((current) =>
@@ -3380,7 +4653,7 @@ export default function CourseWizard({ jobId }) {
             ...current,
             values.category,
             course?.subRubro,
-          ])
+          ]),
         );
       } catch {
         // fallback: solo COURSE_CATEGORIES + current + curso actual
@@ -3391,7 +4664,7 @@ export default function CourseWizard({ jobId }) {
             ...current,
             values.category,
             course?.subRubro,
-          ])
+          ]),
         );
       }
     }
@@ -3422,7 +4695,10 @@ export default function CourseWizard({ jobId }) {
     const nextClassesCount = countCurriculumLessons(values.curriculum);
     const currentClassesCount = Number(values.classesCount || 0);
     if (!nextClassesCount || nextClassesCount === currentClassesCount) return;
-    setValue("classesCount", nextClassesCount, { shouldValidate: true, shouldDirty: true });
+    setValue("classesCount", nextClassesCount, {
+      shouldValidate: true,
+      shouldDirty: true,
+    });
   }, [setValue, values.classesCount, values.curriculum]);
 
   useEffect(() => {
@@ -3441,7 +4717,9 @@ export default function CourseWizard({ jobId }) {
       let curriculumSnapshot = null;
       try {
         if (typeof window !== "undefined") {
-          const rawSnapshot = window.sessionStorage.getItem(`acav:courses:curriculum:${String(jobId).trim()}`);
+          const rawSnapshot = window.sessionStorage.getItem(
+            `acav:courses:curriculum:${String(jobId).trim()}`,
+          );
           if (rawSnapshot) {
             curriculumSnapshot = JSON.parse(rawSnapshot);
           }
@@ -3450,18 +4728,30 @@ export default function CourseWizard({ jobId }) {
         curriculumSnapshot = null;
       }
       try {
-        const data = await authedFetch(user, `/api/courses/${jobId}`, { method: "GET" });
+        const data = await authedFetch(user, `/api/courses/${jobId}`, {
+          method: "GET",
+        });
         if (!alive) return;
         const current = data?.course || {};
         setCourse(current);
         const baseFormValues = mapCourseToFormValues(current, defaultValues);
-        if (curriculumSnapshot && Array.isArray(curriculumSnapshot) && curriculumSnapshot.length) {
+        if (
+          curriculumSnapshot &&
+          Array.isArray(curriculumSnapshot) &&
+          curriculumSnapshot.length
+        ) {
           baseFormValues.curriculum = sanitizeCurriculum(curriculumSnapshot);
-          baseFormValues.modules = buildLegacyModulesFromCurriculum(baseFormValues.curriculum);
-          baseFormValues.classesCount = countCurriculumLessons(baseFormValues.curriculum) || baseFormValues.classesCount;
+          baseFormValues.modules = buildLegacyModulesFromCurriculum(
+            baseFormValues.curriculum,
+          );
+          baseFormValues.classesCount =
+            countCurriculumLessons(baseFormValues.curriculum) ||
+            baseFormValues.classesCount;
         }
         reset(baseFormValues);
-        setSlugTouchedManually(isCustomSlugForTitle(current?.title, current?.slug));
+        setSlugTouchedManually(
+          isCustomSlugForTitle(current?.title, current?.slug),
+        );
         setCourseLoadError("");
         setCourseLoadedAt(new Date().toISOString());
         toast.success("Curso cargado correctamente", { position: "top-right" });
@@ -3485,15 +4775,23 @@ export default function CourseWizard({ jobId }) {
     setValue(
       field,
       next.map((item) => String(item || "")),
-      { shouldValidate: true, shouldDirty: true }
+      { shouldValidate: true, shouldDirty: true },
     );
   };
 
   const updateCurriculum = (nextCurriculum) => {
     const next = Array.isArray(nextCurriculum) ? nextCurriculum : [];
-    setValue("curriculum", next, { shouldValidate: true, shouldDirty: true, shouldTouch: true });
+    setValue("curriculum", next, {
+      shouldValidate: true,
+      shouldDirty: true,
+      shouldTouch: true,
+    });
     const nextClassesCount = countCurriculumLessons(next);
-    setValue("classesCount", nextClassesCount || 1, { shouldValidate: true, shouldDirty: true, shouldTouch: true });
+    setValue("classesCount", nextClassesCount || 1, {
+      shouldValidate: true,
+      shouldDirty: true,
+      shouldTouch: true,
+    });
     try {
       const id = jobId && String(jobId).trim();
       if (!id || typeof window === "undefined") return;
@@ -3512,29 +4810,49 @@ export default function CourseWizard({ jobId }) {
   const updateFinalEvaluation = (nextEvaluation) => {
     setValue(
       "finalEvaluation",
-      nextEvaluation && typeof nextEvaluation === "object" ? nextEvaluation : { enabled: false, questions: [] },
-      { shouldValidate: true, shouldDirty: true }
+      nextEvaluation && typeof nextEvaluation === "object"
+        ? nextEvaluation
+        : { enabled: false, questions: [] },
+      { shouldValidate: true, shouldDirty: true },
     );
   };
 
-  const handleImageUploadField = async (field, nextItems, folder, successMessage, storageKey) => {
+  const handleImageUploadField = async (
+    field,
+    nextItems,
+    folder,
+    successMessage,
+    storageKey,
+  ) => {
     const first = Array.isArray(nextItems) ? nextItems[0] : undefined;
     const clearIt = !first || !first?.url;
     if (clearIt) {
       setValue(field, "", { shouldValidate: false, shouldDirty: true });
-      if (storageKey) setValue(storageKey, undefined, { shouldValidate: false, shouldDirty: true });
+      if (storageKey)
+        setValue(storageKey, undefined, {
+          shouldValidate: false,
+          shouldDirty: true,
+        });
       clearErrors(field);
       return;
     }
     try {
-      setValue(field, String(first.url || ""), { shouldValidate: true, shouldDirty: true });
+      setValue(field, String(first.url || ""), {
+        shouldValidate: true,
+        shouldDirty: true,
+      });
       if (storageKey && first.storageKey) {
-        setValue(storageKey, String(first.storageKey), { shouldValidate: false, shouldDirty: true });
+        setValue(storageKey, String(first.storageKey), {
+          shouldValidate: false,
+          shouldDirty: true,
+        });
       }
       clearErrors(field);
       toast.success(successMessage, { position: "top-right" });
     } catch (error) {
-      toast.error(error?.message || "No se pudo actualizar la imagen.", { position: "top-right" });
+      toast.error(error?.message || "No se pudo actualizar la imagen.", {
+        position: "top-right",
+      });
     }
   };
 
@@ -3552,10 +4870,15 @@ export default function CourseWizard({ jobId }) {
           sizeBytes: file.size,
         },
       ];
-      setValue("attachments", next, { shouldValidate: true, shouldDirty: true });
+      setValue("attachments", next, {
+        shouldValidate: true,
+        shouldDirty: true,
+      });
       toast.success("Archivo adicional cargado", { position: "top-right" });
     } catch (error) {
-      toast.error(error?.message || "No se pudo cargar el adjunto.", { position: "top-right" });
+      toast.error(error?.message || "No se pudo cargar el adjunto.", {
+        position: "top-right",
+      });
     } finally {
       setUploading(false);
     }
@@ -3574,14 +4897,28 @@ export default function CourseWizard({ jobId }) {
       const metadata = await extractVideoMetadata(file);
       const url = await uploadToR2(file, "courses/videos");
       setValue("promoVideo", url, { shouldValidate: true, shouldDirty: true });
-      setValue("promoVideoFileName", file.name, { shouldValidate: false, shouldDirty: true });
-      setValue("promoVideoMimeType", file.type, { shouldValidate: false, shouldDirty: true });
-      setValue("promoVideoSizeBytes", file.size, { shouldValidate: false, shouldDirty: true });
-      setValue("promoVideoDurationSeconds", metadata.durationSeconds || 0, { shouldValidate: false, shouldDirty: true });
+      setValue("promoVideoFileName", file.name, {
+        shouldValidate: false,
+        shouldDirty: true,
+      });
+      setValue("promoVideoMimeType", file.type, {
+        shouldValidate: false,
+        shouldDirty: true,
+      });
+      setValue("promoVideoSizeBytes", file.size, {
+        shouldValidate: false,
+        shouldDirty: true,
+      });
+      setValue("promoVideoDurationSeconds", metadata.durationSeconds || 0, {
+        shouldValidate: false,
+        shouldDirty: true,
+      });
       clearErrors("promoVideo");
       toast.success("Video de presentación cargado", { position: "top-right" });
     } catch (error) {
-      toast.error(error?.message || "No se pudo cargar el video.", { position: "top-right" });
+      toast.error(error?.message || "No se pudo cargar el video.", {
+        position: "top-right",
+      });
     } finally {
       setUploading(false);
     }
@@ -3589,9 +4926,16 @@ export default function CourseWizard({ jobId }) {
 
   const clearForm = ({ resetForm = true, showToast = true } = {}) => {
     if (resetForm) {
-      const baseValues = jobId && course ? mapCourseToFormValues(course, defaultValues) : defaultValues;
+      const baseValues =
+        jobId && course
+          ? mapCourseToFormValues(course, defaultValues)
+          : defaultValues;
       reset(baseValues);
-      setSlugTouchedManually(Boolean(jobId && isCustomSlugForTitle(baseValues?.title, baseValues?.slug)));
+      setSlugTouchedManually(
+        Boolean(
+          jobId && isCustomSlugForTitle(baseValues?.title, baseValues?.slug),
+        ),
+      );
       clearErrors();
       setActiveTab("general");
     }
@@ -3604,7 +4948,7 @@ export default function CourseWizard({ jobId }) {
     setValue(
       "attachments",
       (values.attachments || []).filter((item) => item.id !== attachmentId),
-      { shouldValidate: true, shouldDirty: true }
+      { shouldValidate: true, shouldDirty: true },
     );
   };
 
@@ -3644,10 +4988,15 @@ export default function CourseWizard({ jobId }) {
   const handleCreateCategory = async () => {
     const nextCategory = String(newCategoryTitle || "").trim();
     if (!nextCategory) {
-      toast.error("Ingresá un título para la categoría.", { position: "top-right" });
+      toast.error("Ingresá un título para la categoría.", {
+        position: "top-right",
+      });
       return;
     }
-    const nextOptions = normalizeCategoryOptions([...categoryOptions, nextCategory]);
+    const nextOptions = normalizeCategoryOptions([
+      ...categoryOptions,
+      nextCategory,
+    ]);
     setCategoryOptions(nextOptions);
     clearErrors("category");
     setValue("category", nextCategory, {
@@ -3664,9 +5013,19 @@ export default function CourseWizard({ jobId }) {
 
   const buildPayload = (formValues, mode) => {
     const isFree = Boolean(formValues.freeCourse);
-    const resolvedInstitutionId = String(actor?.companyId || actor?.institutionId || course?.institutionId || course?.companyId || "").trim();
+    const resolvedInstitutionId = String(
+      actor?.companyId ||
+        actor?.institutionId ||
+        course?.institutionId ||
+        course?.companyId ||
+        "",
+    ).trim();
     const resolvedInstitutionName = String(
-      actor?.companyName || actor?.institutionName || course?.institutionName || course?.companyName || ""
+      actor?.companyName ||
+        actor?.institutionName ||
+        course?.institutionName ||
+        course?.companyName ||
+        "",
     ).trim();
     const learningObjectives = sanitizeList(formValues.learningObjectives);
     const requirementsList = sanitizeList(formValues.requirements);
@@ -3674,26 +5033,38 @@ export default function CourseWizard({ jobId }) {
     const curriculumRaw = sanitizeCurriculum(formValues.curriculum);
     const curriculum = curriculumRaw.map((section) => ({
       ...section,
-      lessons: (Array.isArray(section?.lessons) ? section.lessons : []).map((lesson) => {
-        const lessonVideoAsset = lesson?.videoAsset;
-        const hasAsset = Boolean(lessonVideoAsset && typeof lessonVideoAsset === "object" && (lessonVideoAsset.url || lessonVideoAsset.storageKey));
-        const baseVideoUrl = String(lesson?.videoUrl || "").trim();
-        const videoUrl = hasAsset ? String(lessonVideoAsset.url || baseVideoUrl) : baseVideoUrl;
-        return {
-          ...lesson,
-          videoUrl: videoUrl || undefined,
-          videoAsset: hasAsset ? lessonVideoAsset : undefined,
-        };
-      }),
+      lessons: (Array.isArray(section?.lessons) ? section.lessons : []).map(
+        (lesson) => {
+          const lessonVideoAsset = lesson?.videoAsset;
+          const hasAsset = Boolean(
+            lessonVideoAsset &&
+            typeof lessonVideoAsset === "object" &&
+            (lessonVideoAsset.url || lessonVideoAsset.storageKey),
+          );
+          const baseVideoUrl = String(lesson?.videoUrl || "").trim();
+          const videoUrl = hasAsset
+            ? String(lessonVideoAsset.url || baseVideoUrl)
+            : baseVideoUrl;
+          return {
+            ...lesson,
+            videoUrl: videoUrl || undefined,
+            videoAsset: hasAsset ? lessonVideoAsset : undefined,
+          };
+        },
+      ),
     }));
     const modules = buildLegacyModulesFromCurriculum(curriculum);
     const finalEvaluation = sanitizeFinalEvaluation(formValues.finalEvaluation);
-    const classesCount = countCurriculumLessons(curriculum) || Number(formValues.classesCount || 0);
+    const classesCount =
+      countCurriculumLessons(curriculum) ||
+      Number(formValues.classesCount || 0);
     const attachments = sanitizeAttachments(formValues.attachments);
     const shortDescription = String(formValues.shortDescription || "").trim();
     const description = String(formValues.description || "").trim();
     const duration = String(formValues.duration || "").trim();
-    const safeExpiresAtDate = clampDateInputToTodayOrFuture(formValues.expiresAtDate);
+    const safeExpiresAtDate = clampDateInputToTodayOrFuture(
+      formValues.expiresAtDate,
+    );
     const modalityMap = {
       "100% Online": "Virtual",
       "En vivo": "Remoto",
@@ -3735,40 +5106,60 @@ export default function CourseWizard({ jobId }) {
       ]
         .filter(Boolean)
         .join("\n"),
-      imageUrl: formValues.coverImage ? String(formValues.coverImage).trim() : undefined,
-      thumbnailUrl: formValues.thumbnail ? String(formValues.thumbnail).trim() : undefined,
+      imageUrl: formValues.coverImage
+        ? String(formValues.coverImage).trim()
+        : undefined,
+      thumbnailUrl: formValues.thumbnail
+        ? String(formValues.thumbnail).trim()
+        : undefined,
       videoUrl:
         formValues.promoVideoAsset?.url || formValues.promoVideo
-          ? String(formValues.promoVideoAsset?.url || formValues.promoVideo || "").trim() || undefined
+          ? String(
+              formValues.promoVideoAsset?.url || formValues.promoVideo || "",
+            ).trim() || undefined
           : undefined,
       videoAsset: formValues.promoVideoAsset || undefined,
-      videoFileName:
-        formValues.promoVideoAsset?.url
-          ? formValues.promoVideoAsset?.name || formValues.promoVideoFileName || undefined
-          : formValues.promoVideo
-            ? undefined
-            : undefined,
-      videoMimeType:
-        formValues.promoVideoAsset?.url
-          ? formValues.promoVideoAsset?.mimeType || formValues.promoVideoMimeType || undefined
-          : formValues.promoVideo
-            ? undefined
-            : undefined,
-      videoSizeBytes:
-        formValues.promoVideoAsset?.url
-          ? formValues.promoVideoAsset?.fileSize || formValues.promoVideoSizeBytes || undefined
-          : formValues.promoVideo
-            ? undefined
-            : undefined,
-      videoDurationSeconds:
-        formValues.promoVideoAsset?.url
-          ? formValues.promoVideoAsset?.durationSeconds || formValues.promoVideoDurationSeconds || undefined
-          : formValues.promoVideo
-            ? undefined
-            : undefined,
+      videoFileName: formValues.promoVideoAsset?.url
+        ? formValues.promoVideoAsset?.name ||
+          formValues.promoVideoFileName ||
+          undefined
+        : formValues.promoVideo
+          ? undefined
+          : undefined,
+      videoMimeType: formValues.promoVideoAsset?.url
+        ? formValues.promoVideoAsset?.mimeType ||
+          formValues.promoVideoMimeType ||
+          undefined
+        : formValues.promoVideo
+          ? undefined
+          : undefined,
+      videoSizeBytes: formValues.promoVideoAsset?.url
+        ? formValues.promoVideoAsset?.fileSize ||
+          formValues.promoVideoSizeBytes ||
+          undefined
+        : formValues.promoVideo
+          ? undefined
+          : undefined,
+      videoDurationSeconds: formValues.promoVideoAsset?.url
+        ? formValues.promoVideoAsset?.durationSeconds ||
+          formValues.promoVideoDurationSeconds ||
+          undefined
+        : formValues.promoVideo
+          ? undefined
+          : undefined,
       attachments,
+      documentationUrl: formValues.documentationUrl
+        ? String(formValues.documentationUrl).trim()
+        : undefined,
+      forumQuestions: Array.isArray(formValues.forumQuestions)
+        ? formValues.forumQuestions.map((q, i) => ({
+            ...q,
+            order: Number.isFinite(Number(q?.order)) ? Number(q.order) : i,
+            answers: Array.isArray(q?.answers) ? q.answers : [],
+          }))
+        : [],
       price: isFree ? 0 : Number(formValues.price || 0),
-      oldPrice: formValues.oldPrice || undefined,
+      oldPrice: isFree ? undefined : formValues.oldPrice || undefined,
       freeCourse: isFree,
       includesCertificate: Boolean(formValues.certificate),
       lifetimeAccess: Boolean(formValues.lifetimeAccess),
@@ -3779,7 +5170,12 @@ export default function CourseWizard({ jobId }) {
       allowEnrollment: Boolean(formValues.allowEnrollment),
       showOnHome: Boolean(formValues.showOnHome),
       publicationStatus: formValues.status,
-      status: mode === "publish" ? "activa" : mode === "review" ? "pendiente_revision" : formValues.status,
+      status:
+        mode === "publish"
+          ? "activa"
+          : mode === "review"
+            ? "pendiente_revision"
+            : formValues.status,
       expiresAt: isoFromDateInput(safeExpiresAtDate),
       initialModality: modalityMap[formValues.modality] || "Virtual",
       workMode: modalityMap[formValues.modality] || "Virtual",
@@ -3801,7 +5197,9 @@ export default function CourseWizard({ jobId }) {
           body: JSON.stringify(payload),
         });
         setCourse(data?.course || null);
-        toast.success("Curso actualizado correctamente", { position: "top-right" });
+        toast.success("Curso actualizado correctamente", {
+          position: "top-right",
+        });
         return data?.course;
       }
       const data = await authedFetch(user, "/api/courses", {
@@ -3809,7 +5207,12 @@ export default function CourseWizard({ jobId }) {
         body: JSON.stringify(payload),
       });
       setCourse(data?.course || null);
-      toast.success(actor?.role === "empresa" ? "Curso enviado a revisión" : "Curso creado correctamente", { position: "top-right" });
+      toast.success(
+        actor?.role === "empresa"
+          ? "Curso enviado a revisión"
+          : "Curso creado correctamente",
+        { position: "top-right" },
+      );
       return data?.course;
     } catch (error) {
       console.error("Error guardando curso", {
@@ -3825,18 +5228,28 @@ export default function CourseWizard({ jobId }) {
   };
 
   const onSubmit = async (formValues) => {
-    if (typeof window !== "undefined" && Date.now() < preventSubmitUntil) return;
+    if (typeof window !== "undefined" && Date.now() < preventSubmitUntil)
+      return;
     try {
-      const mode = actor?.role === "admin" && formValues.status === "activa" ? "publish" : actor?.role === "admin" ? "draft" : "review";
+      const mode =
+        actor?.role === "admin" && formValues.status === "activa"
+          ? "publish"
+          : actor?.role === "admin"
+            ? "draft"
+            : "review";
       await submit(formValues, mode);
       clearForm({ resetForm: false, showToast: false });
       router.push(buildLocalizedPath("/dashboard/cursos"));
     } catch (error) {
-      toast.error(error?.message || "No se pudo guardar el curso.", { position: "top-right" });
+      toast.error(error?.message || "No se pudo guardar el curso.", {
+        position: "top-right",
+      });
     }
   };
 
-  const publicCourseHref = course?.slug ? buildLocalizedPath(`/cursos/${course.slug}`) : "";
+  const publicCourseHref = course?.slug
+    ? buildLocalizedPath(`/cursos/${course.slug}`)
+    : "";
 
   if (actorLoading || loadingCourse) {
     return (
@@ -3848,7 +5261,9 @@ export default function CourseWizard({ jobId }) {
             </div>
             <div>
               <div className="text-sm font-semibold text-foreground">
-                {jobId ? "Cargando curso existente..." : "Cargando configurador de cursos..."}
+                {jobId
+                  ? "Cargando curso existente..."
+                  : "Cargando configurador de cursos..."}
               </div>
               <p className="mt-1 text-sm text-muted-foreground">
                 {jobId
@@ -3870,7 +5285,9 @@ export default function CourseWizard({ jobId }) {
   if (actorError) {
     return (
       <div className="rounded-[28px] border border-border/60 bg-card p-8">
-        <h2 className="text-xl font-semibold text-foreground">No se pudo cargar el perfil del editor</h2>
+        <h2 className="text-xl font-semibold text-foreground">
+          No se pudo cargar el perfil del editor
+        </h2>
         <p className="mt-2 text-sm text-muted-foreground">{actorError}</p>
       </div>
     );
@@ -3881,15 +5298,25 @@ export default function CourseWizard({ jobId }) {
       <div className="rounded-[28px] border border-destructive/20 bg-card p-8">
         <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
           <div>
-            <h2 className="text-xl font-semibold text-foreground">No pudimos cargar el curso</h2>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">{courseLoadError}</p>
+            <h2 className="text-xl font-semibold text-foreground">
+              No pudimos cargar el curso
+            </h2>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
+              {courseLoadError}
+            </p>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row">
-            <Button type="button" variant="outline" onClick={() => setCourseLoadAttempt((value) => value + 1)}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setCourseLoadAttempt((value) => value + 1)}
+            >
               Reintentar carga
             </Button>
             <Button type="button" asChild>
-              <Link href={buildLocalizedPath("/dashboard/cursos")}>Volver al listado</Link>
+              <Link href={buildLocalizedPath("/dashboard/cursos")}>
+                Volver al listado
+              </Link>
             </Button>
           </div>
         </div>
@@ -3899,80 +5326,133 @@ export default function CourseWizard({ jobId }) {
 
   return (
     <div className="grid gap-6 text-[0.625em] leading-tight [&_*]:!leading-tight [&_*]:!tracking-normal">
-      <form onSubmit={handleSubmit(onSubmit, onInvalidSubmit)} className="grid gap-6 [line-height:1.35]">
+      <form
+        onSubmit={handleSubmit(onSubmit, onInvalidSubmit)}
+        className="grid gap-6 [line-height:1.35]"
+      >
         <div className="rounded-[30px] border border-border/60 bg-card/95 p-4 shadow-sm backdrop-blur">
-        <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-          <div className="flex items-center gap-3 min-w-0">
-            <Button type="button" variant="ghost" size="icon" asChild className="shrink-0 h-8 w-8 rounded-xl text-muted-foreground hover:text-foreground">
-              <Link href={buildLocalizedPath("/dashboard/cursos")} aria-label="Volver al listado de cursos">
-                <ChevronRight className="h-3.5 w-3.5 rotate-180" />
-              </Link>
-            </Button>
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
-                <Link href={buildLocalizedPath("/dashboard/cursos")} className="hover:text-foreground transition-colors">
-                  Cursos
+          <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+            <div className="flex items-center gap-3 min-w-0">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                asChild
+                className="shrink-0 h-8 w-8 rounded-xl text-muted-foreground hover:text-foreground"
+              >
+                <Link
+                  href={buildLocalizedPath("/dashboard/cursos")}
+                  aria-label="Volver al listado de cursos"
+                >
+                  <ChevronRight className="h-3.5 w-3.5 rotate-180" />
                 </Link>
-                <span className="text-slate-300">/</span>
-                <span className="font-medium text-foreground truncate">{jobId ? "Editar curso" : "Crear curso"}</span>
-              </div>
-              <div className="mt-1 flex flex-wrap items-center gap-1.5 min-w-0">
-                <h1 className="text-[15px] font-semibold tracking-[-0.03em] text-foreground truncate">
-                  {values.title || (jobId ? "Curso" : "Nuevo curso")}
-                </h1>
-                {(() => {
-                  const statusMeta = PUBLICATION_STATUS_OPTIONS.find((item) => item.value === (values.status || "borrador"));
-                  const tone = statusMeta?.tone || "secondary";
-                  return statusMeta ? (
-                    <Badge variant="soft" color={tone} className="h-5 px-2 text-[10px] rounded-full shrink-0">
-                      {statusMeta.label}
-                    </Badge>
-                  ) : null;
-                })()}
-                <span className="inline-flex h-5 items-center gap-1 rounded-full border border-border/60 bg-background px-2 text-[10px] font-medium text-muted-foreground shrink-0">
-                  {values.classesCount || 0} clases · {Array.isArray(values.curriculum) ? values.curriculum.length : 0} secciones
-                </span>
+              </Button>
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
+                  <Link
+                    href={buildLocalizedPath("/dashboard/cursos")}
+                    className="hover:text-foreground transition-colors"
+                  >
+                    Cursos
+                  </Link>
+                  <span className="text-slate-300">/</span>
+                  <span className="font-medium text-foreground truncate">
+                    {jobId ? "Editar curso" : "Crear curso"}
+                  </span>
+                </div>
+                <div className="mt-1 flex flex-wrap items-center gap-1.5 min-w-0">
+                  <h1 className="text-[15px] font-semibold tracking-[-0.03em] text-foreground truncate">
+                    {values.title || (jobId ? "Curso" : "Nuevo curso")}
+                  </h1>
+                  {(() => {
+                    const statusMeta = PUBLICATION_STATUS_OPTIONS.find(
+                      (item) => item.value === (values.status || "borrador"),
+                    );
+                    const tone = statusMeta?.tone || "secondary";
+                    return statusMeta ? (
+                      <Badge
+                        variant="soft"
+                        color={tone}
+                        className="h-5 px-2 text-[10px] rounded-full shrink-0"
+                      >
+                        {statusMeta.label}
+                      </Badge>
+                    ) : null;
+                  })()}
+                  <span className="inline-flex h-5 items-center gap-1 rounded-full border border-border/60 bg-background px-2 text-[10px] font-medium text-muted-foreground shrink-0">
+                    {values.classesCount || 0} clases ·{" "}
+                    {Array.isArray(values.curriculum)
+                      ? values.curriculum.length
+                      : 0}{" "}
+                    secciones
+                  </span>
+                </div>
               </div>
             </div>
-          </div>
 
-          <div className="flex flex-wrap items-center gap-2 shrink-0">
-            {publicCourseHref ? (
-              <Button type="button" variant="ghost" size="sm" asChild className="h-8 text-[11px]">
-                <Link href={publicCourseHref} className="gap-1.5">
-                  <Eye className="h-3.5 w-3.5" />
-                  Vista previa
-                </Link>
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
+              {publicCourseHref ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  asChild
+                  className="h-8 text-[11px]"
+                >
+                  <Link href={publicCourseHref} className="gap-1.5">
+                    <Eye className="h-3.5 w-3.5" />
+                    Vista previa
+                  </Link>
+                </Button>
+              ) : null}
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => clearForm()}
+                disabled={busy}
+                className="h-8 text-[11px] text-muted-foreground hover:text-foreground"
+              >
+                Reiniciar formulario
               </Button>
-            ) : null}
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => clearForm()}
-              disabled={busy}
-              className="h-8 text-[11px] text-muted-foreground hover:text-foreground"
-            >
-              Reiniciar formulario
-            </Button>
-            {!isLastTab ? (
-              <Button type="button" size="sm" onClick={goToNextTab} disabled={busy} className="h-8 text-[11px]">
-                Siguiente
-                <ChevronRight className="ml-1 h-3.5 w-3.5" />
-              </Button>
-            ) : (
-              <Button type="submit" size="sm" disabled={busy || submitBlocked} className="h-8 text-[11px] min-w-[160px]">
-                {submitting ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Save className="mr-1.5 h-3.5 w-3.5" />}
-                {submitting ? savingSubmitLabel : primarySubmitLabel}
-              </Button>
-            )}
+              {!isLastTab ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={goToNextTab}
+                  disabled={busy}
+                  className="h-8 text-[11px]"
+                >
+                  Siguiente
+                  <ChevronRight className="ml-1 h-3.5 w-3.5" />
+                </Button>
+              ) : (
+                <Button
+                  type="submit"
+                  size="sm"
+                  disabled={busy || submitBlocked}
+                  className="h-8 text-[11px] min-w-[160px]"
+                >
+                  {submitting ? (
+                    <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Save className="mr-1.5 h-3.5 w-3.5" />
+                  )}
+                  {submitting ? savingSubmitLabel : primarySubmitLabel}
+                </Button>
+              )}
+            </div>
           </div>
         </div>
-      </div>
 
         <div className="grid gap-6 xl:grid-cols-[280px_minmax(0,1fr)]">
           <div className="sticky top-4 self-start z-20 w-full max-w-[320px]">
-            <WorkspaceSidebar activeTab={activeTab} onSelect={handleTabChange} values={values} errors={errors} />
+            <WorkspaceSidebar
+              activeTab={activeTab}
+              onSelect={handleTabChange}
+              values={values}
+              errors={errors}
+            />
           </div>
 
           <div className="grid gap-6 content-baseline">
@@ -3984,18 +5464,25 @@ export default function CourseWizard({ jobId }) {
                       Título del curso
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <button type="button" className="inline-flex h-4 w-4 items-center justify-center text-slate-400 hover:text-slate-700">
+                          <button
+                            type="button"
+                            className="inline-flex h-4 w-4 items-center justify-center text-slate-400 hover:text-slate-700"
+                          >
                             <HelpCircle className="h-3.5 w-3.5" />
                           </button>
                         </TooltipTrigger>
                         <TooltipContent side="right">
                           <div className="max-w-xs text-[11px] leading-5">
-                            Título orientado a alumnos. Buscá que sea claro, accionable y resalte el resultado final.
+                            Título orientado a alumnos. Buscá que sea claro,
+                            accionable y resalte el resultado final.
                           </div>
                         </TooltipContent>
                       </Tooltip>
                     </Label>
-                    <Input placeholder="Ej: Diseño UX para e-learning" {...register("title")} />
+                    <Input
+                      placeholder="Ej: Diseño UX para e-learning"
+                      {...register("title")}
+                    />
                     <FieldError error={errors.title} />
                   </div>
                   <div className="grid gap-2">
@@ -4003,20 +5490,25 @@ export default function CourseWizard({ jobId }) {
                       URL del curso
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <button type="button" className="inline-flex h-4 w-4 items-center justify-center text-slate-400 hover:text-slate-700">
+                          <button
+                            type="button"
+                            className="inline-flex h-4 w-4 items-center justify-center text-slate-400 hover:text-slate-700"
+                          >
                             <HelpCircle className="h-3.5 w-3.5" />
                           </button>
                         </TooltipTrigger>
                         <TooltipContent side="right">
                           <div className="max-w-xs text-[11px] leading-5">
-                            Se genera automáticamente desde el título. Es el link que usarán los alumnos para ver el curso.
+                            Se genera automáticamente desde el título. Es el
+                            link que usarán los alumnos para ver el curso.
                           </div>
                         </TooltipContent>
                       </Tooltip>
                     </Label>
                     <input type="hidden" {...register("slug")} />
                     <div className="flex min-h-10 items-center rounded-md border border-border/60 bg-muted/40 px-3 text-sm text-muted-foreground">
-                      {values.slug || "Se generará automáticamente desde el título"}
+                      {values.slug ||
+                        "Se generará automáticamente desde el título"}
                     </div>
                     <FieldError error={errors.slug} />
                   </div>
@@ -4028,13 +5520,17 @@ export default function CourseWizard({ jobId }) {
                       Categoría
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <button type="button" className="inline-flex h-4 w-4 items-center justify-center text-slate-400 hover:text-slate-700">
+                          <button
+                            type="button"
+                            className="inline-flex h-4 w-4 items-center justify-center text-slate-400 hover:text-slate-700"
+                          >
                             <HelpCircle className="h-3.5 w-3.5" />
                           </button>
                         </TooltipTrigger>
                         <TooltipContent side="right">
                           <div className="max-w-xs text-[11px] leading-5">
-                            Agrupa cursos similares en el catálogo. Podés crear nuevas categorías con el botón +.
+                            Agrupa cursos similares en el catálogo. Podés crear
+                            nuevas categorías con el botón +.
                           </div>
                         </TooltipContent>
                       </Tooltip>
@@ -4045,7 +5541,11 @@ export default function CourseWizard({ jobId }) {
                         value={values.category || ""}
                         onValueChange={(value) => {
                           clearErrors("category");
-                          setValue("category", value, { shouldValidate: true, shouldDirty: true, shouldTouch: true });
+                          setValue("category", value, {
+                            shouldValidate: true,
+                            shouldDirty: true,
+                            shouldTouch: true,
+                          });
                         }}
                       >
                         <SelectTrigger className="flex-1">
@@ -4059,7 +5559,13 @@ export default function CourseWizard({ jobId }) {
                           ))}
                         </SelectContent>
                       </Select>
-                      <Button type="button" variant="outline" size="icon" onClick={() => setCategoryDialogOpen(true)} aria-label="Crear categoría">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        onClick={() => setCategoryDialogOpen(true)}
+                        aria-label="Crear categoría"
+                      >
                         <Plus className="h-4 w-4" />
                       </Button>
                     </div>
@@ -4070,18 +5576,30 @@ export default function CourseWizard({ jobId }) {
                       Nivel
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <button type="button" className="inline-flex h-4 w-4 items-center justify-center text-slate-400 hover:text-slate-700">
+                          <button
+                            type="button"
+                            className="inline-flex h-4 w-4 items-center justify-center text-slate-400 hover:text-slate-700"
+                          >
                             <HelpCircle className="h-3.5 w-3.5" />
                           </button>
                         </TooltipTrigger>
                         <TooltipContent side="right">
                           <div className="max-w-xs text-[11px] leading-5">
-                            Ayuda a los alumnos a entender si el curso es para su perfil.
+                            Ayuda a los alumnos a entender si el curso es para
+                            su perfil.
                           </div>
                         </TooltipContent>
                       </Tooltip>
                     </Label>
-                    <Select value={values.level || ""} onValueChange={(value) => setValue("level", value, { shouldValidate: true, shouldDirty: true })}>
+                    <Select
+                      value={values.level || ""}
+                      onValueChange={(value) =>
+                        setValue("level", value, {
+                          shouldValidate: true,
+                          shouldDirty: true,
+                        })
+                      }
+                    >
                       <SelectTrigger>
                         <SelectValue placeholder="Seleccionar nivel" />
                       </SelectTrigger>
@@ -4100,18 +5618,30 @@ export default function CourseWizard({ jobId }) {
                       Modalidad
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <button type="button" className="inline-flex h-4 w-4 items-center justify-center text-slate-400 hover:text-slate-700">
+                          <button
+                            type="button"
+                            className="inline-flex h-4 w-4 items-center justify-center text-slate-400 hover:text-slate-700"
+                          >
                             <HelpCircle className="h-3.5 w-3.5" />
                           </button>
                         </TooltipTrigger>
                         <TooltipContent side="right">
                           <div className="max-w-xs text-[11px] leading-5">
-                            Cómo se cursa: 100% Online, en vivo, híbrido o presencial.
+                            Cómo se cursa: 100% Online, en vivo, híbrido o
+                            presencial.
                           </div>
                         </TooltipContent>
                       </Tooltip>
                     </Label>
-                    <Select value={values.modality || ""} onValueChange={(value) => setValue("modality", value, { shouldValidate: true, shouldDirty: true })}>
+                    <Select
+                      value={values.modality || ""}
+                      onValueChange={(value) =>
+                        setValue("modality", value, {
+                          shouldValidate: true,
+                          shouldDirty: true,
+                        })
+                      }
+                    >
                       <SelectTrigger>
                         <SelectValue placeholder="Seleccionar modalidad" />
                       </SelectTrigger>
@@ -4130,7 +5660,10 @@ export default function CourseWizard({ jobId }) {
                       Idioma
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <button type="button" className="inline-flex h-4 w-4 items-center justify-center text-slate-400 hover:text-slate-700">
+                          <button
+                            type="button"
+                            className="inline-flex h-4 w-4 items-center justify-center text-slate-400 hover:text-slate-700"
+                          >
                             <HelpCircle className="h-3.5 w-3.5" />
                           </button>
                         </TooltipTrigger>
@@ -4141,7 +5674,15 @@ export default function CourseWizard({ jobId }) {
                         </TooltipContent>
                       </Tooltip>
                     </Label>
-                    <Select value={values.language || ""} onValueChange={(value) => setValue("language", value, { shouldValidate: true, shouldDirty: true })}>
+                    <Select
+                      value={values.language || ""}
+                      onValueChange={(value) =>
+                        setValue("language", value, {
+                          shouldValidate: true,
+                          shouldDirty: true,
+                        })
+                      }
+                    >
                       <SelectTrigger>
                         <SelectValue placeholder="Seleccionar idioma" />
                       </SelectTrigger>
@@ -4165,46 +5706,113 @@ export default function CourseWizard({ jobId }) {
                   <div className="grid gap-4">
                     <div className="grid gap-2">
                       <Label>Descripción corta</Label>
-                      <Textarea rows={3} maxLength={180} placeholder="Resumen breve orientado a venta y conversión." {...register("shortDescription")} />
+                      <Textarea
+                        rows={3}
+                        maxLength={180}
+                        placeholder="Resumen breve orientado a venta y conversión."
+                        {...register("shortDescription")}
+                      />
                       <div className="flex justify-between text-xs text-muted-foreground">
                         <span>Máximo 180 caracteres</span>
-                        <span>{String(values.shortDescription || "").length}/180</span>
+                        <span>
+                          {String(values.shortDescription || "").length}/180
+                        </span>
                       </div>
                       <FieldError error={errors.shortDescription} />
                     </div>
                     <div className="grid gap-2">
                       <Label>Descripción completa</Label>
-                      <Textarea rows={6} placeholder="Desarrolla la propuesta, metodología, beneficios y resultados." {...register("description")} />
+                      <Textarea
+                        rows={6}
+                        placeholder="Desarrolla la propuesta, metodología, beneficios y resultados."
+                        {...register("description")}
+                      />
                       <FieldError error={errors.description} />
                     </div>
                     <div className="grid gap-4 xl:grid-cols-3">
-                      <ChipListField label="¿Qué aprenderás?" description="Resultados concretos que el alumno obtendrá." items={values.learningObjectives || []} onChange={(next) => updateArrayField("learningObjectives", next)} placeholder="Ej: Diseñar landing pages con foco en conversión" error={errors.learningObjectives} />
-                      <ChipListField label="Requisitos previos" description="Conocimientos previos o herramientas necesarias." items={values.requirements || []} onChange={(next) => updateArrayField("requirements", next)} placeholder="Ej: Manejo básico de Figma" error={errors.requirements} />
-                      <ChipListField label="Audiencia objetivo" items={values.targetAudience || []} onChange={(next) => updateArrayField("targetAudience", next)} placeholder="Ej: Diseñadores UX que venden formación online" error={errors.targetAudience} />
+                      <ChipListField
+                        label="¿Qué aprenderás?"
+                        description="Resultados concretos que el alumno obtendrá."
+                        items={values.learningObjectives || []}
+                        onChange={(next) =>
+                          updateArrayField("learningObjectives", next)
+                        }
+                        placeholder="Ej: Diseñar landing pages con foco en conversión"
+                        error={errors.learningObjectives}
+                      />
+                      <ChipListField
+                        label="Requisitos previos"
+                        description="Conocimientos previos o herramientas necesarias."
+                        items={values.requirements || []}
+                        onChange={(next) =>
+                          updateArrayField("requirements", next)
+                        }
+                        placeholder="Ej: Manejo básico de Figma"
+                        error={errors.requirements}
+                      />
+                      <ChipListField
+                        label="Audiencia objetivo"
+                        items={values.targetAudience || []}
+                        onChange={(next) =>
+                          updateArrayField("targetAudience", next)
+                        }
+                        placeholder="Ej: Diseñadores UX que venden formación online"
+                        error={errors.targetAudience}
+                      />
                     </div>
                   </div>
                 </SectionCard>
 
                 <SectionCard>
-                  <CurriculumField curriculum={values.curriculum || []} onChange={updateCurriculum} error={errors.curriculum} />
+                  <CurriculumField
+                    curriculum={values.curriculum || []}
+                    onChange={updateCurriculum}
+                    error={errors.curriculum}
+                  />
                 </SectionCard>
 
                 <SectionCard title="Cierre pedagógico">
-                  <FinalEvaluationField value={values.finalEvaluation || { enabled: false, questions: [] }} onChange={updateFinalEvaluation} error={errors.finalEvaluation} />
+                  <FinalEvaluationField
+                    value={
+                      values.finalEvaluation || {
+                        enabled: false,
+                        questions: [],
+                      }
+                    }
+                    onChange={updateFinalEvaluation}
+                    error={errors.finalEvaluation}
+                  />
                   <div className="mt-5 grid gap-4 md:grid-cols-3">
                     <div className="grid gap-2">
                       <Label>Duración estimada</Label>
-                      <Input placeholder="Ej: 12 horas / 6 semanas" {...register("duration")} />
+                      <Input
+                        placeholder="Ej: 12 horas / 6 semanas"
+                        {...register("duration")}
+                      />
                       <FieldError error={errors.duration} />
                     </div>
                     <div className="grid gap-2">
                       <Label>Cantidad total de clases</Label>
-                      <Input type="number" min="1" value={values.classesCount ?? 1} readOnly className="bg-muted/40" />
+                      <Input
+                        type="number"
+                        min="1"
+                        value={values.classesCount ?? 1}
+                        readOnly
+                        className="bg-muted/40"
+                      />
                       <FieldError error={errors.classesCount} />
                     </div>
                     <div className="grid gap-2">
                       <Label>Secciones cargadas</Label>
-                      <Input value={Array.isArray(values.curriculum) ? values.curriculum.length : 0} readOnly className="bg-muted/40" />
+                      <Input
+                        value={
+                          Array.isArray(values.curriculum)
+                            ? values.curriculum.length
+                            : 0
+                        }
+                        readOnly
+                        className="bg-muted/40"
+                      />
                     </div>
                   </div>
                 </SectionCard>
@@ -4223,7 +5831,15 @@ export default function CourseWizard({ jobId }) {
                           variant="outline"
                           size="sm"
                           className="h-8 rounded-full text-xs text-destructive hover:text-destructive hover:border-destructive/50"
-                          onClick={() => handleImageUploadField("coverImage", [], "courses/covers", undefined, undefined)}
+                          onClick={() =>
+                            handleImageUploadField(
+                              "coverImage",
+                              [],
+                              "courses/covers",
+                              undefined,
+                              undefined,
+                            )
+                          }
                         >
                           <Trash2 className="mr-1.5 h-3.5 w-3.5" />
                           Eliminar
@@ -4242,10 +5858,35 @@ export default function CourseWizard({ jobId }) {
                       hideExistingItems
                       folderPrefix="courses/covers"
                       helperText="PNG · JPG · WebP · hasta 20 MB. Se recomienda 1920 x 1080 px (16:9)."
-                      value={values.coverImage ? [{ id: "cover-fixed", url: values.coverImage, kind: "image", label: "Portada", status: "ready" }] : []}
-                      onChange={(next) => handleImageUploadField("coverImage", next, "courses/covers", "Portada cargada")}
+                      value={
+                        values.coverImage
+                          ? [
+                              {
+                                id: "cover-fixed",
+                                url: values.coverImage,
+                                kind: "image",
+                                label: "Portada",
+                                status: "ready",
+                              },
+                            ]
+                          : []
+                      }
+                      onChange={(next) =>
+                        handleImageUploadField(
+                          "coverImage",
+                          next,
+                          "courses/covers",
+                          "Portada cargada",
+                        )
+                      }
                     />
-                    {values.coverImage ? <FilePreview url={values.coverImage} title="Portada del curso" variant="compact" /> : null}
+                    {values.coverImage ? (
+                      <FilePreview
+                        url={values.coverImage}
+                        title="Portada del curso"
+                        variant="compact"
+                      />
+                    ) : null}
                   </div>
 
                   <div className="grid gap-3">
@@ -4257,7 +5898,15 @@ export default function CourseWizard({ jobId }) {
                           variant="outline"
                           size="sm"
                           className="h-8 rounded-full text-xs text-destructive hover:text-destructive hover:border-destructive/50"
-                          onClick={() => handleImageUploadField("thumbnail", [], "courses/thumbnails", undefined, undefined)}
+                          onClick={() =>
+                            handleImageUploadField(
+                              "thumbnail",
+                              [],
+                              "courses/thumbnails",
+                              undefined,
+                              undefined,
+                            )
+                          }
                         >
                           <Trash2 className="mr-1.5 h-3.5 w-3.5" />
                           Eliminar
@@ -4276,10 +5925,35 @@ export default function CourseWizard({ jobId }) {
                       hideExistingItems
                       folderPrefix="courses/thumbnails"
                       helperText="PNG · JPG · WebP · hasta 20 MB. Se recomienda 640 x 360 px (16:9) para listados."
-                      value={values.thumbnail ? [{ id: "thumb-fixed", url: values.thumbnail, kind: "image", label: "Miniatura", status: "ready" }] : []}
-                      onChange={(next) => handleImageUploadField("thumbnail", next, "courses/thumbnails", "Miniatura cargada")}
+                      value={
+                        values.thumbnail
+                          ? [
+                              {
+                                id: "thumb-fixed",
+                                url: values.thumbnail,
+                                kind: "image",
+                                label: "Miniatura",
+                                status: "ready",
+                              },
+                            ]
+                          : []
+                      }
+                      onChange={(next) =>
+                        handleImageUploadField(
+                          "thumbnail",
+                          next,
+                          "courses/thumbnails",
+                          "Miniatura cargada",
+                        )
+                      }
                     />
-                    {values.thumbnail ? <FilePreview url={values.thumbnail} title="Miniatura del curso" variant="compact" /> : null}
+                    {values.thumbnail ? (
+                      <FilePreview
+                        url={values.thumbnail}
+                        title="Miniatura del curso"
+                        variant="compact"
+                      />
+                    ) : null}
                   </div>
                 </div>
 
@@ -4288,35 +5962,97 @@ export default function CourseWizard({ jobId }) {
                   promoVideo={values.promoVideo || ""}
                   promoVideoFileName={values.promoVideoFileName || ""}
                   promoVideoSizeBytes={values.promoVideoSizeBytes}
-                  onVideoAssetChange={(next) => setValue("promoVideoAsset", next || undefined, { shouldValidate: true, shouldDirty: true })}
-                  onVideoUrlChange={(next) => setValue("promoVideo", next || "", { shouldValidate: true, shouldDirty: true })}
+                  onVideoAssetChange={(next) =>
+                    setValue("promoVideoAsset", next || undefined, {
+                      shouldValidate: true,
+                      shouldDirty: true,
+                    })
+                  }
+                  onVideoUrlChange={(next) =>
+                    setValue("promoVideo", next || "", {
+                      shouldValidate: true,
+                      shouldDirty: true,
+                    })
+                  }
                   validateVideoFile={validateVideoFile}
                   extractVideoMetadata={extractVideoMetadata}
                   onPromoMetadataChange={(patch) => {
                     if (!patch) return;
-                    if (Object.prototype.hasOwnProperty.call(patch, "promoVideoFileName")) {
-                      setValue("promoVideoFileName", patch.promoVideoFileName || "", { shouldValidate: false, shouldDirty: true });
+                    if (
+                      Object.prototype.hasOwnProperty.call(
+                        patch,
+                        "promoVideoFileName",
+                      )
+                    ) {
+                      setValue(
+                        "promoVideoFileName",
+                        patch.promoVideoFileName || "",
+                        { shouldValidate: false, shouldDirty: true },
+                      );
                     }
-                    if (Object.prototype.hasOwnProperty.call(patch, "promoVideoMimeType")) {
-                      setValue("promoVideoMimeType", patch.promoVideoMimeType || "", { shouldValidate: false, shouldDirty: true });
+                    if (
+                      Object.prototype.hasOwnProperty.call(
+                        patch,
+                        "promoVideoMimeType",
+                      )
+                    ) {
+                      setValue(
+                        "promoVideoMimeType",
+                        patch.promoVideoMimeType || "",
+                        { shouldValidate: false, shouldDirty: true },
+                      );
                     }
-                    if (Object.prototype.hasOwnProperty.call(patch, "promoVideoSizeBytes")) {
-                      setValue("promoVideoSizeBytes", patch.promoVideoSizeBytes ?? undefined, { shouldValidate: false, shouldDirty: true });
+                    if (
+                      Object.prototype.hasOwnProperty.call(
+                        patch,
+                        "promoVideoSizeBytes",
+                      )
+                    ) {
+                      setValue(
+                        "promoVideoSizeBytes",
+                        patch.promoVideoSizeBytes ?? undefined,
+                        { shouldValidate: false, shouldDirty: true },
+                      );
                     }
-                    if (Object.prototype.hasOwnProperty.call(patch, "promoVideoDurationSeconds")) {
-                      setValue("promoVideoDurationSeconds", patch.promoVideoDurationSeconds ?? 0, { shouldValidate: false, shouldDirty: true });
+                    if (
+                      Object.prototype.hasOwnProperty.call(
+                        patch,
+                        "promoVideoDurationSeconds",
+                      )
+                    ) {
+                      setValue(
+                        "promoVideoDurationSeconds",
+                        patch.promoVideoDurationSeconds ?? 0,
+                        { shouldValidate: false, shouldDirty: true },
+                      );
                     }
                     if (patch.validationError) {
-                      setError("promoVideo", { type: "manual", message: String(patch.validationError) });
-                      toast.error(String(patch.validationError), { position: "top-right" });
+                      setError("promoVideo", {
+                        type: "manual",
+                        message: String(patch.validationError),
+                      });
+                      toast.error(String(patch.validationError), {
+                        position: "top-right",
+                      });
                     } else {
                       clearErrors("promoVideo");
                     }
-                    if (patch.sourceFile && typeof patch.sourceFile === "object" && patch.sourceFile instanceof window?.File) {
+                    if (
+                      patch.sourceFile &&
+                      typeof patch.sourceFile === "object" &&
+                      patch.sourceFile instanceof window?.File
+                    ) {
                       extractVideoMetadata(patch.sourceFile)
                         .then((meta) => {
-                          if (meta && Number.isFinite(Number(meta.durationSeconds))) {
-                            setValue("promoVideoDurationSeconds", Number(meta.durationSeconds) || 0, { shouldValidate: false, shouldDirty: true });
+                          if (
+                            meta &&
+                            Number.isFinite(Number(meta.durationSeconds))
+                          ) {
+                            setValue(
+                              "promoVideoDurationSeconds",
+                              Number(meta.durationSeconds) || 0,
+                              { shouldValidate: false, shouldDirty: true },
+                            );
                           }
                         })
                         .catch(() => {});
@@ -4326,8 +6062,56 @@ export default function CourseWizard({ jobId }) {
                 />
                 <CourseAttachmentsField
                   attachments={values.attachments || []}
-                  onChange={(next) => setValue("attachments", next, { shouldValidate: true, shouldDirty: true })}
+                  onChange={(next) =>
+                    setValue("attachments", next, {
+                      shouldValidate: true,
+                      shouldDirty: true,
+                    })
+                  }
                 />
+                <div className="grid gap-3">
+                  <Label className="flex items-center gap-1.5">
+                    Link de documentación del curso
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          type="button"
+                          className="inline-flex h-4 w-4 items-center justify-center text-slate-400 hover:text-slate-700"
+                        >
+                          <HelpCircle className="h-3.5 w-3.5" />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent side="right">
+                        <div className="max-w-xs text-[11px] leading-5">
+                          URL externa a documentación, manual o guía oficial del curso.
+                        </div>
+                      </TooltipContent>
+                    </Tooltip>
+                  </Label>
+                  <Input
+                    type="url"
+                    placeholder="https://..."
+                    value={values.documentationUrl || ""}
+                    onChange={(event) =>
+                      setValue("documentationUrl", event.target.value || "", {
+                        shouldValidate: true,
+                        shouldDirty: true,
+                      })
+                    }
+                  />
+                  <FieldError error={errors.documentationUrl} />
+                  {values.documentationUrl ? (
+                    <a
+                      href={values.documentationUrl}
+                      target="_blank"
+                      rel="noreferrer noopener"
+                      className="inline-flex w-fit items-center gap-1.5 text-xs font-semibold text-[#2356B8] hover:underline"
+                    >
+                      Abrir documentación
+                      <ExternalLink className="h-3.5 w-3.5" />
+                    </a>
+                  ) : null}
+                </div>
               </SectionCard>
             ) : null}
 
@@ -4339,18 +6123,35 @@ export default function CourseWizard({ jobId }) {
                       Precio socios
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <button type="button" className="inline-flex h-4 w-4 items-center justify-center text-slate-400 hover:text-slate-700">
+                          <button
+                            type="button"
+                            className="inline-flex h-4 w-4 items-center justify-center text-slate-400 hover:text-slate-700"
+                          >
                             <HelpCircle className="h-3.5 w-3.5" />
                           </button>
                         </TooltipTrigger>
                         <TooltipContent side="right">
                           <div className="max-w-xs text-[11px] leading-5">
-                            Valor en pesos argentinos (ARS) para socios de la institución. Es el precio vigente que se muestra al alumno.
+                            Valor en pesos argentinos (ARS) para socios de la
+                            institución. Es el precio vigente que se muestra al
+                            alumno.
                           </div>
                         </TooltipContent>
                       </Tooltip>
                     </Label>
-                    <Input type="number" min="0" step="0.01" value={values.price ?? 0} onChange={(event) => setValue("price", Number(event.target.value || 0), { shouldValidate: true, shouldDirty: true })} />
+                    <Input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      disabled={Boolean(values.freeCourse)}
+                      value={values.price ?? 0}
+                      onChange={(event) =>
+                        setValue("price", Number(event.target.value || 0), {
+                          shouldValidate: true,
+                          shouldDirty: true,
+                        })
+                      }
+                    />
                     <FieldError error={errors.price} />
                   </div>
                   <div className="grid gap-2">
@@ -4358,18 +6159,38 @@ export default function CourseWizard({ jobId }) {
                       Precio no socios
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <button type="button" className="inline-flex h-4 w-4 items-center justify-center text-slate-400 hover:text-slate-700">
+                          <button
+                            type="button"
+                            className="inline-flex h-4 w-4 items-center justify-center text-slate-400 hover:text-slate-700"
+                          >
                             <HelpCircle className="h-3.5 w-3.5" />
                           </button>
                         </TooltipTrigger>
                         <TooltipContent side="right">
                           <div className="max-w-xs text-[11px] leading-5">
-                            Valor de lista para personas que no son socios. Se muestra tachado como oferta cuando coincida con el precio socios.
+                            Valor de lista para personas que no son socios. Se
+                            muestra tachado como oferta cuando coincida con el
+                            precio socios.
                           </div>
                         </TooltipContent>
                       </Tooltip>
                     </Label>
-                    <Input type="number" min="0" step="0.01" value={values.oldPrice ?? ""} onChange={(event) => setValue("oldPrice", event.target.value ? Number(event.target.value) : undefined, { shouldValidate: true, shouldDirty: true })} />
+                    <Input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      disabled={Boolean(values.freeCourse)}
+                      value={values.oldPrice ?? ""}
+                      onChange={(event) =>
+                        setValue(
+                          "oldPrice",
+                          event.target.value
+                            ? Number(event.target.value)
+                            : undefined,
+                          { shouldValidate: true, shouldDirty: true },
+                        )
+                      }
+                    />
                     <FieldError error={errors.oldPrice} />
                   </div>
                   <div className="grid gap-2">
@@ -4377,20 +6198,43 @@ export default function CourseWizard({ jobId }) {
                       Curso gratuito
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <button type="button" className="inline-flex h-4 w-4 items-center justify-center text-slate-400 hover:text-slate-700">
+                          <button
+                            type="button"
+                            className="inline-flex h-4 w-4 items-center justify-center text-slate-400 hover:text-slate-700"
+                          >
                             <HelpCircle className="h-3.5 w-3.5" />
                           </button>
                         </TooltipTrigger>
                         <TooltipContent side="right">
                           <div className="max-w-xs text-[11px] leading-5">
-                            Actívalo para publicar el curso sin precio visible. El acceso se habilita automáticamente al inscribirse.
+                            Actívalo para publicar el curso sin precio visible.
+                            El acceso se habilita automáticamente al
+                            inscribirse.
                           </div>
                         </TooltipContent>
                       </Tooltip>
                     </Label>
                     <div className="rounded-2xl border border-border/60 bg-background px-4 py-3">
                       <div className="flex items-center justify-end gap-4">
-                        <Switch checked={Boolean(values.freeCourse)} onCheckedChange={(checked) => setValue("freeCourse", checked, { shouldValidate: true, shouldDirty: true })} />
+                        <Switch
+                          checked={Boolean(values.freeCourse)}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              setValue("price", 0, {
+                                shouldValidate: true,
+                                shouldDirty: true,
+                              });
+                              setValue("oldPrice", undefined, {
+                                shouldValidate: true,
+                                shouldDirty: true,
+                              });
+                            }
+                            setValue("freeCourse", checked, {
+                              shouldValidate: true,
+                              shouldDirty: true,
+                            });
+                          }}
+                        />
                       </div>
                     </div>
                   </div>
@@ -4398,13 +6242,41 @@ export default function CourseWizard({ jobId }) {
 
                 <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
                   {[
-                    ["certificate", "Incluye certificado", <Award key="cert-icon" className="h-4 w-4" />, "El alumno recibe un certificado oficial de ACAV al finalizar la cursada."],
-                    ["lifetimeAccess", "Acceso de por vida", <CheckCircle2 key="life-icon" className="h-4 w-4" />, "No hay fecha de caducidad. El contenido queda disponible para siempre."],
-                    ["downloadableResources", "Material descargable", <UploadCloud key="down-icon" className="h-4 w-4" />, "PDFs, plantillas o recursos que el alumno puede guardar."],
-                    ["recordedClasses", "Clases grabadas", <Film key="rec-icon" className="h-4 w-4" />, "Las sesiones en vivo se graban y quedan disponibles."],
-                    ["support", "Tutorías / Soporte", <Info key="sup-icon" className="h-4 w-4" />, "El alumno tiene contacto con el docente o equipo de soporte."],
+                    [
+                      "certificate",
+                      "Incluye certificado",
+                      <Award key="cert-icon" className="h-4 w-4" />,
+                      "El alumno recibe un certificado oficial de ACAV al finalizar la cursada.",
+                    ],
+                    [
+                      "lifetimeAccess",
+                      "Acceso de por vida",
+                      <CheckCircle2 key="life-icon" className="h-4 w-4" />,
+                      "No hay fecha de caducidad. El contenido queda disponible para siempre.",
+                    ],
+                    [
+                      "downloadableResources",
+                      "Material descargable",
+                      <UploadCloud key="down-icon" className="h-4 w-4" />,
+                      "PDFs, plantillas o recursos que el alumno puede guardar.",
+                    ],
+                    [
+                      "recordedClasses",
+                      "Clases grabadas",
+                      <Film key="rec-icon" className="h-4 w-4" />,
+                      "Las sesiones en vivo se graban y quedan disponibles.",
+                    ],
+                    [
+                      "support",
+                      "Tutorías / Soporte",
+                      <Info key="sup-icon" className="h-4 w-4" />,
+                      "El alumno tiene contacto con el docente o equipo de soporte.",
+                    ],
                   ].map(([field, label, icon, description]) => (
-                    <div key={field} className="rounded-[22px] border border-border/60 bg-background px-4 py-4">
+                    <div
+                      key={field}
+                      className="rounded-[22px] border border-border/60 bg-background px-4 py-4"
+                    >
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-1.5 text-sm font-medium text-foreground">
@@ -4415,14 +6287,27 @@ export default function CourseWizard({ jobId }) {
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <div className="flex items-center gap-2">
-                              <button type="button" className="inline-flex h-4 w-4 items-center justify-center text-slate-400 hover:text-slate-700">
+                              <button
+                                type="button"
+                                className="inline-flex h-4 w-4 items-center justify-center text-slate-400 hover:text-slate-700"
+                              >
                                 <HelpCircle className="h-3.5 w-3.5" />
                               </button>
-                              <Switch checked={Boolean(values[field])} onCheckedChange={(checked) => setValue(field, checked, { shouldValidate: true, shouldDirty: true })} />
+                              <Switch
+                                checked={Boolean(values[field])}
+                                onCheckedChange={(checked) =>
+                                  setValue(field, checked, {
+                                    shouldValidate: true,
+                                    shouldDirty: true,
+                                  })
+                                }
+                              />
                             </div>
                           </TooltipTrigger>
                           <TooltipContent side="bottom">
-                            <div className="max-w-[180px] leading-5 text-[11px]">{description}</div>
+                            <div className="max-w-[180px] leading-5 text-[11px]">
+                              {description}
+                            </div>
                           </TooltipContent>
                         </Tooltip>
                       </div>
@@ -4437,26 +6322,56 @@ export default function CourseWizard({ jobId }) {
                 <SectionCard title="Publicación">
                   <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                     {[
-                      ["featured", "Destacar en la portada", "Curso top. Se muestra primero en la home con badge Destacado."],
-                      ["allowEnrollment", "Permitir inscripciones abiertas", "Los alumnos pueden inscribirse. Desactívalo para pausar nuevas inscripciones."],
-                      ["showOnHome", "Mostrar en catálogo principal", "Aparece en la lista pública de cursos."],
+                      [
+                        "featured",
+                        "Destacar en la portada",
+                        "Curso top. Se muestra primero en la home con badge Destacado.",
+                      ],
+                      [
+                        "allowEnrollment",
+                        "Permitir inscripciones abiertas",
+                        "Los alumnos pueden inscribirse. Desactívalo para pausar nuevas inscripciones.",
+                      ],
+                      [
+                        "showOnHome",
+                        "Mostrar en catálogo principal",
+                        "Aparece en la lista pública de cursos.",
+                      ],
                     ].map(([field, label, description]) => (
-                      <div key={field} className="rounded-[22px] border border-border/60 bg-background px-4 py-4">
+                      <div
+                        key={field}
+                        className="rounded-[22px] border border-border/60 bg-background px-4 py-4"
+                      >
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0 flex-1">
-                            <div className="text-sm font-medium text-foreground">{label}</div>
+                            <div className="text-sm font-medium text-foreground">
+                              {label}
+                            </div>
                           </div>
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <div className="flex items-center gap-2">
-                                <button type="button" className="inline-flex h-4 w-4 items-center justify-center text-slate-400 hover:text-slate-700">
+                                <button
+                                  type="button"
+                                  className="inline-flex h-4 w-4 items-center justify-center text-slate-400 hover:text-slate-700"
+                                >
                                   <HelpCircle className="h-3.5 w-3.5" />
                                 </button>
-                                <Switch checked={Boolean(values[field])} onCheckedChange={(checked) => setValue(field, checked, { shouldValidate: true, shouldDirty: true })} />
+                                <Switch
+                                  checked={Boolean(values[field])}
+                                  onCheckedChange={(checked) =>
+                                    setValue(field, checked, {
+                                      shouldValidate: true,
+                                      shouldDirty: true,
+                                    })
+                                  }
+                                />
                               </div>
                             </TooltipTrigger>
                             <TooltipContent side="bottom">
-                              <div className="max-w-[180px] leading-5 text-[11px]">{description}</div>
+                              <div className="max-w-[180px] leading-5 text-[11px]">
+                                {description}
+                              </div>
                             </TooltipContent>
                           </Tooltip>
                         </div>
@@ -4470,23 +6385,39 @@ export default function CourseWizard({ jobId }) {
                         Estado
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <button type="button" className="inline-flex h-4 w-4 items-center justify-center text-slate-400 hover:text-slate-700">
+                            <button
+                              type="button"
+                              className="inline-flex h-4 w-4 items-center justify-center text-slate-400 hover:text-slate-700"
+                            >
                               <HelpCircle className="h-3.5 w-3.5" />
                             </button>
                           </TooltipTrigger>
                           <TooltipContent side="right">
                             <div className="max-w-xs text-[11px] leading-5">
-                              Controla el ciclo de vida del curso: borrador, publicado, oculto o finalizado.
+                              Controla el ciclo de vida del curso: borrador,
+                              publicado, oculto o finalizado.
                             </div>
                           </TooltipContent>
                         </Tooltip>
                       </Label>
-                      <Select value={values.status || ""} onValueChange={(value) => setValue("status", value, { shouldValidate: true, shouldDirty: true })}>
+                      <Select
+                        value={values.status || ""}
+                        onValueChange={(value) =>
+                          setValue("status", value, {
+                            shouldValidate: true,
+                            shouldDirty: true,
+                          })
+                        }
+                      >
                         <SelectTrigger>
                           <SelectValue placeholder="Seleccionar estado" />
                         </SelectTrigger>
                         <SelectContent>
-                          {PUBLICATION_STATUS_OPTIONS.filter((option) => COURSE_PUBLICATION_VISIBILITY.includes(option.value)).map((option) => (
+                          {PUBLICATION_STATUS_OPTIONS.filter((option) =>
+                            COURSE_PUBLICATION_VISIBILITY.includes(
+                              option.value,
+                            ),
+                          ).map((option) => (
                             <SelectItem key={option.value} value={option.value}>
                               {option.label}
                             </SelectItem>
@@ -4500,13 +6431,17 @@ export default function CourseWizard({ jobId }) {
                         Fecha de publicación / vigencia
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <button type="button" className="inline-flex h-4 w-4 items-center justify-center text-slate-400 hover:text-slate-700">
+                            <button
+                              type="button"
+                              className="inline-flex h-4 w-4 items-center justify-center text-slate-400 hover:text-slate-700"
+                            >
                               <HelpCircle className="h-3.5 w-3.5" />
                             </button>
                           </TooltipTrigger>
                           <TooltipContent side="right">
                             <div className="max-w-xs text-[11px] leading-5">
-                              Fecha de referencia de la publicación o hasta cuando el curso mantiene vigencia.
+                              Fecha de referencia de la publicación o hasta
+                              cuando el curso mantiene vigencia.
                             </div>
                           </TooltipContent>
                         </Tooltip>
@@ -4523,24 +6458,62 @@ export default function CourseWizard({ jobId }) {
                       <div className="inline-flex rounded-full border border-[#DD4913]/20 bg-[#DD4913]/10 px-3 py-1 text-[11px] font-extrabold uppercase tracking-[0.14em] text-[#DD4913]">
                         {values.category || "Categoría"}
                       </div>
-                      <h2 className="mt-4 text-2xl font-extrabold tracking-tight text-[#1B2B50]">{values.title || "Nuevo curso"}</h2>
-                      <p className="mt-3 text-sm leading-7 text-slate-600">{values.shortDescription || "La descripción corta aparecerá aquí."}</p>
+                      <h2 className="mt-4 text-2xl font-extrabold tracking-tight text-[#1B2B50]">
+                        {values.title || "Nuevo curso"}
+                      </h2>
+                      <p className="mt-3 text-sm leading-7 text-slate-600">
+                        {values.shortDescription ||
+                          "La descripción corta aparecerá aquí."}
+                      </p>
                       <div className="mt-5 flex flex-wrap gap-2 text-xs text-slate-600">
-                        <span className="rounded-full border border-[#DCE6F4] bg-white px-3 py-1">{values.modality || "Modalidad"}</span>
-                        <span className="rounded-full border border-[#DCE6F4] bg-white px-3 py-1">{values.level || "Nivel"}</span>
-                        <span className="rounded-full border border-[#DCE6F4] bg-white px-3 py-1">{values.duration || "Duración"}</span>
+                        <span className="rounded-full border border-[#DCE6F4] bg-white px-3 py-1">
+                          {values.modality || "Modalidad"}
+                        </span>
+                        <span className="rounded-full border border-[#DCE6F4] bg-white px-3 py-1">
+                          {values.level || "Nivel"}
+                        </span>
+                        <span className="rounded-full border border-[#DCE6F4] bg-white px-3 py-1">
+                          {values.duration || "Duración"}
+                        </span>
                       </div>
                     </div>
                     <div className="rounded-[24px] border border-border/60 bg-background p-5">
-                      <div className="text-sm font-semibold text-foreground">Resumen comercial</div>
+                      <div className="text-sm font-semibold text-foreground">
+                        Resumen comercial
+                      </div>
                       <div className="mt-4 grid gap-3 text-sm text-muted-foreground">
-                        <div>Precio: {values.freeCourse ? "Gratuito" : values.price ? `$ ${values.price}` : "Sin definir"}</div>
-                        <div>Inscripciones: {values.allowEnrollment ? "Abiertas" : "Cerradas"}</div>
-                        <div>Certificado: {values.certificate ? "Incluido" : "No incluido"}</div>
-                        {values.promoVideoAsset?.url || values.promoVideo ? <div>Video: Cargado</div> : null}
-                        <div>Secciones: {Array.isArray(values.curriculum) ? values.curriculum.length : 0}</div>
+                        <div>
+                          Precio:{" "}
+                          {values.freeCourse
+                            ? "Gratuito"
+                            : values.price
+                              ? `$ ${values.price}`
+                              : "Sin definir"}
+                        </div>
+                        <div>
+                          Inscripciones:{" "}
+                          {values.allowEnrollment ? "Abiertas" : "Cerradas"}
+                        </div>
+                        <div>
+                          Certificado:{" "}
+                          {values.certificate ? "Incluido" : "No incluido"}
+                        </div>
+                        {values.promoVideoAsset?.url || values.promoVideo ? (
+                          <div>Video: Cargado</div>
+                        ) : null}
+                        <div>
+                          Secciones:{" "}
+                          {Array.isArray(values.curriculum)
+                            ? values.curriculum.length
+                            : 0}
+                        </div>
                         <div>Clases: {values.classesCount || 0}</div>
-                        <div>Evaluación final: {values.finalEvaluation?.enabled ? `${values.finalEvaluation?.questions?.length || 0} preguntas` : "No incluida"}</div>
+                        <div>
+                          Evaluación final:{" "}
+                          {values.finalEvaluation?.enabled
+                            ? `${values.finalEvaluation?.questions?.length || 0} preguntas`
+                            : "No incluida"}
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -4548,18 +6521,216 @@ export default function CourseWizard({ jobId }) {
               </>
             ) : null}
 
-            
+            {activeTab === "forum" ? (
+              <SectionCard
+                title="Foro del curso"
+                description="Creá las preguntas que los alumnos podrán responder dentro del campus. Las respuestas quedan asociadas a cada inscripción."
+              >
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <div className="text-sm font-semibold text-foreground">
+                      Preguntas publicadas
+                    </div>
+                    <div className="mt-1 text-xs text-muted-foreground">
+                      {values.forumQuestions?.length || 0} pregunta
+                      {(values.forumQuestions?.length || 0) === 1 ? "" : "s"} en el foro
+                    </div>
+                  </div>
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => {
+                      const next = [
+                        ...(Array.isArray(values.forumQuestions)
+                          ? values.forumQuestions
+                          : []),
+                        {
+                          id: `forum-q-${Date.now()}`,
+                          title: "",
+                          description: "",
+                          createdAt: new Date().toISOString(),
+                          createdBy: user?.uid || user?.email || "admin",
+                          createdByName: user?.displayName || user?.email || "Administrador",
+                          order: values.forumQuestions?.length || 0,
+                          answers: [],
+                        },
+                      ];
+                      setValue("forumQuestions", next, {
+                        shouldValidate: true,
+                        shouldDirty: true,
+                      });
+                    }}
+                    className="rounded-2xl"
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    Nueva pregunta
+                  </Button>
+                </div>
+
+                <div className="grid gap-3">
+                  {Array.isArray(values.forumQuestions) && values.forumQuestions.length
+                    ? values.forumQuestions.map((question, idx) => (
+                        <div
+                          key={question.id || `q-${idx}`}
+                          className="rounded-[22px] border border-border/60 bg-background p-4 md:p-5"
+                        >
+                          <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                            <div className="min-w-0 flex-1 grid gap-3">
+                              <div className="grid gap-2">
+                                <Label className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">
+                                  Pregunta {idx + 1}
+                                </Label>
+                                <Input
+                                  value={question.title || ""}
+                                  placeholder="Ej: ¿Qué aprendiste en la primera clase?"
+                                  onChange={(event) => {
+                                    const next = (
+                                      values.forumQuestions || []
+                                    ).map((item, i) =>
+                                      i === idx
+                                        ? { ...item, title: event.target.value }
+                                        : item
+                                    );
+                                    setValue("forumQuestions", next, {
+                                      shouldValidate: true,
+                                      shouldDirty: true,
+                                    });
+                                  }}
+                                />
+                                <Textarea
+                                  value={question.description || ""}
+                                  placeholder="Contexto adicional o ayuda para la respuesta (opcional)"
+                                  rows={2}
+                                  onChange={(event) => {
+                                    const next = (
+                                      values.forumQuestions || []
+                                    ).map((item, i) =>
+                                      i === idx
+                                        ? { ...item, description: event.target.value }
+                                        : item
+                                    );
+                                    setValue("forumQuestions", next, {
+                                      shouldValidate: true,
+                                      shouldDirty: true,
+                                    });
+                                  }}
+                                />
+                              </div>
+                            </div>
+                            <div className="flex md:flex-col items-center md:items-end gap-2">
+                              <Badge
+                                variant="soft"
+                                color="info"
+                                className="rounded-full shrink-0"
+                              >
+                                <HelpCircle className="mr-1 h-3 w-3" />
+                                {Array.isArray(question.answers)
+                                  ? question.answers.length
+                                  : 0}{" "}
+                                respuesta
+                                {Array.isArray(question.answers) &&
+                                question.answers.length === 1
+                                  ? ""
+                                  : "s"}
+                              </Badge>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                  const next = (values.forumQuestions || []).filter(
+                                    (_item, i) => i !== idx
+                                  );
+                                  setValue("forumQuestions", next, {
+                                    shouldValidate: true,
+                                    shouldDirty: true,
+                                  });
+                                }}
+                                className="rounded-full border-destructive/30 text-destructive hover:bg-destructive/10 h-8"
+                              >
+                                <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+                                Eliminar
+                              </Button>
+                            </div>
+                          </div>
+                          {Array.isArray(question.answers) && question.answers.length
+                            ? (() => {
+                                const maxShow = 3;
+                                const show = question.answers.slice(0, maxShow);
+                                const rest = question.answers.length - maxShow;
+                                return (
+                                  <div className="mt-4 space-y-2 pl-0 md:pl-2">
+                                    <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">
+                                      Últimas respuestas
+                                    </div>
+                                    {show.map((a) => (
+                                      <div
+                                        key={a.id}
+                                        className="rounded-[18px] border border-slate-200 bg-[#FBFCFE] p-3"
+                                      >
+                                        <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
+                                          <span className="font-semibold text-slate-700">
+                                            {a.userFullName || a.userEmail}
+                                          </span>
+                                          <span>·</span>
+                                          <span>{(() => { try { const d = new Date(a.createdAt); return Number.isNaN(d.getTime()) ? "" : d.toLocaleDateString("es-AR"); } catch { return ""; } })()}</span>
+                                        </div>
+                                        <div className="mt-1 text-sm text-slate-700 line-clamp-2">
+                                          {a.answer}
+                                        </div>
+                                      </div>
+                                    ))}
+                                    {rest > 0 ? (
+                                      <div className="text-[11px] text-slate-400 pl-1">
+                                        + {rest} respuesta{rest === 1 ? "" : "s"} más
+                                      </div>
+                                    ) : null}
+                                  </div>
+                                );
+                              })()
+                            : null}
+                        </div>
+                      ))
+                    : (() => {
+                        return (
+                          <div className="rounded-[24px] border border-dashed border-border/70 bg-background/50 p-6 md:p-8 text-center">
+                            <div className="mx-auto inline-flex h-12 w-12 items-center justify-center rounded-full bg-[#EEF4FF] text-[#2356B8]">
+                              <HelpCircle className="h-5 w-5" />
+                            </div>
+                            <div className="mt-4 text-sm font-semibold text-foreground">
+                              Aún no hay preguntas en el foro
+                            </div>
+                            <p className="mt-2 text-xs text-muted-foreground mx-auto max-w-md">
+                              Creá preguntas para abrir espacios de reflexión y
+                              respuesta dentro de la cursada. Los alumnos podrán
+                              responder cuando ingresen al campus.
+                            </p>
+                          </div>
+                        );
+                      })()}
+                </div>
+              </SectionCard>
+            ) : null}
           </div>
 
-          <WorkspaceSummary values={values} course={course} publicHref={publicCourseHref} />
+          <WorkspaceSummary
+            values={values}
+            course={course}
+            publicHref={publicCourseHref}
+          />
         </div>
       </form>
 
       <Dialog open={categoryDialogOpen} onOpenChange={setCategoryDialogOpen}>
-        <DialogContent size="sm" className="max-w-lg rounded-[28px] border border-border/60 p-0">
+        <DialogContent
+          size="sm"
+          className="max-w-lg rounded-[28px] border border-border/60 p-0"
+        >
           <DialogHeader className="border-b border-border/60 px-6 py-5">
             <DialogTitle>Nueva categoría</DialogTitle>
-            <DialogDescription>Creá una categoría nueva para este curso.</DialogDescription>
+            <DialogDescription>
+              Creá una categoría nueva para este curso.
+            </DialogDescription>
           </DialogHeader>
           <div className="grid gap-3 px-6 py-5">
             <Label htmlFor="new-course-category">Título</Label>

@@ -12,6 +12,7 @@ import SingleMenuItem from "./single-menu-item";
 import SubMenuHandler from "./sub-menu-handler";
 import NestedSubMenu from "../common/nested-menus";
 import { useCourseActor } from "@/components/courses/dashboard/use-course-actor";
+import { useAuth } from "@/provider/auth.provider";
 import SidebarProfileFooter from "../common/profile-footer";
 
 const ClassicSidebar = ({ trans }) => {
@@ -22,6 +23,7 @@ const ClassicSidebar = ({ trans }) => {
   const { collapsed, setCollapsed } = useSidebar();
   const { isRtl } = useThemeStore();
   const [hovered, setHovered] = useState(false);
+  const { user } = useAuth();
 
   const toggleSubmenu = (i) => {
     if (activeSubmenu === i) {
@@ -41,8 +43,23 @@ const ClassicSidebar = ({ trans }) => {
 
   const pathname = usePathname();
   const locationName = getDynamicPath(pathname);
-  const effectiveActor = actor || null;
-  const menus = filterMenusByRole(menusConfig?.sidebarNav?.classic || [], effectiveActor);
+  const baseMenus = menusConfig?.sidebarNav?.classic || [];
+  const userEmail = String(user?.email || "").trim().toLowerCase();
+  const actorRole = String(actor?.role || "").trim().toLowerCase();
+  const isAdminByEmail =
+    userEmail === "admin@admin.com" ||
+    /^admin[.-_+\w]*@/.test(userEmail) ||
+    /^lautaro|mazalautaro|lauti/.test(userEmail);
+  const menus = (() => {
+    if (actorRole) {
+      return filterMenusByRole(baseMenus, { role: actorRole });
+    }
+    if (isAdminByEmail) {
+      return filterMenusByRole(baseMenus, { role: "admin" });
+    }
+    if (!user) return [];
+    return filterMenusByRole(baseMenus, { role: "alumno" });
+  })();
 
   React.useEffect(() => {
     let subMenuIndex = null;
@@ -66,7 +83,7 @@ const ClassicSidebar = ({ trans }) => {
     });
     setActiveSubmenu(subMenuIndex);
     setMultiMenu(multiMenuIndex);
-  }, [locationName]);
+  }, [locationName, menus]);
 
   return (
     <div

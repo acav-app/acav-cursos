@@ -1,7 +1,12 @@
 import { getAdminDb } from "@/lib/firebase-admin";
 import { COURSE_COLLECTIONS } from "@/lib/courses/collections";
 import { COURSE_MODALITIES, COURSE_SALES_MODALITIES, COURSE_VIDEO_ALLOWED_TYPES, COURSE_VIDEO_MAX_SIZE_BYTES, isExternalVideoUrl } from "@/lib/courses/constants";
-import { CourseCreateSchema, CourseUpdateSchema, type Course } from "@/lib/courses/schemas";
+import {
+  CourseCreateSchema,
+  CourseForumAnswerSchema,
+  CourseUpdateSchema,
+  type Course,
+} from "@/lib/courses/schemas";
 import type { CourseActor } from "@/lib/courses/server/auth";
 import { err } from "@/lib/courses/server/errors";
 import { getInstitutionById } from "@/lib/courses/server/institutions";
@@ -335,6 +340,8 @@ export function toPublicCourse(course: Course): Course {
     mustSendCvByEmail: Boolean(normalized.mustSendCvByEmail),
     emailSubject: normalized.emailSubject || "",
     attachments: [],
+    documentationUrl: normalized.documentationUrl || "",
+    forumQuestions: Array.isArray(normalized.forumQuestions) ? normalized.forumQuestions : [],
     price: Number(normalized.price || 0),
     oldPrice: normalized.oldPrice === undefined ? undefined : Number(normalized.oldPrice || 0),
     freeCourse: Boolean(normalized.freeCourse),
@@ -502,6 +509,53 @@ export async function updateCourse(id: string, input: unknown, actor: CourseActo
   await ref.set(payload, { merge: true, ignoreUndefinedProperties: true });
   const updated = await ref.get();
   return toCourse(updated);
+}
+
+export async function appendForumAnswersForStudent(
+  id: string,
+  incomingQuestions: unknown,
+) {
+  const db = getAdminDb();
+  const ref = db.collection(COURSE_COLLECTIONS.courses).doc(String(id));
+
+  return db.runTransaction(async (transaction) => {
+    const snapshot = await transaction.get(ref);
+    if (!snapshot.exists) throw err(404, "course_not_found");
+
+    const current = toCourse(snapshot);
+    const existingQuestions = Array.isArray(current.forumQuestions)
+      ? current.forumQuestions
+      : [];
+    const incoming = Array.isArray(incomingQuestions) ? incomingQuestions : [];
+    const incomingById = new Map<string, any>();
+
+    for (const question of incoming) {
+      if (!question || typeof question !== "object") continue;
+      const questionId = String((question as Record<string, any>).id || "").trim();
+      if (questionId) incomingById.set(questionId, question);
+    }
+
+    const forumQuestions = existingQuestions.map((question: any) => {
+      const questionId = String(question?.id || "").trim();
+      const existingAnswers = Array.isArray(question?.answers) ? question.answers : [];
+      const answerIds = new Set(existingAnswers.map((answer: any) => String(answer?.id || "").trim()));
+      const incomingAnswers = incomingById.get(questionId)?.answers;
+      const answers = [...existingAnswers];
+
+      for (const answer of Array.isArray(incomingAnswers) ? incomingAnswers : []) {
+        const parsed = CourseForumAnswerSchema.safeParse(answer);
+        if (!parsed.success || answerIds.has(parsed.data.id)) continue;
+        answers.push(parsed.data);
+        answerIds.add(parsed.data.id);
+      }
+
+      return { ...question, answers };
+    });
+
+    const updatedAt = nowIso();
+    transaction.update(ref, { forumQuestions, updatedAt });
+    return { ...current, forumQuestions, updatedAt } as Course;
+  });
 }
 
 export async function deleteCourse(id: string) {

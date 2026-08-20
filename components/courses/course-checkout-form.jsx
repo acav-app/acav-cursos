@@ -114,30 +114,33 @@ export default function CourseCheckoutForm({ lang, job, variant = "modal", onClo
   const requiresPayment = !job?.freeCourse && amount > 0;
   const hasReceipt = Boolean(receiptUrl);
   const steps = useMemo(
-    () => [
-      {
-        id: "profile",
-        title: "Tu perfil",
-        description: "Confirma tus datos personales y de contacto.",
-        icon: User,
-        fields: ["phone", "city", "province"],
-      },
-      {
-        id: "payment",
-        title: "Pago",
-        description: "Revisa los datos bancarios y el importe a transferir.",
-        icon: Landmark,
-        fields: ["paymentMethod"],
-      },
-      {
-        id: "confirmation",
-        title: "Confirmación",
-        description: "Acepta los términos y confirma tu inscripción.",
-        icon: Receipt,
-        fields: ["acceptedTerms", "acceptedSecurity"],
-      },
-    ],
-    []
+    () => {
+      const allSteps = [
+        {
+          id: "profile",
+          title: "Tu perfil",
+          description: "Confirma tus datos personales y de contacto.",
+          icon: User,
+          fields: ["phone", "city", "province"],
+        },
+        requiresPayment ? {
+          id: "payment",
+          title: "Pago",
+          description: "Revisa los datos bancarios y el importe a transferir.",
+          icon: Landmark,
+          fields: ["paymentMethod"],
+        } : null,
+        {
+          id: "confirmation",
+          title: "Confirmación",
+          description: "Acepta los términos y confirma tu inscripción.",
+          icon: Receipt,
+          fields: ["acceptedTerms", "acceptedSecurity"],
+        },
+      ];
+      return allSteps.filter(Boolean);
+    },
+    [requiresPayment]
   );
 
   const schema = useMemo(
@@ -152,12 +155,14 @@ export default function CourseCheckoutForm({ lang, job, variant = "modal", onClo
           .refine((value) => String(value || "").replace(/\D/g, "").length >= 6, "Teléfono inválido"),
         city: z.string().min(2, "Ciudad requerida"),
         province: z.string().min(2, "Provincia requerida"),
-        paymentMethod: z.string().min(1, "Método requerido"),
+        paymentMethod: requiresPayment
+          ? z.string().min(1, "Método requerido")
+          : z.string().optional(),
         paymentReference: z.string().optional(),
         acceptedTerms: z.boolean().refine((value) => value === true, { message: "Debes aceptar los términos." }),
         acceptedSecurity: z.boolean().refine((value) => value === true, { message: "Debes confirmar la seguridad." }),
       }),
-    []
+    [requiresPayment]
   );
 
   const draftKey = useMemo(() => `course-checkout-draft:${job?.id || "global"}`, [job?.id]);
@@ -294,6 +299,10 @@ export default function CourseCheckoutForm({ lang, job, variant = "modal", onClo
   const goBack = () => {
     setCurrentStep((value) => Math.max(value - 1, 0));
   };
+
+  useEffect(() => {
+    setCurrentStep((current) => Math.min(current, Math.max(0, steps.length - 1)));
+  }, [steps.length]);
 
   const handleCopy = async (label, value) => {
     try {
@@ -533,7 +542,7 @@ export default function CourseCheckoutForm({ lang, job, variant = "modal", onClo
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge variant="soft" color="info" className="rounded-full">
                     <Sparkles className="mr-1 h-3 w-3" />
-                    Inscripción simple, 3 pasos
+                    Inscripción simple, {steps.length} pasos
                   </Badge>
                   {job?.institutionPlanTier || job?.accreditations?.length ? (
                     <Badge variant="soft" color="success" className="rounded-full">
@@ -584,7 +593,7 @@ export default function CourseCheckoutForm({ lang, job, variant = "modal", onClo
           </div>
           <Progress value={progressValue} size="sm" color="primary" className="bg-slate-100 [&>div]:bg-[#1B2B50]" />
 
-          <div className="mt-4 grid grid-cols-3 gap-3">
+          <div className={`mt-4 grid gap-3 ${steps.length >= 3 ? "grid-cols-3" : "grid-cols-2"}`}>
             {steps.map((step, index) => {
               const completed = index < currentStep;
               const active = index === currentStep;
@@ -656,7 +665,7 @@ export default function CourseCheckoutForm({ lang, job, variant = "modal", onClo
             </div>
           </div>
 
-          {currentStep === 0 ? (
+          {steps[currentStep]?.id === "profile" ? (
             <div className="grid gap-6">
               <div className="rounded-[20px] border border-[#E5EAF2] bg-white p-5">
                 <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
@@ -748,7 +757,7 @@ export default function CourseCheckoutForm({ lang, job, variant = "modal", onClo
             </div>
           ) : null}
 
-          {currentStep === 1 ? (
+          {steps[currentStep]?.id === "payment" ? (
             <div className="grid gap-6">
               {requiresPayment ? (
                 <>
@@ -964,7 +973,7 @@ export default function CourseCheckoutForm({ lang, job, variant = "modal", onClo
             </div>
           ) : null}
 
-          {currentStep === 2 ? (
+          {steps[currentStep]?.id === "confirmation" ? (
             <div className="grid gap-6">
               <div className="rounded-[20px] border border-[#E5EAF2] bg-white p-5">
                 <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
