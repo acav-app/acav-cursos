@@ -536,3 +536,19 @@ export async function updateEnrollmentCourseStatus(
 
   return updated;
 }
+
+export async function studentHasActiveEnrollmentForCourse(actor: CourseActor, courseId: string) {
+  const normalizedCourseId = String(courseId || "").trim();
+  if (!normalizedCourseId) return false;
+
+  const enrollments = await listEnrollments({
+    actor,
+    filters: { courseId: normalizedCourseId },
+  });
+
+  return enrollments.some(
+    (enrollment) =>
+      enrollment.status === "active" &&
+      String(enrollment.courseId || enrollment.jobId || "").trim() === normalizedCourseId,
+  );
+}

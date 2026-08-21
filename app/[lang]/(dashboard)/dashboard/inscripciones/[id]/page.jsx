@@ -12,6 +12,7 @@ import {
   FileDown,
   FileText,
   Loader2,
+  Paperclip,
   Save,
   ShieldCheck,
   Trash2,
@@ -1245,6 +1246,7 @@ export default function InscripcionDetailPage({ params: { id } }) {
                       (item) => String(item?.lessonId || "") === String(lesson?.id || "")
                     );
                     const submissionStatus = resolveSubmissionStatusMeta(submission?.status);
+                    const attachment = submission?.attachment;
                     return (
                       <div key={lesson.id} className="min-w-0 rounded-xl bg-[#F8FAFC] px-3 py-2.5">
                         <div className="flex min-w-0 items-center justify-between gap-3">
@@ -1253,6 +1255,18 @@ export default function InscripcionDetailPage({ params: { id } }) {
                             {submissionStatus.label}
                           </Badge>
                         </div>
+                        {submission?.note ? <p className="mt-1 break-words text-xs leading-5 text-[#475569]">{submission.note}</p> : null}
+                        {attachment?.url ? (
+                          <a
+                            href={attachment.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="mt-1.5 inline-flex min-w-0 items-center gap-1.5 text-xs font-semibold text-[#4338CA] hover:underline"
+                          >
+                            <Paperclip className="h-3.5 w-3.5 shrink-0" />
+                            <span className="truncate">{attachment.name || "Archivo adjunto"}</span>
+                          </a>
+                        ) : null}
                         {submission?.feedback ? <p className="mt-1 break-words text-xs leading-5 text-[#64748B]">{submission.feedback}</p> : null}
                       </div>
                     );

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import {
+  ALLOWED_ACTIVITY_ATTACHMENT_MIME_TYPES,
   ALLOWED_SCORE_ATTACHMENT_MIME_TYPES,
   COURSE_AREAS,
   COURSE_CATEGORIES,
@@ -17,6 +18,7 @@ import {
   COURSE_VIDEO_MAX_SIZE_BYTES,
   ENROLLMENT_STATUSES,
   INSTITUTION_STATUSES,
+  MAX_ACTIVITY_ATTACHMENT_SIZE_BYTES,
   MAX_SCORE_ATTACHMENT_SIZE_BYTES,
   PAYMENT_METHODS,
   PAYMENT_STATUSES,
@@ -220,6 +222,16 @@ export const ScoreAttachmentSchema = z.object({
   uploadedAt: CourseIsoDateString.optional(),
 });
 
+export const ActivitySubmissionAttachmentSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  url: z.string().url(),
+  storagePath: OptionalString.optional(),
+  mimeType: z.enum(ALLOWED_ACTIVITY_ATTACHMENT_MIME_TYPES).optional(),
+  sizeBytes: z.number().nonnegative().max(MAX_ACTIVITY_ATTACHMENT_SIZE_BYTES).optional(),
+  uploadedAt: CourseIsoDateString.optional(),
+});
+
 export const PortalUserProfileSchema = z.object({
   uid: z.string().min(1),
   email: z.string().email(),
@@ -310,6 +322,50 @@ export const CourseForumQuestionSchema = z.object({
   order: z.number().int().min(0).default(0),
   answers: z.array(CourseForumAnswerSchema).default([]),
 });
+
+// Foro general del curso: espacio de comunidad separado del "Foro de la clase".
+// Cualquier alumno inscripto activo o el admin puede abrir preguntas y responder.
+export const CourseForumThreadAuthorRoleSchema = z.enum(["admin", "alumno"]);
+
+export const CourseForumThreadReplySchema = z.object({
+  id: z.string().min(1),
+  message: z.string().min(1),
+  createdBy: z.string().min(1),
+  createdByName: OptionalString.optional(),
+  createdByEmail: OptionalString.optional(),
+  createdByRole: CourseForumThreadAuthorRoleSchema,
+  createdAt: CourseIsoDateString,
+});
+
+export const CourseForumThreadSchema = z.object({
+  id: z.string().min(1),
+  courseId: z.string().min(1),
+  title: z.string().min(1),
+  message: z.string().min(1),
+  createdBy: z.string().min(1),
+  createdByName: OptionalString.optional(),
+  createdByEmail: OptionalString.optional(),
+  createdByRole: CourseForumThreadAuthorRoleSchema,
+  createdAt: CourseIsoDateString,
+  updatedAt: CourseIsoDateString,
+  repliesCount: z.number().int().min(0).default(0),
+  lastActivityAt: CourseIsoDateString.optional(),
+  replies: z.array(CourseForumThreadReplySchema).default([]),
+});
+
+export const CourseForumThreadCreateSchema = z.object({
+  title: z.string().trim().min(3, "El título debe tener al menos 3 caracteres").max(180),
+  message: z.string().trim().min(3, "El mensaje debe tener al menos 3 caracteres").max(4000),
+});
+
+export const CourseForumReplyCreateSchema = z.object({
+  message: z.string().trim().min(1, "La respuesta no puede estar vacía").max(4000),
+});
+
+export type CourseForumThread = z.infer<typeof CourseForumThreadSchema>;
+export type CourseForumThreadReply = z.infer<typeof CourseForumThreadReplySchema>;
+export type CourseForumThreadCreateInput = z.infer<typeof CourseForumThreadCreateSchema>;
+export type CourseForumReplyCreateInput = z.infer<typeof CourseForumReplyCreateSchema>;
 
 export const CourseCreateSchema = z.object({
   title: z.string().min(4),
@@ -472,7 +528,7 @@ const EnrollmentBaseSchema = z.object({
         lessonId: z.string().min(1),
         title: OptionalString.optional(),
         note: OptionalString.optional(),
-        linkUrl: OptionalUrl.optional(),
+        attachment: ActivitySubmissionAttachmentSchema.optional(),
         status: z.enum(["pending", "submitted", "reviewed"]).optional(),
         submittedAt: CourseIsoDateString.optional(),
         reviewedAt: CourseIsoDateString.optional(),
@@ -540,7 +596,7 @@ export const EnrollmentUpdateSchema = z.object({
         lessonId: z.string().min(1),
         title: OptionalString.optional(),
         note: OptionalString.optional(),
-        linkUrl: OptionalUrl.optional(),
+        attachment: ActivitySubmissionAttachmentSchema.optional(),
         status: z.enum(["pending", "submitted", "reviewed"]).optional(),
         submittedAt: CourseIsoDateString.optional(),
         reviewedAt: CourseIsoDateString.optional(),

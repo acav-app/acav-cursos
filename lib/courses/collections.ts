@@ -6,4 +6,5 @@ export const COURSE_COLLECTIONS = {
   settings: "employmentSettings",
   notificationLogs: "emailLogs",
   userProfiles: "employmentUsers",
+  forumThreads: "courseForumThreads",
 } as const;

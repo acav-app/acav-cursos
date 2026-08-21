@@ -67,6 +67,23 @@ export const ALLOWED_SCORE_ATTACHMENT_MIME_TYPES = [
 
 export const MAX_SCORE_ATTACHMENT_SIZE_BYTES = 12 * 1024 * 1024;
 
+export const ALLOWED_ACTIVITY_ATTACHMENT_MIME_TYPES = [
+  "application/pdf",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  "application/msword",
+  "application/vnd.ms-excel",
+  "application/zip",
+  "application/x-zip-compressed",
+  "image/png",
+  "image/jpeg",
+  "image/jpg",
+  "image/webp",
+] as const;
+
+export const MAX_ACTIVITY_ATTACHMENT_SIZE_BYTES = 20 * 1024 * 1024;
+
 export const PAYMENT_METHODS = [
   "transferencia",
   "manual",

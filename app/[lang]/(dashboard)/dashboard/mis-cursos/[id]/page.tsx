@@ -28,14 +28,16 @@ import {
   Info,
   Languages,
   Layers,
-  Link2,
   Loader2,
   MessageSquare,
+  Paperclip,
   PlayCircle,
   Radio,
   ShieldCheck,
   SlidersHorizontal,
   Sparkles,
+  Trash2,
+  Upload,
   Video,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -74,7 +76,11 @@ import DocumentPreviewCard from "@/components/courses/document-preview";
 import EvaluationRenderer from "@/components/courses/evaluation-renderer";
 import CourseCertificate from "@/components/courses/course-certificate";
 import type { CourseCertificateData } from "@/components/courses/course-certificate";
+import CourseForum from "@/components/courses/course-forum";
 import { DashboardDetailSkeleton } from "@/components/courses/dashboard/page-skeletons";
+import { uploadToR2 } from "@/components/courses/dashboard/upload";
+import { normalizePublicR2Url } from "@/lib/r2/normalize-public-url";
+import { ALLOWED_ACTIVITY_ATTACHMENT_MIME_TYPES, MAX_ACTIVITY_ATTACHMENT_SIZE_BYTES } from "@/lib/courses/constants";
 import {
   isFinalEvaluationUnlocked,
   isLessonEvaluationUnlocked,
@@ -746,7 +752,7 @@ function LessonEvaluationCard({
 export default function DashboardCursoAlumnoPage({ params: { id } }) {
   const buildLocalizedPath = useLocalizedPath();
   const { user } = useAuth();
-  const { loading: actorLoading } = useCourseActor();
+  const { actor: courseActor, loading: actorLoading } = useCourseActor();
   const hasShownSkeletonRef = useRef<boolean>(false);
   const hasCompletedFirstLoadRef = useRef<boolean>(false);
   const initialLoading = !hasShownSkeletonRef.current || !hasCompletedFirstLoadRef.current;
@@ -757,7 +763,8 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
   const [enrollment, setEnrollment] = useState<Enrollment | null>(null);
   const [lessonProgress, setLessonProgress] = useState<LessonProgressEntry[]>([]);
   const [activitySubmissions, setActivitySubmissions] = useState<Record<string, unknown>[]>([]);
-  const [submissionDrafts, setSubmissionDrafts] = useState<Record<string, Record<string, string>>>({});
+  const [submissionDrafts, setSubmissionDrafts] = useState<Record<string, { note: string; attachment: Record<string, unknown> | null }>>({});
+  const [uploadingSubmissionAttachment, setUploadingSubmissionAttachment] = useState<string>("");
   const [locked, setLocked] = useState<boolean>(false);
   const [openSections, setOpenSections] = useState<string[]>([]);
   const [contentTypeFilter, setContentTypeFilter] = useState<string>("all");
@@ -798,7 +805,7 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
           Object.fromEntries(
             nextSubmissions.map((item) => [
               String(item?.lessonId || ""),
-              { note: String(item?.note || ""), linkUrl: String(item?.linkUrl || "") },
+              { note: String(item?.note || ""), attachment: item?.attachment || null },
             ])
           )
         );
@@ -855,7 +862,7 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
                 if (!key) return;
                 base[key] = {
                   note: String(item?.note || ""),
-                  linkUrl: String(item?.linkUrl || ""),
+                  attachment: item?.attachment || null,
                 };
               });
               return base;
@@ -1023,22 +1030,57 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
       ...current,
       [lessonId]: {
         note: "",
-        linkUrl: "",
+        attachment: null,
         ...(current[lessonId] || {}),
         ...patch,
       },
     }));
   };
 
+  const handleSubmissionAttachmentUpload = async (lessonId, file) => {
+    if (!file || !user) return;
+    if (file.size > MAX_ACTIVITY_ATTACHMENT_SIZE_BYTES) {
+      toast.error(
+        `El archivo no puede superar los ${Math.round(MAX_ACTIVITY_ATTACHMENT_SIZE_BYTES / (1024 * 1024))}MB.`,
+        { position: "top-right" }
+      );
+      return;
+    }
+    if (!ALLOWED_ACTIVITY_ATTACHMENT_MIME_TYPES.includes(file.type)) {
+      toast.error("Formato de archivo no permitido.", { position: "top-right" });
+      return;
+    }
+    try {
+      setUploadingSubmissionAttachment(lessonId);
+      const result = await uploadToR2(file, "activity-submissions");
+      const url = normalizePublicR2Url(result?.url);
+      handleSubmissionDraft(lessonId, {
+        attachment: {
+          id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
+          name: file.name,
+          url,
+          mimeType: file.type,
+          sizeBytes: file.size,
+          uploadedAt: new Date().toISOString(),
+        },
+      });
+      toast.success("Archivo adjuntado correctamente.", { position: "top-right" });
+    } catch (error) {
+      toast.error(error?.message || "No pudimos subir el archivo.", { position: "top-right" });
+    } finally {
+      setUploadingSubmissionAttachment("");
+    }
+  };
+
   const submitActivity = async (lesson) => {
     const lessonId = String(lesson?.id || "").trim();
     if (!lessonId) return;
-    const draft = submissionDrafts[lessonId] || { note: "", linkUrl: "" };
+    const draft = submissionDrafts[lessonId] || { note: "", attachment: null };
     const nextSubmission = {
       lessonId,
       title: lesson?.title || "Actividad",
       note: String(draft.note || "").trim() || undefined,
-      linkUrl: String(draft.linkUrl || "").trim() || undefined,
+      attachment: draft.attachment || undefined,
       status: "submitted",
       submittedAt: new Date().toISOString(),
     };
@@ -2511,7 +2553,7 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
                                   : null;
                                 const submissionDraft = submissionDrafts[lessonId] || {
                                   note: String(currentSubmission?.note || ""),
-                                  linkUrl: String(currentSubmission?.linkUrl || ""),
+                                  attachment: currentSubmission?.attachment || null,
                                 };
 
                                 return (
@@ -2707,29 +2749,69 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
                                                 className="rounded-[16px] border-slate-200 bg-white"
                                                 aria-label={`Nota para ${lesson.title}`}
                                               />
-                                              <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto]">
-                                                <Input
-                                                  value={submissionDraft.linkUrl}
-                                                  onChange={(event) => handleSubmissionDraft(lessonId, { linkUrl: event.target.value })}
-                                                  placeholder="https://link-a-tu-entrega.com"
-                                                  className="rounded-[16px] border-slate-200 bg-white"
-                                                  aria-label={`Link de entrega para ${lesson.title}`}
-                                                />
-                                                <Button
-                                                  type="button"
-                                                  size="sm"
-                                                  className="rounded-2xl bg-[#6D4CFF] hover:bg-[#5E3EF0]"
-                                                  onClick={() => submitActivity(lesson)}
-                                                  disabled={savingActivity === lesson.id}
-                                                >
-                                                  {savingActivity === lesson.id ? (
-                                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                                  ) : (
-                                                    <Link2 className="mr-2 h-4 w-4" />
+                                              {submissionDraft.attachment ? (
+                                                <div className="flex items-center justify-between gap-3 rounded-[16px] border border-slate-200 bg-white px-3 py-2.5">
+                                                  <div className="flex min-w-0 items-center gap-2">
+                                                    <Paperclip className="h-4 w-4 shrink-0 text-slate-400" />
+                                                    <a
+                                                      href={submissionDraft.attachment.url}
+                                                      target="_blank"
+                                                      rel="noreferrer"
+                                                      className="truncate text-sm font-medium text-[#6D4CFF] hover:underline"
+                                                    >
+                                                      {submissionDraft.attachment.name}
+                                                    </a>
+                                                  </div>
+                                                  <button
+                                                    type="button"
+                                                    onClick={() => handleSubmissionDraft(lessonId, { attachment: null })}
+                                                    className="shrink-0 text-slate-400 transition hover:text-destructive"
+                                                    aria-label={`Quitar archivo de ${lesson.title}`}
+                                                  >
+                                                    <Trash2 className="h-4 w-4" />
+                                                  </button>
+                                                </div>
+                                              ) : (
+                                                <label
+                                                  className={cn(
+                                                    "flex cursor-pointer items-center justify-center gap-2 rounded-[16px] border border-dashed border-slate-300 bg-white px-3 py-3 text-sm font-medium text-slate-600 transition hover:border-[#6D4CFF]/50 hover:text-[#6D4CFF]",
+                                                    uploadingSubmissionAttachment === lessonId && "pointer-events-none opacity-70"
                                                   )}
-                                                  Guardar entrega
-                                                </Button>
-                                              </div>
+                                                >
+                                                  {uploadingSubmissionAttachment === lessonId ? (
+                                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                                  ) : (
+                                                    <Upload className="h-4 w-4" />
+                                                  )}
+                                                  {uploadingSubmissionAttachment === lessonId ? "Subiendo archivo..." : "Adjuntar archivo"}
+                                                  <input
+                                                    type="file"
+                                                    className="hidden"
+                                                    accept={ALLOWED_ACTIVITY_ATTACHMENT_MIME_TYPES.join(",")}
+                                                    disabled={uploadingSubmissionAttachment === lessonId}
+                                                    onChange={(event) => {
+                                                      const file = event.target.files?.[0] || null;
+                                                      event.target.value = "";
+                                                      if (file) handleSubmissionAttachmentUpload(lessonId, file);
+                                                    }}
+                                                    aria-label={`Archivo de entrega para ${lesson.title}`}
+                                                  />
+                                                </label>
+                                              )}
+                                              <Button
+                                                type="button"
+                                                size="sm"
+                                                className="w-full rounded-2xl bg-[#6D4CFF] hover:bg-[#5E3EF0] md:w-auto md:justify-self-end"
+                                                onClick={() => submitActivity(lesson)}
+                                                disabled={savingActivity === lesson.id || uploadingSubmissionAttachment === lessonId}
+                                              >
+                                                {savingActivity === lesson.id ? (
+                                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                                ) : (
+                                                  <Upload className="mr-2 h-4 w-4" />
+                                                )}
+                                                Guardar entrega
+                                              </Button>
                                               {currentSubmission?.feedback ? (
                                                 <div className="rounded-[16px] border border-sky-200 bg-sky-50 p-3 text-sm leading-6 text-sky-800">
                                                   <span className="font-semibold">Feedback docente:</span> {currentSubmission.feedback}
@@ -3807,6 +3889,10 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
                 </section>
               );
             })()}
+
+            {course && user ? (
+              <CourseForum courseId={String((course as any)?.id || id)} user={user} actor={courseActor} />
+            ) : null}
           </aside>
         </div >
       </div >
