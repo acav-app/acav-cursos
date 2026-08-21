@@ -76,7 +76,6 @@ import DocumentPreviewCard from "@/components/courses/document-preview";
 import EvaluationRenderer from "@/components/courses/evaluation-renderer";
 import CourseCertificate from "@/components/courses/course-certificate";
 import type { CourseCertificateData } from "@/components/courses/course-certificate";
-import CourseForum from "@/components/courses/course-forum";
 import { DashboardDetailSkeleton } from "@/components/courses/dashboard/page-skeletons";
 import { uploadToR2 } from "@/components/courses/dashboard/upload";
 import { normalizePublicR2Url } from "@/lib/r2/normalize-public-url";
@@ -752,7 +751,7 @@ function LessonEvaluationCard({
 export default function DashboardCursoAlumnoPage({ params: { id } }) {
   const buildLocalizedPath = useLocalizedPath();
   const { user } = useAuth();
-  const { actor: courseActor, loading: actorLoading } = useCourseActor();
+  const { loading: actorLoading } = useCourseActor();
   const hasShownSkeletonRef = useRef<boolean>(false);
   const hasCompletedFirstLoadRef = useRef<boolean>(false);
   const initialLoading = !hasShownSkeletonRef.current || !hasCompletedFirstLoadRef.current;
@@ -3889,10 +3888,6 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
                 </section>
               );
             })()}
-
-            {course && user ? (
-              <CourseForum courseId={String((course as any)?.id || id)} user={user} actor={courseActor} />
-            ) : null}
           </aside>
         </div >
       </div >

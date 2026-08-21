@@ -10,7 +10,7 @@ import { authedFetch } from "@/lib/auth/authed-fetch";
 import { useLocalizedPath } from "@/lib/utils";
 import CourseForum from "@/components/courses/course-forum";
 
-export default function CursoForoPage({ params: { id } }) {
+export default function ForoCursoPage({ params: { id } }) {
   const buildLocalizedPath = useLocalizedPath();
   const { user } = useAuth();
   const { actor } = useCourseActor();
@@ -41,9 +41,9 @@ export default function CursoForoPage({ params: { id } }) {
     <div className="mx-auto max-w-4xl space-y-4">
       <div className="flex items-center justify-between gap-3">
         <Button type="button" variant="outline" asChild className="rounded-2xl">
-          <Link href={buildLocalizedPath(`/dashboard/cursos/${id}`)}>
+          <Link href={buildLocalizedPath("/dashboard/foro")}>
             <ArrowLeft className="mr-2 h-4 w-4" />
-            Volver al curso
+            Volver al listado
           </Link>
         </Button>
       </div>

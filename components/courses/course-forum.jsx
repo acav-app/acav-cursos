@@ -198,33 +198,33 @@ export default function CourseForum({ courseId, user, actor, className }) {
         className,
       )}
     >
-      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        <div>
-          <div className="inline-flex items-center gap-2 rounded-full bg-[#F1F5F9] px-3 py-1 text-[11px] font-extrabold uppercase tracking-[0.18em] text-[#334155]">
-            <MessagesSquare className="h-3 w-3" />
+      <div className="flex flex-col gap-3">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div className="min-w-0 inline-flex items-center gap-2 rounded-full bg-[#F1F5F9] px-3 py-1 text-[11px] font-extrabold uppercase tracking-[0.18em] text-[#334155]">
+            <MessagesSquare className="h-3 w-3 shrink-0" />
             Foro del curso
           </div>
-          <h2 className="mt-3 text-[22px] font-semibold tracking-[-0.03em] text-slate-950">
-            Comunidad y consultas
-          </h2>
-          <p className="mt-1 text-sm text-slate-500">
-            Espacio abierto para preguntar y responder dudas generales del curso.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
           <Badge variant="soft" color="secondary" className="rounded-full shrink-0">
             {threads.length} pregunta{threads.length === 1 ? "" : "s"}
           </Badge>
-          <Button
-            type="button"
-            size="sm"
-            onClick={() => setShowNewForm((v) => !v)}
-            className="rounded-2xl bg-[#1B2B50] hover:bg-[#233A6A]"
-          >
-            <MessageSquare className="mr-2 h-4 w-4" />
-            Nueva pregunta
-          </Button>
         </div>
+        <div>
+          <h2 className="text-[20px] font-semibold leading-tight tracking-[-0.03em] text-slate-950">
+            Comunidad y consultas
+          </h2>
+          <p className="mt-1 text-sm leading-6 text-slate-500">
+            Espacio abierto para preguntar y responder dudas generales del curso.
+          </p>
+        </div>
+        <Button
+          type="button"
+          size="sm"
+          onClick={() => setShowNewForm((v) => !v)}
+          className="w-full rounded-2xl bg-[#1B2B50] hover:bg-[#233A6A]"
+        >
+          <MessageSquare className="mr-2 h-4 w-4" />
+          Nueva pregunta
+        </Button>
       </div>
 
       {showNewForm ? (
@@ -315,8 +315,40 @@ export default function CourseForum({ courseId, user, actor, className }) {
                 key={thread.id}
                 className="rounded-[22px] border border-slate-200 bg-[#FCFDFF] p-4 md:p-5"
               >
-                <header className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                  <div className="min-w-0 flex-1">
+                <header className="flex flex-col gap-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <Badge variant="soft" color={replies.length ? "success" : "secondary"} className="rounded-full shrink-0">
+                      {replies.length} respuesta{replies.length === 1 ? "" : "s"}
+                    </Badge>
+                    <div className="flex shrink-0 items-center gap-2">
+                      {canDeleteThread ? (
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="outline"
+                          disabled={deletingKey === `thread-${thread.id}`}
+                          onClick={() => handleDeleteThread(thread.id)}
+                          className="h-8 w-8 rounded-full border-destructive/30 text-destructive hover:bg-destructive/10"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      ) : null}
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="outline"
+                        onClick={() => setExpandedId(isExpanded ? "" : thread.id)}
+                        className="h-8 w-8 rounded-full"
+                      >
+                        {isExpanded ? (
+                          <ChevronUp className="h-3.5 w-3.5" />
+                        ) : (
+                          <ChevronDown className="h-3.5 w-3.5" />
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <AuthorBadge role={thread.createdByRole} />
                       <span className="text-[11px] text-slate-400">
@@ -333,36 +365,6 @@ export default function CourseForum({ courseId, user, actor, className }) {
                     <p className="mt-1.5 text-sm leading-6 text-slate-600 whitespace-pre-wrap">
                       {thread.message}
                     </p>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-2">
-                    <Badge variant="soft" color={replies.length ? "success" : "secondary"} className="rounded-full">
-                      {replies.length} respuesta{replies.length === 1 ? "" : "s"}
-                    </Badge>
-                    {canDeleteThread ? (
-                      <Button
-                        type="button"
-                        size="icon"
-                        variant="outline"
-                        disabled={deletingKey === `thread-${thread.id}`}
-                        onClick={() => handleDeleteThread(thread.id)}
-                        className="h-8 w-8 rounded-full border-destructive/30 text-destructive hover:bg-destructive/10"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    ) : null}
-                    <Button
-                      type="button"
-                      size="icon"
-                      variant="outline"
-                      onClick={() => setExpandedId(isExpanded ? "" : thread.id)}
-                      className="h-8 w-8 rounded-full"
-                    >
-                      {isExpanded ? (
-                        <ChevronUp className="h-3.5 w-3.5" />
-                      ) : (
-                        <ChevronDown className="h-3.5 w-3.5" />
-                      )}
-                    </Button>
                   </div>
                 </header>
 

@@ -290,15 +290,6 @@ export default function DashboardCursosPage() {
                   <Link href={buildLocalizedPath(`/dashboard/cursos/${c.id}`)}>Editar</Link>
                 </Button>
 
-                <Button
-                  type="button"
-                  variant="outline"
-                  asChild
-                  className="h-9 rounded-2xl border-[#E5E7EB] bg-white text-sm text-[#0F172A] hover:bg-[#F8FAFC]"
-                >
-                  <Link href={buildLocalizedPath(`/dashboard/cursos/${c.id}/foro`)}>Foro</Link>
-                </Button>
-
                 {actor?.role === "admin" && c.status === "pendiente_revision" ? (
                   <Button
                     type="button"

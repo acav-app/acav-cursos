@@ -1,4 +1,4 @@
-import { BarChart3, Bookmark, Briefcase, CreditCard, FileText, Users2 } from "lucide-react";
+import { BarChart3, Bookmark, Briefcase, CreditCard, FileText, MessagesSquare, Users2 } from "lucide-react";
 
 function withRoles(item) {
   return item;
@@ -132,6 +132,12 @@ export const menusConfig = {
       roles: ["admin"],
     }),
     withRoles({
+      title: "Foro",
+      icon: MessagesSquare,
+      href: "/dashboard/foro",
+      roles: ["admin"],
+    }),
+    withRoles({
       title: "Mi panel",
       icon: BarChart3,
       href: "/dashboard",
@@ -141,6 +147,12 @@ export const menusConfig = {
       title: "Mis cursos",
       icon: Bookmark,
       href: "/dashboard/mis-cursos",
+      roles: ["alumno"],
+    }),
+    withRoles({
+      title: "Foro",
+      icon: MessagesSquare,
+      href: "/dashboard/foro",
       roles: ["alumno"],
     }),
   ],
@@ -182,6 +194,12 @@ export const menusConfig = {
         roles: ["admin"],
       }),
       withRoles({
+        title: "Foro",
+        icon: MessagesSquare,
+        href: "/dashboard/foro",
+        roles: ["admin"],
+      }),
+      withRoles({
         title: "Mi panel",
         icon: BarChart3,
         href: "/dashboard",
@@ -191,6 +209,12 @@ export const menusConfig = {
         title: "Mis cursos",
         icon: Bookmark,
         href: "/dashboard/mis-cursos",
+        roles: ["alumno"],
+      }),
+      withRoles({
+        title: "Foro",
+        icon: MessagesSquare,
+        href: "/dashboard/foro",
         roles: ["alumno"],
       }),
     ],
@@ -235,6 +259,12 @@ export const menusConfig = {
         roles: ["admin"],
       }),
       withRoles({
+        title: "Foro",
+        icon: MessagesSquare,
+        href: "/dashboard/foro",
+        roles: ["admin"],
+      }),
+      withRoles({
         title: "Mi panel",
         icon: BarChart3,
         href: "/dashboard",
@@ -244,6 +274,12 @@ export const menusConfig = {
         title: "Mis cursos",
         icon: Bookmark,
         href: "/dashboard/mis-cursos",
+        roles: ["alumno"],
+      }),
+      withRoles({
+        title: "Foro",
+        icon: MessagesSquare,
+        href: "/dashboard/foro",
         roles: ["alumno"],
       }),
     ],
