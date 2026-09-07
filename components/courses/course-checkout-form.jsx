@@ -45,13 +45,16 @@ import { uploadToR2 } from "@/components/courses/dashboard/upload";
 import { normalizePublicR2Url } from "@/lib/r2/normalize-public-url";
 
 const FALLBACK_PAYMENT_SETTINGS = {
-  paymentAlias: "acav.cursos",
-  paymentCbu: "00000000000000000",
-  paymentCvu: "00000000000000000",
-  paymentAccountHolder: "ACAV",
+  paymentAlias: "EQUITACION.JADE.PEZ",
+  paymentCbu: "2850307140095916661858",
+  paymentCvu: "",
+  paymentAccountHolder: "Asociación Cordobesa de Agencias de Viajes",
   paymentInstructions:
-    "Realiza la transferencia con estos datos. Tu inscripción quedará iniciada y podrás continuar el seguimiento del pago desde tu panel.",
+    "Cuenta Caja de Ahorro – Banco Macro\nN°: 430709591666185\nCBU: 2850307140095916661858\nCUIT: 30-55915252-4\nAlias: EQUITACION.JADE.PEZ\nRealiza la transferencia con estos datos. Tu inscripción quedará iniciada y podrás continuar el seguimiento del pago desde tu panel.",
 };
+
+// Temporal: ocultar el paso de Pago en el flujo (activar más tarde cambiando a false)
+const HIDE_PAYMENT_STEP = true;
 
 function toTitleCase(value) {
   return String(value || "")
@@ -123,7 +126,7 @@ export default function CourseCheckoutForm({ lang, job, variant = "modal", onClo
           icon: User,
           fields: ["phone", "city", "province"],
         },
-        requiresPayment ? {
+        (requiresPayment && !HIDE_PAYMENT_STEP) ? {
           id: "payment",
           title: "Pago",
           description: "Revisa los datos bancarios y el importe a transferir.",
