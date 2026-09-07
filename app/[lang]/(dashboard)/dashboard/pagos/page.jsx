@@ -556,12 +556,7 @@ export default function DashboardPagosPage() {
     if (!file || !editingPaymentId || !user) return;
     try {
       setEditReceiptUploading(true);
-      const uploaded = await uploadToR2({
-        type: "enrollment-receipt",
-        scope: `enrollments/${editingPaymentId}`,
-        file,
-        user,
-      });
+      const uploaded = await uploadToR2(file, { folder: `enrollments/${editingPaymentId}` });
       const publicUrl = normalizePublicR2Url(uploaded?.downloadUrl || uploaded?.url);
       setEditReceiptUrl(publicUrl);
       toast.success("Comprobante adjuntado correctamente.", { position: "top-right" });
