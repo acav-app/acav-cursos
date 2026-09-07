@@ -578,11 +578,14 @@ export default function DashboardPagosPage() {
         paymentReceiptUrl: editReceiptUrl?.trim() || undefined,
         reviewedBy: user?.email || user?.uid || "admin",
       };
-      const data = await authedFetch(user, `/api/enrollments/${editingPaymentId}`, {
+      await authedFetch(user, `/api/enrollments/${editingPaymentId}`, {
         method: "PATCH",
         body: JSON.stringify(payload),
       });
-      syncEnrollment(data?.enrollment);
+      // Ensure we have the latest enrollment (with paymentReceiptUrl persisted)
+      const fresh = await authedFetch(user, `/api/enrollments/${editingPaymentId}`, { method: "GET" });
+      syncEnrollment(fresh?.enrollment);
+      setEditReceiptUrl(String((fresh?.enrollment?.paymentReceiptUrl || fresh?.enrollment?.payment?.receiptUrl) || "").trim());
       toast.success("Cambios guardados correctamente.", { position: "top-right" });
       handleCloseEditPayment();
     } catch (error) {
