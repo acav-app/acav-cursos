@@ -19,6 +19,7 @@ import {
   FileDown,
   Save,
   Upload,
+  Eye,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -465,17 +466,16 @@ export default function DashboardPagosPage() {
                 </>
               ) : null}
 
-              <Link href={detailHref} onClick={(e) => e.stopPropagation()} passHref legacyBehavior>
-                <Button
-                  type="button"
-                  size="sm"
-                  className="h-9 rounded-2xl bg-[#2356B8] text-white hover:bg-[#1D4ED8]"
-                  onClick={() => router.push(detailHref)}
-                >
-                  Ver inscripción
-                  <ArrowUpRight className="ml-1.5 h-4 w-4" />
-                </Button>
-              </Link>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => handleOpenEditPayment(item)}
+                className="h-9 rounded-2xl border-[#E5E7EB] bg-white text-[#0F172A] hover:bg-[#F8FAFC]"
+                aria-label="Ver detalles"
+              >
+                <Eye className="h-4 w-4" />
+              </Button>
             </div>
           );
         },
