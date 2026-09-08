@@ -50,6 +50,11 @@ import { uploadToR2 } from "@/components/courses/dashboard/upload";
 import { normalizePublicR2Url } from "@/lib/r2/normalize-public-url";
 import { resolveCourseCompletionStatusMeta } from "@/lib/courses/status-meta";
 
+function isImageReceipt(url) {
+  const clean = String(url || "").split("?")[0].split("#")[0].toLowerCase();
+  return /\.(jpg|jpeg|png|webp|gif|bmp|svg)(\?|$|#)/i.test(clean);
+}
+
 function dateLabel(iso) {
   const d = new Date(String(iso || ""));
   if (Number.isNaN(d.getTime())) return "-";
@@ -406,13 +411,13 @@ export default function InscripcionDetailPage({ params: { id } }) {
     }
     try {
       setUploadingAttachment(true);
-      const url = await uploadToR2(file, "score-attachments");
-      const normalized = normalizePublicR2Url(url);
+      const result = await uploadToR2(file, "score-attachments");
+      const url = normalizePublicR2Url(result?.url);
       const attachment = {
         id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
         name: file.name,
-        url: normalized,
-        storagePath: normalized,
+        url: url,
+        storagePath: url,
         mimeType: file.type,
         sizeBytes: file.size,
         uploadedByUid: user?.uid || user?.email || undefined,
@@ -660,11 +665,18 @@ export default function InscripcionDetailPage({ params: { id } }) {
                       </Badge>
                     </div>
                     {paymentReceiptUrl ? (
-                      <Button asChild variant="outline" className="rounded-2xl">
-                        <a href={paymentReceiptUrl} target="_blank" rel="noreferrer">
-                          Ver comprobante
-                        </a>
-                      </Button>
+                      <div className="flex items-center gap-2">
+                        {isImageReceipt(paymentReceiptUrl) ? (
+                          <img src={paymentReceiptUrl} alt="" className="h-10 w-10 rounded-lg object-cover border border-slate-200" />
+                        ) : (
+                          <FileText className="h-10 w-10 text-slate-400" />
+                        )}
+                        <Button asChild variant="outline" className="rounded-2xl">
+                          <a href={paymentReceiptUrl} target="_blank" rel="noreferrer">
+                            Ver comprobante
+                          </a>
+                        </Button>
+                      </div>
                     ) : null}
                   </div>
                 </div>

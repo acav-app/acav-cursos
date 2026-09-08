@@ -275,7 +275,8 @@ export default function EnrollmentTrackingDialog({
                         </div>
                       ) : null}
                       {receiptUrl ? (
-                        <div>
+                        <div className="flex items-center gap-3">
+                          <img src={String(receiptUrl)} alt="" className="h-10 w-10 rounded-lg object-cover border border-slate-200" />
                           <Button
                             asChild
                             variant="outline"

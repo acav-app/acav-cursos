@@ -323,7 +323,8 @@ export default function InstitutionForm({ companyId }) {
     if (!file) return;
     try {
       setSaving(true);
-      const url = await uploadToR2(file, folder);
+      const result = await uploadToR2(file, folder);
+      const url = result?.url;
       setValue(field, url, { shouldValidate: true });
       toast.success("Archivo subido", { position: "top-right" });
     } catch (e) {

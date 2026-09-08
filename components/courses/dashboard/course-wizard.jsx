@@ -4860,7 +4860,8 @@ export default function CourseWizard({ jobId }) {
     if (!file) return;
     try {
       setUploading(true);
-      const url = await uploadToR2(file, "courses/resources");
+      const result = await uploadToR2(file, "courses/resources");
+      const url = result?.url;
       const next = [
         ...(Array.isArray(values.attachments) ? values.attachments : []),
         {
@@ -4895,7 +4896,8 @@ export default function CourseWizard({ jobId }) {
     try {
       setUploading(true);
       const metadata = await extractVideoMetadata(file);
-      const url = await uploadToR2(file, "courses/videos");
+      const result = await uploadToR2(file, "courses/videos");
+      const url = result?.url;
       setValue("promoVideo", url, { shouldValidate: true, shouldDirty: true });
       setValue("promoVideoFileName", file.name, {
         shouldValidate: false,

@@ -153,7 +153,8 @@ export default function CompanySignupForm({
   const handleUpload = async (field, folder, file) => {
     if (!file) return;
     try {
-      const url = await uploadToR2(file, folder);
+      const result = await uploadToR2(file, folder);
+      const url = result?.url;
       setValue(field, url, { shouldValidate: true, shouldDirty: true });
       toast.success("Archivo cargado correctamente.", { position: "top-right" });
     } catch (error) {

@@ -54,6 +54,11 @@ import {
 import { uploadToR2 } from "@/components/courses/dashboard/upload";
 import { normalizePublicR2Url } from "@/lib/r2/normalize-public-url";
 
+function isImageReceipt(url) {
+  const clean = String(url || "").split("?")[0].split("#")[0].toLowerCase();
+  return /\.(jpg|jpeg|png|webp|gif|bmp|svg)(\?|$|#)/i.test(clean);
+}
+
 function dateLabel(value) {
   const date = new Date(String(value || ""));
   if (Number.isNaN(date.getTime())) return "-";
@@ -387,18 +392,25 @@ export default function DashboardPagosPage() {
               onClick={(e) => e.stopPropagation()}
             >
               {item.paymentMeta.receiptUrl ? (
-                <Button
-                  asChild
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  className="h-9 rounded-2xl border-[#E5E7EB] bg-white text-[#0F172A] hover:bg-[#F8FAFC]"
-                >
-                  <a href={item.paymentMeta.receiptUrl} target="_blank" rel="noreferrer">
-                    <Receipt className="mr-1.5 h-3.5 w-3.5" />
-                    Comprobante
-                  </a>
-                </Button>
+                <div className="flex items-center gap-2">
+                  {isImageReceipt(item.paymentMeta.receiptUrl) ? (
+                    <img src={item.paymentMeta.receiptUrl} alt="" className="h-10 w-10 rounded-lg object-cover border border-slate-200" />
+                  ) : (
+                    <FileText className="h-10 w-10 text-slate-400" />
+                  )}
+                  <Button
+                    asChild
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-9 rounded-2xl border-[#E5E7EB] bg-white text-[#0F172A] hover:bg-[#F8FAFC]"
+                  >
+                    <a href={item.paymentMeta.receiptUrl} target="_blank" rel="noreferrer">
+                      <Receipt className="mr-1.5 h-3.5 w-3.5" />
+                      Comprobante
+                    </a>
+                  </Button>
+                </div>
               ) : null}
 
               {actor?.role === "admin" ? (
@@ -820,28 +832,34 @@ export default function DashboardPagosPage() {
                 Comprobante de pago
               </Label>
               <div className="rounded-2xl border border-dashed border-border/70 bg-background p-3 space-y-2">
-                {editReceiptUrl ? (
-                  <div className="flex items-center justify-between gap-3 rounded-xl bg-muted/30 px-3 py-2">
-                    <a
-                      href={editReceiptUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="flex items-center gap-2 text-xs font-medium text-foreground truncate"
-                    >
-                      <FileDown className="h-4 w-4 text-primary shrink-0" />
-                      <span className="truncate">Ver comprobante actual</span>
-                    </a>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => setEditReceiptUrl("")}
-                      className="h-7 rounded-xl text-[11px] text-destructive hover:text-destructive"
-                    >
-                      Quitar
-                    </Button>
-                  </div>
-                ) : (
+                 {editReceiptUrl ? (
+                   <div className="flex items-center justify-between gap-3 rounded-xl bg-muted/30 px-3 py-2">
+                     <div className="flex items-center gap-2">
+                       {isImageReceipt(editReceiptUrl) ? (
+                         <img src={editReceiptUrl} alt="" className="h-10 w-10 rounded-lg object-cover border border-slate-200" />
+                       ) : (
+                         <FileDown className="h-4 w-4 text-primary shrink-0" />
+                       )}
+                       <a
+                         href={editReceiptUrl}
+                         target="_blank"
+                         rel="noreferrer"
+                         className="flex items-center gap-2 text-xs font-medium text-foreground truncate"
+                       >
+                         <span className="truncate">Ver comprobante actual</span>
+                       </a>
+                     </div>
+                     <Button
+                       type="button"
+                       size="sm"
+                       variant="ghost"
+                       onClick={() => setEditReceiptUrl("")}
+                       className="h-7 rounded-xl text-[11px] text-destructive hover:text-destructive"
+                     >
+                       Quitar
+                     </Button>
+                   </div>
+                 ) : (
                   <div className="flex items-center gap-2 rounded-xl bg-muted/30 px-3 py-2">
                     <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
                     <span className="text-xs text-muted-foreground">Sin comprobante adjunto.</span>

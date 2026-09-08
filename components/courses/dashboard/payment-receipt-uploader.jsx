@@ -83,7 +83,8 @@ export default function PaymentReceiptUploader({
     try {
       setReceiptFile(file);
       setUploading(true);
-      const url = await uploadToR2(file, "payment-receipts");
+      const result = await uploadToR2(file, "payment-receipts");
+      const url = result?.url;
       const normalized = normalizePublicR2Url(url);
       setReceiptUrl(normalized);
       toast.success("Comprobante cargado. Guardalo para enviar al equipo.", { position: "top-right" });

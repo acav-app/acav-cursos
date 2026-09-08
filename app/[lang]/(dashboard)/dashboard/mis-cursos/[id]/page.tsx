@@ -204,6 +204,11 @@ function isDirectVideoUrl(url, mimeType) {
   );
 }
 
+function isImageReceipt(url) {
+  const clean = String(url || "").split("?")[0].split("#")[0].toLowerCase();
+  return /\.(jpg|jpeg|png|webp|gif|bmp|svg)(\?|$|#)/i.test(clean);
+}
+
 function getLessonTypeMeta(type) {
   const normalized = String(type || "").trim();
   const map = {
@@ -2197,7 +2202,12 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
                               </div>
                             ) : null}
                             {(enrollment as any)?.paymentReceiptUrl ? (
-                              <div>
+                              <div className="flex items-center gap-3">
+                                {isImageReceipt(String((enrollment as any).paymentReceiptUrl)) ? (
+                                  <img src={String((enrollment as any).paymentReceiptUrl)} alt="" className="h-10 w-10 rounded-lg object-cover border border-slate-200" />
+                                ) : (
+                                  <FileText className="h-10 w-10 text-slate-400" />
+                                )}
                                 <a
                                   href={String((enrollment as any).paymentReceiptUrl)}
                                   target="_blank"

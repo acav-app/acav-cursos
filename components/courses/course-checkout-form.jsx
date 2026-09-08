@@ -342,7 +342,8 @@ export default function CourseCheckoutForm({ lang, job, variant = "modal", onClo
     try {
       setReceiptFile(file);
       setReceiptUploading(true);
-      const url = await uploadToR2(file, "payment-receipts");
+      const result = await uploadToR2(file, "payment-receipts");
+      const url = result?.url;
       setReceiptUrl(normalizePublicR2Url(url));
       toast.success("Comprobante cargado correctamente.", { position: "top-right" });
     } catch (error) {
