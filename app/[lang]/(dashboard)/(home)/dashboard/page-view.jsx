@@ -6,6 +6,7 @@ import { useParams } from "next/navigation";
 import { Icon } from "@iconify/react";
 import { useAuth } from "@/provider/auth.provider";
 import { authedFetch } from "@/lib/auth/authed-fetch";
+import { isAdminRole, isStudentRole } from "@/lib/courses/roles";
 import { cn } from "@/lib/utils";
 import { normalizePublicR2Url } from "@/lib/r2/normalize-public-url";
 import { uploadToR2 } from "@/components/courses/dashboard/upload";
@@ -469,12 +470,18 @@ function PaymentRow({ enrollment, lang }) {
 }
 
 function StudentEnrollmentRow({ enrollment, lang }) {
+  const { user } = useAuth();
+  const { actor } = useCourseActor();
   const courseTitle = enrollment?.jobTitle || enrollment?.courseTitle || "Curso";
   const companyName = enrollment?.companyName || enrollment?.institutionName || "ACAV Cursos";
+  const isStudent = isStudentRole(actor?.role);
+  const href = isStudent
+    ? `/${lang}/dashboard/mis-cursos/${enrollment.id}`
+    : `/${lang}/dashboard/inscripciones/${enrollment.id}`;
 
   return (
     <Link
-      href={`/${lang}/dashboard/inscripciones/${enrollment.id}`}
+      href={href}
       className="block w-full rounded-2xl border border-border/60 p-4 transition hover:border-primary/20 hover:bg-muted/20"
     >
       <div className="flex items-start justify-between gap-3">
