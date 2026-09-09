@@ -8,6 +8,7 @@ import { useAuth } from "@/provider/auth.provider";
 import { authedFetch } from "@/lib/auth/authed-fetch";
 import { cn } from "@/lib/utils";
 import { normalizePublicR2Url } from "@/lib/r2/normalize-public-url";
+import { uploadToR2 } from "@/components/courses/dashboard/upload";
 import { SiteLogo } from "@/components/svg";
 import { useCourseActor } from "@/components/courses/dashboard/use-course-actor";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,6 +16,17 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { FileText, Upload, AlertCircle } from "lucide-react";
+import toast from "react-hot-toast";
+import { Label } from "@/components/ui/label";
 
 const asArray = (value) => (Array.isArray(value) ? value : []);
 
@@ -40,6 +52,11 @@ const formatCurrency = (value) => {
     currency: "ARS",
     maximumFractionDigits: 0,
   }).format(amount);
+};
+
+const isImageReceipt = (url) => {
+  const clean = String(url || "").split("?")[0].split("#")[0].toLowerCase();
+  return /\.(jpg|jpeg|png|webp|gif|bmp|svg)(\?|$|#)/i.test(clean);
 };
 
 const startOfDay = (value) => {
@@ -478,24 +495,230 @@ function StudentEnrollmentRow({ enrollment, lang }) {
   );
 }
 
-function StudentPaymentRow({ enrollment, lang }) {
+function StudentPaymentRow({ enrollment, lang, jobs, paymentSettings }) {
   const payment = resolvePaymentMeta(enrollment);
+  const course = jobs?.get(enrollment?.courseId || enrollment?.jobId) || null;
+  const settings = paymentSettings || course?.paymentSettings || course?.settings || null;
+  const [open, setOpen] = useState(false);
+  const [receiptFile, setReceiptFile] = useState(null);
+  const [receiptUrl, setReceiptUrl] = useState(String(enrollment?.paymentReceiptUrl || enrollment?.payment?.receiptUrl || "").trim());
+  const [reference, setReference] = useState(String(enrollment?.paymentReference || enrollment?.payment?.reference || "").trim());
+  const [uploading, setUploading] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const hasReceipt = Boolean(receiptUrl);
+  const isUrgent =
+    String(enrollment?.paymentStatus || enrollment?.payment?.status || "").trim().toLowerCase() === "rejected" ||
+    String(enrollment?.status || "").trim().toLowerCase() === "rejected";
+
+  const handleFileChange = async (event) => {
+    const file = event.target.files?.[0] || null;
+    if (!file) return;
+    const maxSize = 10 * 1024 * 1024;
+    if (file.size > maxSize) {
+      toast?.error?.("El comprobante no puede superar los 10MB.", { position: "top-right" });
+      return;
+    }
+    const allowed = new Set(["application/pdf", "image/jpeg", "image/jpg", "image/png", "image/webp"]);
+    if (!allowed.has(file.type)) {
+      toast?.error?.("Solo se admiten PDF, JPG, PNG o WEBP.", { position: "top-right" });
+      return;
+    }
+    try {
+      setReceiptFile(file);
+      setUploading(true);
+      const result = await uploadToR2(file, "payment-receipts");
+      const url = normalizePublicR2Url(result?.url);
+      setReceiptUrl(url);
+      toast?.success?.("Comprobante cargado. Guardalo para enviar al equipo.", { position: "top-right" });
+    } catch (error) {
+      setReceiptFile(null);
+      toast?.error?.(error?.message || "No pudimos subir el comprobante.", { position: "top-right" });
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleRemove = () => {
+    setReceiptFile(null);
+    setReceiptUrl("");
+  };
+
+  const handleSave = async () => {
+    const user = window.__NEXT_DATA__?.props?.user || null;
+    if (!user || !enrollment?.id) return;
+    if (!receiptUrl) {
+      toast?.error?.("Primero adjunta un comprobante.", { position: "top-right" });
+      return;
+    }
+    try {
+      setSaving(true);
+      const payload = { receiptUrl };
+      if (String(reference || "").trim()) payload.paymentReference = String(reference).trim();
+      await authedFetch(user, `/api/enrollments/${enrollment.id}/receipt`, {
+        method: "POST",
+        body: JSON.stringify(payload),
+      });
+      toast?.success?.("Comprobante enviado a revisión.", { position: "top-right" });
+      setOpen(false);
+    } catch (error) {
+      toast?.error?.(error?.message || "No pudimos guardar el comprobante.", { position: "top-right" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
-    <Link
-      href={`/${lang}/dashboard/pagos`}
-      className="block w-full rounded-2xl border border-border/60 p-4 transition hover:border-primary/20 hover:bg-muted/20"
-    >
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="truncate font-semibold text-foreground">{enrollment?.jobTitle || enrollment?.courseTitle || "Curso"}</div>
-          <div className="mt-1 truncate text-sm text-muted-foreground">{payment.helper}</div>
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="block w-full rounded-2xl border border-border/60 p-4 transition hover:border-primary/20 hover:bg-muted/20 text-left"
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="truncate font-semibold text-foreground">{enrollment?.jobTitle || enrollment?.courseTitle || "Curso"}</div>
+            <div className="mt-1 truncate text-sm text-muted-foreground">{payment.helper}</div>
+          </div>
+          <Badge color={payment.tone} variant="soft" className="shrink-0">
+            {payment.label}
+          </Badge>
         </div>
-        <Badge color={payment.tone} variant="soft" className="shrink-0">
-          {payment.label}
-        </Badge>
-      </div>
-      <div className="mt-3 text-xs font-medium text-foreground">{payment.amountLabel}</div>
-    </Link>
+        <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+          <span className="font-medium text-foreground">{payment.amountLabel}</span>
+          {hasReceipt ? (
+            <>
+              <span>·</span>
+              <span className="inline-flex items-center gap-1 text-emerald-700">
+                <FileText className="h-3.5 w-3.5" />
+                Comprobante adjunto
+              </span>
+            </>
+          ) : (
+            <>
+              <span>·</span>
+              <span className="inline-flex items-center gap-1 text-amber-700">
+                <AlertCircle className="h-3.5 w-3.5" />
+                Sin comprobante
+              </span>
+            </>
+          )}
+        </div>
+      </button>
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Comprobante de pago</DialogTitle>
+            <DialogDescription>
+              {enrollment?.jobTitle || enrollment?.courseTitle || "Curso"} · {payment.amountLabel}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-4">
+            {!hasReceipt ? (
+              <Alert variant="soft" color="warning">
+                <AlertTitle>Falta comprobante</AlertTitle>
+                <AlertDescription>
+                  Todavía no adjuntaste el comprobante de la transferencia. Podés subirlo ahora para agilizar la revisión.
+                </AlertDescription>
+              </Alert>
+            ) : null}
+
+            {settings?.paymentAlias || settings?.paymentCbu || settings?.paymentCvu || settings?.paymentAccountHolder ? (
+              <div className="rounded-xl border border-border/60 bg-muted/20 p-4 text-sm">
+                <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Datos bancarios</div>
+                <div className="mt-2 grid gap-1">
+                  {settings?.paymentAccountHolder ? (
+                    <div><span className="font-medium">Titular:</span> {settings.paymentAccountHolder}</div>
+                  ) : null}
+                  {settings?.paymentAlias ? (
+                    <div><span className="font-medium">Alias:</span> {settings.paymentAlias}</div>
+                  ) : null}
+                  {settings?.paymentCbu ? (
+                    <div><span className="font-medium">CBU:</span> {settings.paymentCbu}</div>
+                  ) : null}
+                  {settings?.paymentCvu ? (
+                    <div><span className="font-medium">CVU:</span> {settings.paymentCvu}</div>
+                  ) : null}
+                </div>
+                {settings?.paymentInstructions ? (
+                  <p className="mt-2 text-xs text-muted-foreground">{settings.paymentInstructions}</p>
+                ) : null}
+              </div>
+            ) : null}
+
+            {hasReceipt ? (
+              <div className="grid gap-3">
+                <div className="flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
+                  {isImageReceipt(receiptUrl) ? (
+                    <img src={receiptUrl} alt="" className="h-10 w-10 rounded-lg object-cover border border-slate-200" />
+                  ) : (
+                    <FileText className="h-10 w-10 text-slate-400" />
+                  )}
+                  <div>
+                    <div className="font-semibold">Comprobante enviado</div>
+                    {/* <p className="mt-1">El equipo administrativo está validando tu pago. Recibirás una novedad cuando se apruebe.</p> */}
+                  </div>
+                </div>
+                <Button asChild variant="outline" className="h-9 rounded-2xl border-[#E5E7EB] bg-white text-[#0F172A] hover:text-[#0F172A] hover:bg-[#F8FAFC]">
+                  <a href={receiptUrl} target="_blank" rel="noreferrer">
+                    <FileText className="mr-1.5 h-3.5 w-3.5" />
+                    Ver comprobante
+                  </a>
+                </Button>
+              </div>
+            ) : (
+              <div className="grid gap-3">
+                <div className="grid gap-2">
+                  <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Referencia (opcional)</Label>
+                  <Input
+                    value={reference}
+                    onChange={(event) => setReference(event.target.value)}
+                    placeholder="Últimos números, banco o aclaración"
+                    className="h-10 rounded-xl"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Adjuntar comprobante</Label>
+                  <input
+                    type="file"
+                    accept="application/pdf,image/jpeg,image/jpg,image/png,image/webp"
+                    className="hidden"
+                    onChange={handleFileChange}
+                  />
+                  {receiptUrl ? (
+                    <div className="flex items-center justify-between gap-3 rounded-xl bg-muted/30 px-3 py-2">
+                      <span className="truncate text-sm font-medium">Comprobante listo</span>
+                      <Button type="button" size="sm" variant="ghost" onClick={handleRemove} className="h-7 rounded-xl text-destructive hover:text-destructive">
+                        Quitar
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button type="button" variant="outline" onClick={() => document.querySelector('input[type="file"]')?.click()} className="h-10 rounded-xl">
+                      <Upload className="mr-2 h-4 w-4" />
+                      Seleccionar archivo
+                    </Button>
+                  )}
+                  <p className="text-[11px] text-muted-foreground leading-4">PDF, JPG, PNG o WEBP · máximo 10MB.</p>
+                </div>
+              </div>
+            )}
+
+            <div className="flex items-center justify-end gap-2 pt-1">
+              <Button type="button" variant="outline" onClick={() => setOpen(false)} className="h-10 rounded-xl">
+                Cerrar
+              </Button>
+              {!hasReceipt ? (
+                <Button type="button" onClick={handleSave} disabled={!receiptUrl || uploading || saving} className="h-10 rounded-xl bg-[#1B2B50] text-white hover:bg-[#133778]">
+                  {saving ? "Enviando..." : "Enviar comprobante"}
+                </Button>
+              ) : null}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
@@ -529,6 +752,7 @@ const DashboardPageView = () => {
   const [applications, setApplications] = useState([]);
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
+  const [paymentSettings, setPaymentSettings] = useState(null);
 
   const load = useCallback(async () => {
     if (!user) {
@@ -549,6 +773,9 @@ const DashboardPageView = () => {
       setCompanies(companiesData.status === "fulfilled" ? asArray(companiesData.value?.institutions) : []);
       setJobs(jobsData.status === "fulfilled" ? asArray(jobsData.value?.courses) : []);
       setApplications(applicationsData.status === "fulfilled" ? asArray(applicationsData.value?.enrollments) : []);
+
+      const settingsData = await authedFetch(user, "/api/courses/settings", { method: "GET" });
+      setPaymentSettings(settingsData?.settings || null);
     } finally {
       setLoading(false);
     }
@@ -787,7 +1014,7 @@ const DashboardPageView = () => {
             <CardContent className="space-y-3">
               {studentBoards.paymentFollowUp.length
                 ? studentBoards.paymentFollowUp.map((application) => (
-                    <StudentPaymentRow key={application.id} enrollment={application} lang={lang} />
+                    <StudentPaymentRow key={application.id} enrollment={application} lang={lang} jobs={jobsById} paymentSettings={paymentSettings} />
                   ))
                 : <EmptyBlock text="No hay movimientos de pago para mostrar." />}
             </CardContent>
