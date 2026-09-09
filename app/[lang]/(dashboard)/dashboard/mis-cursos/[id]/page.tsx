@@ -2076,7 +2076,7 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
             />
           </div>
 
-          {/* <div className="mt-6 flex flex-wrap gap-3">
+          <div className="mt-6 flex flex-wrap gap-3">
             <Dialog open={showTracking} onOpenChange={setShowTracking}>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -2240,7 +2240,7 @@ export default function DashboardCursoAlumnoPage({ params: { id } }) {
                 <div className="text-[11px]">Panel consolidado de todas tus inscripciones y pagos.</div>
               </TooltipContent>
             </Tooltip>
-          </div> */}
+          </div>
         </div>
       </div>
     );

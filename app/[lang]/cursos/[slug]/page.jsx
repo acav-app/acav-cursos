@@ -425,8 +425,6 @@ export default async function CursoDetailPage({ params: { lang, slug } }) {
                     ].join(" ")}
                   >
                     <PriceTier
-                      highlight
-                      badge="Recomendado"
                       label="Socio ACAV"
                       subtitle="Tarifa preferente para asociados activos"
                       value={memberPriceText}

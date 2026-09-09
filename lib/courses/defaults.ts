@@ -30,7 +30,7 @@ export const DEFAULT_COURSE_SETTINGS = {
   paymentCvu: "",
   paymentAccountHolder: "Asociación Cordobesa de Agencias de Viajes",
   paymentInstructions:
-    "Tu inscripción quedará iniciada y podrás continuar el seguimiento del pago desde tu panel.",
+    "Ante cualquier inquietud, no dudes en contactarte con nuestro equipo al: 9 351 874-7119",
   adminNotificationEmail: "",
   emailFrom: "",
   emailFromName: "",

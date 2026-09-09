@@ -820,7 +820,7 @@ export default function CourseCheckoutForm({ lang, job, variant = "modal", onClo
                           <Landmark className="h-4 w-4" />
                         </span>
                         <div>
-                          <div className="font-semibold text-[#1B2B50]">Instrucciones para tu banco</div>
+                          <div className="font-semibold text-[#1B2B50]">Información importante</div>
                           <p className="mt-1 text-xs leading-5 text-slate-500">{settings.paymentInstructions}</p>
                         </div>
                       </div>

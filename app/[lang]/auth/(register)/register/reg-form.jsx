@@ -46,6 +46,17 @@ const schema = z
   .refine((data) => data.password === data.confirmPassword, {
     message: "Las contraseñas no coinciden.",
     path: ["confirmPassword"],
+  })
+  .superRefine((data) => {
+    if (data.isMember && !String(data.employeeFileNumber || "").trim()) {
+      throw new z.ZodError([
+        {
+          code: z.ZodIssueCode.custom,
+          path: ["employeeFileNumber"],
+          message: "El legajo es obligatorio para socios ACAV.",
+        },
+      ]);
+    }
   });
 const RegForm = ({
   variant = "page",
@@ -318,19 +329,20 @@ const RegForm = ({
 
         <div>
           <Label htmlFor="employeeFileNumber" className="mb-2 font-medium text-default-700">
-            Legajo
+            Legajo {watch("isMember") ? <span className="text-destructive">*</span> : ""}
           </Label>
           <Input
             disabled={isPending}
             {...register("employeeFileNumber")}
             type="text"
             id="employeeFileNumber"
-            placeholder="Opcional"
+            placeholder={watch("isMember") ? "Obligatorio para socios ACAV" : "Opcional"}
             className={cn("rounded-2xl", {
               "border-destructive": errors.employeeFileNumber,
             })}
             size="xl"
           />
+          {errors.employeeFileNumber && <div className="mt-2 text-sm text-destructive">{errors.employeeFileNumber.message}</div>}
         </div>
 
         <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-5 dark:border-slate-800/80 dark:bg-slate-900/30">

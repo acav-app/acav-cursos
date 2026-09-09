@@ -11,7 +11,6 @@ import { readSavedCourses, writeSavedCourses } from "@/lib/courses/client/saved-
 import { useLocalizedPath } from "@/lib/utils";
 import { useAuth } from "@/provider/auth.provider";
 import { authedFetch } from "@/lib/auth/authed-fetch";
-import EnrollmentTrackingDialog from "@/components/courses/dashboard/enrollment-tracking-dialog";
 import { isStudentRole, isAdminRole } from "@/lib/courses/roles";
 
 function dateLabel(value) {
@@ -84,8 +83,6 @@ export default function DashboardMisCursosPage() {
   const [savedCourses, setSavedCourses] = useState([]);
   const [enrollments, setEnrollments] = useState([]);
   const [loadingEnrollments, setLoadingEnrollments] = useState(true);
-  const [trackingOpen, setTrackingOpen] = useState(false);
-  const [selectedEnrollment, setSelectedEnrollment] = useState(null);
 
   useEffect(() => {
     const syncSaved = () => {
@@ -186,11 +183,6 @@ export default function DashboardMisCursosPage() {
       return ACTIVE_STATUSES.has(status) === false;
     });
   }, [enrollments, activeIds]);
-
-  const openTrackingFor = (enrollment) => {
-    setSelectedEnrollment(enrollment);
-    setTrackingOpen(true);
-  };
 
   if (actorLoading) return <DashboardPageShellSkeleton />;
 
@@ -311,13 +303,12 @@ export default function DashboardMisCursosPage() {
                               <ExternalLink className="ml-2 h-4 w-4" />
                             </Link>
                           </Button>
-                          <Button
-                            variant="outline"
-                            className="rounded-2xl"
-                            onClick={() => openTrackingFor(enrollment)}
-                          >
+                          <Button asChild className="rounded-2xl">
+                          <Link href={buildLocalizedPath(`/dashboard/mis-cursos/${String(enrollment?.id)}`)}>
                             Ver seguimiento
-                          </Button>
+                            <ExternalLink className="ml-2 h-4 w-4" />
+                          </Link>
+                        </Button>
                         </div>
                       </div>
                     </article>
@@ -388,12 +379,11 @@ export default function DashboardMisCursosPage() {
                           </p>
                         </div>
 
-                        <Button
-                          variant="outline"
-                          className="rounded-2xl"
-                          onClick={() => openTrackingFor(enrollment)}
-                        >
-                          Ver seguimiento
+                        <Button asChild className="rounded-2xl">
+                          <Link href={buildLocalizedPath(`/dashboard/mis-cursos/${String(enrollment?.id)}`)}>
+                            Ver seguimiento
+                            <ExternalLink className="ml-2 h-4 w-4" />
+                          </Link>
                         </Button>
                       </div>
                     </article>
@@ -495,16 +485,6 @@ export default function DashboardMisCursosPage() {
           />
         )}
       </section>
-
-      <EnrollmentTrackingDialog
-        open={trackingOpen}
-        onOpenChange={(next) => {
-          setTrackingOpen(next);
-          if (!next) setSelectedEnrollment(null);
-        }}
-        enrollment={selectedEnrollment}
-        course={selectedEnrollment}
-      />
     </div>
   );
 }

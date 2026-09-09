@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { Icon } from "@iconify/react";
@@ -24,7 +24,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { FileText, Upload, AlertCircle } from "lucide-react";
+import { FileText, Upload, AlertCircle, Copy } from "lucide-react";
 import toast from "react-hot-toast";
 import { Label } from "@/components/ui/label";
 
@@ -495,7 +495,7 @@ function StudentEnrollmentRow({ enrollment, lang }) {
   );
 }
 
-function StudentPaymentRow({ enrollment, lang, jobs, paymentSettings }) {
+function StudentPaymentRow({ enrollment, lang, jobs, paymentSettings, user }) {
   const payment = resolvePaymentMeta(enrollment);
   const course = jobs?.get(enrollment?.courseId || enrollment?.jobId) || null;
   const settings = paymentSettings || course?.paymentSettings || course?.settings || null;
@@ -505,11 +505,14 @@ function StudentPaymentRow({ enrollment, lang, jobs, paymentSettings }) {
   const [reference, setReference] = useState(String(enrollment?.paymentReference || enrollment?.payment?.reference || "").trim());
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [sent, setSent] = useState(false);
 
   const hasReceipt = Boolean(receiptUrl);
   const isUrgent =
     String(enrollment?.paymentStatus || enrollment?.payment?.status || "").trim().toLowerCase() === "rejected" ||
     String(enrollment?.status || "").trim().toLowerCase() === "rejected";
+
+  const fileInputRef = useRef(null);
 
   const handleFileChange = async (event) => {
     const file = event.target.files?.[0] || null;
@@ -527,6 +530,7 @@ function StudentPaymentRow({ enrollment, lang, jobs, paymentSettings }) {
     try {
       setReceiptFile(file);
       setUploading(true);
+      setSent(false);
       const result = await uploadToR2(file, "payment-receipts");
       const url = normalizePublicR2Url(result?.url);
       setReceiptUrl(url);
@@ -542,10 +546,19 @@ function StudentPaymentRow({ enrollment, lang, jobs, paymentSettings }) {
   const handleRemove = () => {
     setReceiptFile(null);
     setReceiptUrl("");
+    setSent(false);
+  };
+
+  const handleCopy = async (label, value) => {
+    try {
+      await navigator.clipboard.writeText(String(value || ""));
+      toast?.success?.(`${label} copiado`, { position: "top-right" });
+    } catch {
+      toast?.error?.("No pudimos copiar el dato.", { position: "top-right" });
+    }
   };
 
   const handleSave = async () => {
-    const user = window.__NEXT_DATA__?.props?.user || null;
     if (!user || !enrollment?.id) return;
     if (!receiptUrl) {
       toast?.error?.("Primero adjunta un comprobante.", { position: "top-right" });
@@ -559,6 +572,7 @@ function StudentPaymentRow({ enrollment, lang, jobs, paymentSettings }) {
         method: "POST",
         body: JSON.stringify(payload),
       });
+      setSent(true);
       toast?.success?.("Comprobante enviado a revisión.", { position: "top-right" });
       setOpen(false);
     } catch (error) {
@@ -616,15 +630,6 @@ function StudentPaymentRow({ enrollment, lang, jobs, paymentSettings }) {
           </DialogHeader>
 
           <div className="grid gap-4">
-            {!hasReceipt ? (
-              <Alert variant="soft" color="warning">
-                <AlertTitle>Falta comprobante</AlertTitle>
-                <AlertDescription>
-                  Todavía no adjuntaste el comprobante de la transferencia. Podés subirlo ahora para agilizar la revisión.
-                </AlertDescription>
-              </Alert>
-            ) : null}
-
             {settings?.paymentAlias || settings?.paymentCbu || settings?.paymentCvu || settings?.paymentAccountHolder ? (
               <div className="rounded-xl border border-border/60 bg-muted/20 p-4 text-sm">
                 <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Datos bancarios</div>
@@ -648,7 +653,7 @@ function StudentPaymentRow({ enrollment, lang, jobs, paymentSettings }) {
               </div>
             ) : null}
 
-            {hasReceipt ? (
+            {sent ? (
               <div className="grid gap-3">
                 <div className="flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
                   {isImageReceipt(receiptUrl) ? (
@@ -658,7 +663,6 @@ function StudentPaymentRow({ enrollment, lang, jobs, paymentSettings }) {
                   )}
                   <div>
                     <div className="font-semibold">Comprobante enviado</div>
-                    {/* <p className="mt-1">El equipo administrativo está validando tu pago. Recibirás una novedad cuando se apruebe.</p> */}
                   </div>
                 </div>
                 <Button asChild variant="outline" className="h-9 rounded-2xl border-[#E5E7EB] bg-white text-[#0F172A] hover:text-[#0F172A] hover:bg-[#F8FAFC]">
@@ -670,21 +674,45 @@ function StudentPaymentRow({ enrollment, lang, jobs, paymentSettings }) {
               </div>
             ) : (
               <div className="grid gap-3">
-                <div className="grid gap-2">
-                  <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Referencia (opcional)</Label>
-                  <Input
-                    value={reference}
-                    onChange={(event) => setReference(event.target.value)}
-                    placeholder="Últimos números, banco o aclaración"
-                    className="h-10 rounded-xl"
-                  />
-                </div>
+                {settings?.paymentAlias || settings?.paymentCbu || settings?.paymentCvu || settings?.paymentAccountHolder ? (
+                  <div className="rounded-xl border border-border/60 bg-muted/20 p-4 text-sm">
+                    <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Datos bancarios</div>
+                    <div className="mt-2 grid gap-1">
+                      {settings?.paymentAccountHolder ? (
+                        <div><span className="font-medium">Titular:</span> {settings.paymentAccountHolder}</div>
+                      ) : null}
+                      {settings?.paymentAlias ? (
+                        <div className="flex items-center justify-between gap-3">
+                          <div><span className="font-medium">Alias:</span> {settings.paymentAlias}</div>
+                          <Button type="button" variant="outline" size="sm" className="rounded-lg" onClick={() => handleCopy("Alias", settings.paymentAlias)}>
+                            <Copy className="mr-1.5 h-3.5 w-3.5" />
+                            Copiar
+                          </Button>
+                        </div>
+                      ) : null}
+                      {settings?.paymentCbu ? (
+                        <div className="flex items-center justify-between gap-3">
+                          <div><span className="font-medium">CBU:</span> {settings.paymentCbu}</div>
+                          <Button type="button" variant="outline" size="sm" className="rounded-lg" onClick={() => handleCopy("CBU", settings.paymentCbu)}>
+                            <Copy className="mr-1.5 h-3.5 w-3.5" />
+                            Copiar
+                          </Button>
+                        </div>
+                      ) : null}
+                    </div>
+                    {settings?.paymentInstructions ? (
+                      <p className="mt-2 text-xs text-muted-foreground">{settings.paymentInstructions}</p>
+                    ) : null}
+                  </div>
+                ) : null}
+
                 <div className="grid gap-2">
                   <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Adjuntar comprobante</Label>
                   <input
                     type="file"
                     accept="application/pdf,image/jpeg,image/jpg,image/png,image/webp"
                     className="hidden"
+                    ref={fileInputRef}
                     onChange={handleFileChange}
                   />
                   {receiptUrl ? (
@@ -695,7 +723,7 @@ function StudentPaymentRow({ enrollment, lang, jobs, paymentSettings }) {
                       </Button>
                     </div>
                   ) : (
-                    <Button type="button" variant="outline" onClick={() => document.querySelector('input[type="file"]')?.click()} className="h-10 rounded-xl">
+                    <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()} className="h-10 rounded-xl">
                       <Upload className="mr-2 h-4 w-4" />
                       Seleccionar archivo
                     </Button>
@@ -709,7 +737,7 @@ function StudentPaymentRow({ enrollment, lang, jobs, paymentSettings }) {
               <Button type="button" variant="outline" onClick={() => setOpen(false)} className="h-10 rounded-xl">
                 Cerrar
               </Button>
-              {!hasReceipt ? (
+              {!sent ? (
                 <Button type="button" onClick={handleSave} disabled={!receiptUrl || uploading || saving} className="h-10 rounded-xl bg-[#1B2B50] text-white hover:bg-[#133778]">
                   {saving ? "Enviando..." : "Enviar comprobante"}
                 </Button>
@@ -1014,7 +1042,7 @@ const DashboardPageView = () => {
             <CardContent className="space-y-3">
               {studentBoards.paymentFollowUp.length
                 ? studentBoards.paymentFollowUp.map((application) => (
-                    <StudentPaymentRow key={application.id} enrollment={application} lang={lang} jobs={jobsById} paymentSettings={paymentSettings} />
+                    <StudentPaymentRow key={application.id} enrollment={application} lang={lang} jobs={jobsById} paymentSettings={paymentSettings} user={user} />
                   ))
                 : <EmptyBlock text="No hay movimientos de pago para mostrar." />}
             </CardContent>
