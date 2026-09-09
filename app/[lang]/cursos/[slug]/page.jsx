@@ -457,7 +457,7 @@ export default async function CursoDetailPage({ params: { lang, slug } }) {
                     </div>
                   </div>
 
-                  <div className="mt-4 flex flex-col gap-2.5">
+                  {/* <div className="mt-4 flex flex-col gap-2.5">
                     <CourseEnrollButton
                       lang={lang}
                       jobId={course.id}
@@ -478,7 +478,7 @@ export default async function CursoDetailPage({ params: { lang, slug } }) {
                       Inscribirme como socio
                       <ExternalLink className="h-3.5 w-3.5" />
                     </a>
-                  </div>
+                  </div> */}
 
                   <div className="mt-3 flex items-center gap-2 text-xs text-slate-500">
                     <ShieldCheck className="h-3.5 w-3.5 text-[#7A9FE8]" />

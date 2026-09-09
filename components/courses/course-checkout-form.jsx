@@ -50,11 +50,11 @@ const FALLBACK_PAYMENT_SETTINGS = {
   paymentCvu: "",
   paymentAccountHolder: "Asociación Cordobesa de Agencias de Viajes",
   paymentInstructions:
-    "Cuenta Caja de Ahorro – Banco Macro\nN°: 430709591666185\nCBU: 2850307140095916661858\nCUIT: 30-55915252-4\nAlias: EQUITACION.JADE.PEZ\nRealiza la transferencia con estos datos. Tu inscripción quedará iniciada y podrás continuar el seguimiento del pago desde tu panel.",
+    "Tu inscripción quedará iniciada y podrás continuar el seguimiento del pago desde tu panel.",
 };
 
 // Temporal: ocultar el paso de Pago en el flujo (activar más tarde cambiando a false)
-const HIDE_PAYMENT_STEP = true;
+const HIDE_PAYMENT_STEP = false;
 
 function toTitleCase(value) {
   return String(value || "")
@@ -767,46 +767,6 @@ export default function CourseCheckoutForm({ lang, job, variant = "modal", onClo
                   <div className="rounded-[20px] border border-[#E5EAF2] bg-white p-5">
                     <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                       <div>
-                        <div className="text-base font-semibold text-[#0F172A]">Resumen del curso</div>
-                        <p className="mt-1 text-xs leading-5 text-[#667085]">Revisá antes de realizar la transferencia.</p>
-                      </div>
-                      <Badge variant="soft" color="warning" className="rounded-full">
-                        <Landmark className="mr-1 h-3 w-3" />
-                        Pago por transferencia
-                      </Badge>
-                    </div>
-                    <div className="grid gap-3 text-sm text-[#475467] md:grid-cols-2">
-                      <div className="rounded-[16px] border border-[#E5EAF2] bg-[#FAFBFD] p-4">
-                        <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">Curso</div>
-                        <div className="mt-1 font-semibold text-[#0F172A]">{job.title}</div>
-                      </div>
-                      <div className="rounded-[16px] border border-[#E5EAF2] bg-[#FAFBFD] p-4">
-                        <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">Alumno</div>
-                        <div className="mt-1 font-semibold text-[#0F172A]">{`${firstNameValue} ${lastNameValue}`.trim()}</div>
-                      </div>
-                      <div className="rounded-[16px] border border-[#E5EAF2] bg-[#FAFBFD] p-4">
-                        <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">Institución</div>
-                        <div className="mt-1 font-semibold text-[#0F172A]">{job.companyName || "ACAV"}</div>
-                      </div>
-                      <div className="rounded-[16px] border border-[#2356B8]/30 bg-gradient-to-br from-[#EEF4FF] to-white p-4">
-                        <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#1B2B50]/70">Valores</div>
-                        <div className="mt-2 space-y-1">
-                          {job?.oldPrice && Number(job.oldPrice) !== Number(job?.price) ? (
-                            <>
-                              <div className="text-xs">{formatCurrency(job.oldPrice)} <span className="font-semibold text-slate-400">Público general</span></div>
-                              <div className="text-xs font-bold tracking-tight text-[#1B2B50]">{formatCurrency(amount)} <span className="text-xs font-semibold text-[#1B2B50]/70">Socios</span></div>
-                            </>
-                          ) : (
-                            <div className="text-[22px] font-bold tracking-tight text-[#1B2B50]">{amount > 0 ? formatCurrency(amount) : "Gratuito"}</div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="rounded-[20px] border border-[#E5EAF2] bg-white p-5">
-                    <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                      <div>
                         <div className="text-base font-semibold text-[#0F172A]">Datos para la transferencia</div>
                         <p className="mt-1 text-xs leading-5 text-[#667085]">Usá el botón copiar y luego pegá en tu banco.</p>
                       </div>
@@ -827,7 +787,6 @@ export default function CourseCheckoutForm({ lang, job, variant = "modal", onClo
                       {[
                         ["Alias", settings.paymentAlias],
                         ["CBU", settings.paymentCbu],
-                        ["CVU", settings.paymentCvu],
                         ["Titular", settings.paymentAccountHolder],
                       ].map(([label, value]) => (
                         <div key={label} className="flex flex-col gap-3 rounded-[16px] border border-[#E5EAF2] bg-[#FAFBFD] px-4 py-3 md:flex-row md:items-center md:justify-between">
@@ -1026,7 +985,7 @@ export default function CourseCheckoutForm({ lang, job, variant = "modal", onClo
                     <div className="text-right">
                       {requiresPayment && job?.oldPrice && Number(job.oldPrice) !== Number(job?.price) ? (
                         <div className="space-y-0.5">
-                          <div className="text-[11px] text-slate-500 line-through">{formatCurrency(job.oldPrice)} <span className="font-semibold text-slate-400">Público general</span></div>
+                           <div className="text-[11px] text-slate-500">{formatCurrency(job.oldPrice)} <span className="font-semibold text-slate-400">Público general</span></div>
                           <div className="text-sm font-bold text-[#1B2B50]">{formatCurrency(amount)} <span className="text-[10px] font-semibold text-[#1B2B50]/70">Socios</span></div>
                         </div>
                       ) : (
