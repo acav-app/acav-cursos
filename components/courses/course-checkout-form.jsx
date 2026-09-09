@@ -642,7 +642,7 @@ export default function CourseCheckoutForm({ lang, job, variant = "modal", onClo
         </div>
 
         <div className="flex-1 overflow-y-auto px-5 py-6 md:px-7 md:py-7">
-          <div className="mb-5 rounded-[20px] border border-[#E5EAF2] bg-gradient-to-br from-[#F8FBFF] via-white to-[#FAFBFD] p-5">
+          {/* <div className="mb-5 rounded-[20px] border border-[#E5EAF2] bg-gradient-to-br from-[#F8FBFF] via-white to-[#FAFBFD] p-5">
             <div className="flex items-start gap-4">
               <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#1B2B50] text-white shadow-[0_12px_30px_rgba(27,43,80,0.24)]">
                 <ActiveIcon className="h-5 w-5" />
@@ -666,7 +666,7 @@ export default function CourseCheckoutForm({ lang, job, variant = "modal", onClo
                 <p className="mt-1 text-sm leading-6 text-slate-500">{steps[currentStep].description}</p>
               </div>
             </div>
-          </div>
+          </div> */}
 
           {steps[currentStep]?.id === "profile" ? (
             <div className="grid gap-6">
@@ -794,10 +794,12 @@ export default function CourseCheckoutForm({ lang, job, variant = "modal", onClo
                             <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">{label}</div>
                             <div className="mt-0.5 truncate font-medium text-[#0F172A]">{value}</div>
                           </div>
-                          <Button type="button" variant="outline" className="rounded-xl" onClick={() => handleCopy(label, value)}>
-                            <Copy className="mr-2 h-4 w-4" />
-                            {copyState === label ? "Copiado ✓" : `Copiar ${label}`}
-                          </Button>
+                          {label !== "Titular" ? (
+                            <Button type="button" variant="outline" className="rounded-xl" onClick={() => handleCopy(label, value)}>
+                              <Copy className="mr-2 h-4 w-4" />
+                              {copyState === label ? "Copiado ✓" : `Copiar ${label}`}
+                            </Button>
+                          ) : null}
                         </div>
                       ))}
                     </div>
