@@ -1123,7 +1123,7 @@ export default function ApplicationPublicForm({ lang, job, variant = "page", onC
               <Button
                 type="button"
                 variant="outline"
-                onClick={currentStep > 0 ? goBack : onClose || (() => {})}
+                onClick={currentStep > 0 ? goBack : onClose || (() => { })}
                 className="h-11 rounded-xl border-[#D7DEEA] px-6 text-[#344054]"
               >
                 {currentStep > 0 ? "Volver" : "Cerrar"}
@@ -1243,427 +1243,427 @@ export default function ApplicationPublicForm({ lang, job, variant = "page", onC
                 key={currentStepMeta.id}
                 className="grid gap-6 animate-in fade-in-0 slide-in-from-bottom-3 duration-300"
               >
-          {currentStep === 0 ? (
-            <div className="grid gap-6">
-              <div className="grid gap-6 md:grid-cols-2">
-                <div className="grid gap-2">
-                  <Label>Nombre</Label>
-                  <div className="relative">
-                    <Input
-                      placeholder="Tu nombre"
-                      color={firstNameMeta.color}
-                      className="pr-10"
-                      {...register("firstName", { setValueAs: (v) => toTitleCase(v) })}
-                    />
-                    {firstNameMeta.icon ? <firstNameMeta.icon className={`pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 ${errors.firstName ? "text-destructive" : "text-emerald-600"}`} /> : null}
-                  </div>
-                  {firstNameMeta.helper ? <p className={`text-sm ${firstNameMeta.helperClassName}`}>{firstNameMeta.helper}</p> : null}
-                </div>
-                <div className="grid gap-2">
-                  <Label>Apellido</Label>
-                  <div className="relative">
-                    <Input
-                      placeholder="Tu apellido"
-                      color={lastNameMeta.color}
-                      className="pr-10"
-                      {...register("lastName", { setValueAs: (v) => toTitleCase(v) })}
-                    />
-                    {lastNameMeta.icon ? <lastNameMeta.icon className={`pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 ${errors.lastName ? "text-destructive" : "text-emerald-600"}`} /> : null}
-                  </div>
-                  {lastNameMeta.helper ? <p className={`text-sm ${lastNameMeta.helperClassName}`}>{lastNameMeta.helper}</p> : null}
-                </div>
-              </div>
-
-              <div className="grid gap-6 md:grid-cols-2">
-                <div className="grid gap-2">
-                  <Label>Email</Label>
-                  <div className="relative">
-                    <Input
-                      placeholder="tu@email.com"
-                      inputMode="email"
-                      autoCapitalize="none"
-                      autoCorrect="off"
-                      color={emailMeta.color}
-                      className="pr-10"
-                      {...register("email", { setValueAs: normalizeEmail })}
-                    />
-                    {emailMeta.icon ? <emailMeta.icon className={`pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 ${errors.email ? "text-destructive" : "text-emerald-600"}`} /> : null}
-                  </div>
-                  {emailMeta.helper ? <p className={`text-sm ${emailMeta.helperClassName}`}>{emailMeta.helper}</p> : null}
-                </div>
-                <div className="grid gap-2">
-                  <Label>Teléfono</Label>
-                  <div className="relative">
-                    <Input
-                      placeholder="+54 9 351 ..."
-                      inputMode="tel"
-                      autoCorrect="off"
-                      color={phoneMeta.color}
-                      className="pr-10"
-                      {...register("phone", { setValueAs: normalizePhone })}
-                    />
-                    {phoneMeta.icon ? <phoneMeta.icon className={`pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 ${errors.phone ? "text-destructive" : "text-emerald-600"}`} /> : null}
-                  </div>
-                  {phoneMeta.helper ? <p className={`text-sm ${phoneMeta.helperClassName}`}>{phoneMeta.helper}</p> : null}
-                </div>
-              </div>
-
-              <div className="grid gap-6 md:grid-cols-2">
-                <div className="grid gap-2">
-                  <Label>Ciudad</Label>
-                  <div className="relative">
-                    <Input
-                      placeholder="Ciudad"
-                      list={cityListId}
-                      color={cityMeta.color}
-                      className="pr-10"
-                      {...register("city", {
-                        setValueAs: (v) => normalizeLocation(v, citySuggestions),
-                      })}
-                    />
-                    {cityMeta.icon ? <cityMeta.icon className={`pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 ${errors.city ? "text-destructive" : "text-emerald-600"}`} /> : null}
-                    <datalist id={cityListId}>
-                      {filteredCitySuggestions.map((city) => (
-                        <option key={city} value={city} />
-                      ))}
-                    </datalist>
-                  </div>
-                  {cityMeta.helper ? <p className={`text-sm ${cityMeta.helperClassName}`}>{cityMeta.helper}</p> : null}
-                  {job?.city ? (
-                    <button
-                      type="button"
-                      onClick={() => setValue("city", job.city, { shouldDirty: true, shouldValidate: true })}
-                      className="inline-flex w-fit items-center rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 transition hover:bg-slate-200"
-                    >
-                      Usar ciudad del curso: {job.city}
-                    </button>
-                  ) : null}
-                  {filteredCitySuggestions.length ? (
-                    <div className="flex flex-wrap gap-2">
-                      {filteredCitySuggestions.slice(0, 5).map((city) => (
-                        <button
-                          key={city}
-                          type="button"
-                          onClick={() => setValue("city", city, { shouldDirty: true, shouldValidate: true })}
-                          className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 transition hover:bg-slate-200"
-                        >
-                          {city}
-                        </button>
-                      ))}
+                {currentStep === 0 ? (
+                  <div className="grid gap-6">
+                    <div className="grid gap-6 md:grid-cols-2">
+                      <div className="grid gap-2">
+                        <Label>Nombre</Label>
+                        <div className="relative">
+                          <Input
+                            placeholder="Tu nombre"
+                            color={firstNameMeta.color}
+                            className="pr-10"
+                            {...register("firstName", { setValueAs: (v) => toTitleCase(v) })}
+                          />
+                          {firstNameMeta.icon ? <firstNameMeta.icon className={`pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 ${errors.firstName ? "text-destructive" : "text-emerald-600"}`} /> : null}
+                        </div>
+                        {firstNameMeta.helper ? <p className={`text-sm ${firstNameMeta.helperClassName}`}>{firstNameMeta.helper}</p> : null}
+                      </div>
+                      <div className="grid gap-2">
+                        <Label>Apellido</Label>
+                        <div className="relative">
+                          <Input
+                            placeholder="Tu apellido"
+                            color={lastNameMeta.color}
+                            className="pr-10"
+                            {...register("lastName", { setValueAs: (v) => toTitleCase(v) })}
+                          />
+                          {lastNameMeta.icon ? <lastNameMeta.icon className={`pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 ${errors.lastName ? "text-destructive" : "text-emerald-600"}`} /> : null}
+                        </div>
+                        {lastNameMeta.helper ? <p className={`text-sm ${lastNameMeta.helperClassName}`}>{lastNameMeta.helper}</p> : null}
+                      </div>
                     </div>
-                  ) : null}
-                </div>
-                <div className="grid gap-2">
-                  <Label>Provincia</Label>
-                  <div className="relative">
-                    <Input
-                      placeholder="Provincia"
-                      list={provinceListId}
-                      color={provinceMeta.color}
-                      className="pr-10"
-                      {...register("province", {
-                        setValueAs: (v) => normalizeLocation(v, provinceSuggestions),
-                        onChange: () => {
-                          provinceManualRef.current = true;
-                        },
-                      })}
-                    />
-                    {provinceMeta.icon ? <provinceMeta.icon className={`pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 ${errors.province ? "text-destructive" : "text-emerald-600"}`} /> : null}
-                    <datalist id={provinceListId}>
-                      {provinceSuggestions.map((province) => (
-                        <option key={province} value={province} />
-                      ))}
-                    </datalist>
+
+                    <div className="grid gap-6 md:grid-cols-2">
+                      <div className="grid gap-2">
+                        <Label>Email</Label>
+                        <div className="relative">
+                          <Input
+                            placeholder="tu@email.com"
+                            inputMode="email"
+                            autoCapitalize="none"
+                            autoCorrect="off"
+                            color={emailMeta.color}
+                            className="pr-10"
+                            {...register("email", { setValueAs: normalizeEmail })}
+                          />
+                          {emailMeta.icon ? <emailMeta.icon className={`pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 ${errors.email ? "text-destructive" : "text-emerald-600"}`} /> : null}
+                        </div>
+                        {emailMeta.helper ? <p className={`text-sm ${emailMeta.helperClassName}`}>{emailMeta.helper}</p> : null}
+                      </div>
+                      <div className="grid gap-2">
+                        <Label>Teléfono</Label>
+                        <div className="relative">
+                          <Input
+                            placeholder="+54 9 351 ..."
+                            inputMode="tel"
+                            autoCorrect="off"
+                            color={phoneMeta.color}
+                            className="pr-10"
+                            {...register("phone", { setValueAs: normalizePhone })}
+                          />
+                          {phoneMeta.icon ? <phoneMeta.icon className={`pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 ${errors.phone ? "text-destructive" : "text-emerald-600"}`} /> : null}
+                        </div>
+                        {phoneMeta.helper ? <p className={`text-sm ${phoneMeta.helperClassName}`}>{phoneMeta.helper}</p> : null}
+                      </div>
+                    </div>
+
+                    <div className="grid gap-6 md:grid-cols-2">
+                      <div className="grid gap-2">
+                        <Label>Ciudad</Label>
+                        <div className="relative">
+                          <Input
+                            placeholder="Ciudad"
+                            list={cityListId}
+                            color={cityMeta.color}
+                            className="pr-10"
+                            {...register("city", {
+                              setValueAs: (v) => normalizeLocation(v, citySuggestions),
+                            })}
+                          />
+                          {cityMeta.icon ? <cityMeta.icon className={`pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 ${errors.city ? "text-destructive" : "text-emerald-600"}`} /> : null}
+                          <datalist id={cityListId}>
+                            {filteredCitySuggestions.map((city) => (
+                              <option key={city} value={city} />
+                            ))}
+                          </datalist>
+                        </div>
+                        {cityMeta.helper ? <p className={`text-sm ${cityMeta.helperClassName}`}>{cityMeta.helper}</p> : null}
+                        {job?.city ? (
+                          <button
+                            type="button"
+                            onClick={() => setValue("city", job.city, { shouldDirty: true, shouldValidate: true })}
+                            className="inline-flex w-fit items-center rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 transition hover:bg-slate-200"
+                          >
+                            Usar ciudad del curso: {job.city}
+                          </button>
+                        ) : null}
+                        {filteredCitySuggestions.length ? (
+                          <div className="flex flex-wrap gap-2">
+                            {filteredCitySuggestions.slice(0, 5).map((city) => (
+                              <button
+                                key={city}
+                                type="button"
+                                onClick={() => setValue("city", city, { shouldDirty: true, shouldValidate: true })}
+                                className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 transition hover:bg-slate-200"
+                              >
+                                {city}
+                              </button>
+                            ))}
+                          </div>
+                        ) : null}
+                      </div>
+                      <div className="grid gap-2">
+                        <Label>Provincia</Label>
+                        <div className="relative">
+                          <Input
+                            placeholder="Provincia"
+                            list={provinceListId}
+                            color={provinceMeta.color}
+                            className="pr-10"
+                            {...register("province", {
+                              setValueAs: (v) => normalizeLocation(v, provinceSuggestions),
+                              onChange: () => {
+                                provinceManualRef.current = true;
+                              },
+                            })}
+                          />
+                          {provinceMeta.icon ? <provinceMeta.icon className={`pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 ${errors.province ? "text-destructive" : "text-emerald-600"}`} /> : null}
+                          <datalist id={provinceListId}>
+                            {provinceSuggestions.map((province) => (
+                              <option key={province} value={province} />
+                            ))}
+                          </datalist>
+                        </div>
+                        {provinceMeta.helper ? <p className={`text-sm ${provinceMeta.helperClassName}`}>{provinceMeta.helper}</p> : null}
+                        <div className="flex flex-wrap gap-2">
+                          {provinceSuggestions.slice(0, 5).map((province) => (
+                            <button
+                              key={province}
+                              type="button"
+                              onClick={() => setValue("province", province, { shouldDirty: true, shouldValidate: true })}
+                              className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 transition hover:bg-slate-200"
+                            >
+                              {province}
+                            </button>
+                          ))}
+                        </div>
+                        {normalizedProvinceValue && stripDiacritics(normalizeWhitespace(provinceValue)).toLowerCase() !== stripDiacritics(normalizeWhitespace(normalizedProvinceValue)).toLowerCase() ? (
+                          <button
+                            type="button"
+                            onClick={() => setValue("province", normalizedProvinceValue, { shouldDirty: true, shouldValidate: true })}
+                            className="inline-flex w-fit items-center rounded-full bg-[#EEF5FF] px-3 py-1 text-xs font-semibold text-[#31456F] transition hover:bg-[#DCEBFF]"
+                          >
+                            Normalizar a: {normalizedProvinceValue}
+                          </button>
+                        ) : null}
+                      </div>
+                    </div>
                   </div>
-                  {provinceMeta.helper ? <p className={`text-sm ${provinceMeta.helperClassName}`}>{provinceMeta.helper}</p> : null}
-                  <div className="flex flex-wrap gap-2">
-                    {provinceSuggestions.slice(0, 5).map((province) => (
+                ) : null}
+
+                {currentStep === 1 ? (
+                  <div className="grid gap-6">
+                    <div className="grid gap-2">
+                      <Label>Documentacion adjunta</Label>
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept=".pdf,.doc,.docx,.txt,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
+                        className="hidden"
+                        onChange={(e) => handleFiles(e.target.files)}
+                      />
                       <button
-                        key={province}
                         type="button"
-                        onClick={() => setValue("province", province, { shouldDirty: true, shouldValidate: true })}
-                        className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 transition hover:bg-slate-200"
+                        onClick={openFilePicker}
+                        onDragEnter={(e) => {
+                          e.preventDefault();
+                          setDragActive(true);
+                        }}
+                        onDragOver={(e) => {
+                          e.preventDefault();
+                          setDragActive(true);
+                        }}
+                        onDragLeave={(e) => {
+                          e.preventDefault();
+                          setDragActive(false);
+                        }}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          setDragActive(false);
+                          handleFiles(e.dataTransfer.files);
+                        }}
+                        className={[
+                          "group flex min-h-[180px] w-full flex-col items-center justify-center gap-3 rounded-[28px] border-2 border-dashed px-6 py-8 text-center transition",
+                          dragActive ? "border-[#31456F] bg-[#EEF5FF]" : "border-slate-200 bg-slate-50 hover:border-[#31456F] hover:bg-[#F7FBFF]",
+                        ].join(" ")}
                       >
-                        {province}
+                        <span className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-[#31456F] shadow-sm">
+                          <FileUp className="h-6 w-6" />
+                        </span>
+                        <div>
+                          <div className="text-base font-bold text-[#1B2B50]">
+                            {cvFile ? "Documentacion lista para enviar" : "Arrastra tu archivo o toca para subirlo"}
+                          </div>
+                          <div className="mt-2 text-sm leading-6 text-slate-500">
+                            PDF, DOC, DOCX o TXT. Máximo 10MB.
+                          </div>
+                        </div>
+                        <span className="inline-flex items-center rounded-full bg-[#1B2B50] px-4 py-2 text-xs font-extrabold uppercase tracking-[0.16em] text-white transition group-hover:bg-[#31456F]">
+                          Seleccionar archivo
+                        </span>
                       </button>
-                    ))}
-                  </div>
-                  {normalizedProvinceValue && stripDiacritics(normalizeWhitespace(provinceValue)).toLowerCase() !== stripDiacritics(normalizeWhitespace(normalizedProvinceValue)).toLowerCase() ? (
-                    <button
-                      type="button"
-                      onClick={() => setValue("province", normalizedProvinceValue, { shouldDirty: true, shouldValidate: true })}
-                      className="inline-flex w-fit items-center rounded-full bg-[#EEF5FF] px-3 py-1 text-xs font-semibold text-[#31456F] transition hover:bg-[#DCEBFF]"
-                    >
-                      Normalizar a: {normalizedProvinceValue}
-                    </button>
-                  ) : null}
-                </div>
-              </div>
-            </div>
-          ) : null}
-
-          {currentStep === 1 ? (
-            <div className="grid gap-6">
-              <div className="grid gap-2">
-                <Label>Documentacion adjunta</Label>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".pdf,.doc,.docx,.txt,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
-                  className="hidden"
-                  onChange={(e) => handleFiles(e.target.files)}
-                />
-                <button
-                  type="button"
-                  onClick={openFilePicker}
-                  onDragEnter={(e) => {
-                    e.preventDefault();
-                    setDragActive(true);
-                  }}
-                  onDragOver={(e) => {
-                    e.preventDefault();
-                    setDragActive(true);
-                  }}
-                  onDragLeave={(e) => {
-                    e.preventDefault();
-                    setDragActive(false);
-                  }}
-                  onDrop={(e) => {
-                    e.preventDefault();
-                    setDragActive(false);
-                    handleFiles(e.dataTransfer.files);
-                  }}
-                  className={[
-                    "group flex min-h-[180px] w-full flex-col items-center justify-center gap-3 rounded-[28px] border-2 border-dashed px-6 py-8 text-center transition",
-                    dragActive ? "border-[#31456F] bg-[#EEF5FF]" : "border-slate-200 bg-slate-50 hover:border-[#31456F] hover:bg-[#F7FBFF]",
-                  ].join(" ")}
-                >
-                  <span className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-[#31456F] shadow-sm">
-                    <FileUp className="h-6 w-6" />
-                  </span>
-                  <div>
-                    <div className="text-base font-bold text-[#1B2B50]">
-                      {cvFile ? "Documentacion lista para enviar" : "Arrastra tu archivo o toca para subirlo"}
+                      {cvRestorationNeeded && !cvFile ? (
+                        <p className="text-sm text-amber-700">
+                          Recuperamos tu borrador, pero por seguridad tenes que volver a adjuntar la documentacion antes de enviarla.
+                        </p>
+                      ) : null}
+                      {cvFile ? (
+                        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm">
+                          <div className="min-w-0">
+                            <div className="truncate font-semibold text-emerald-800">{cvFile.name}</div>
+                            <div className="text-emerald-700">{formatBytes(cvFile.size)}</div>
+                          </div>
+                          <Button type="button" variant="outline" size="sm" onClick={openFilePicker}>
+                            Cambiar archivo
+                          </Button>
+                        </div>
+                      ) : null}
+                      {errors.cvFile ? <p className="text-sm text-destructive">{errors.cvFile.message}</p> : null}
+                      {showUploadProgress ? (
+                        <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                          <div className="mb-2 flex items-center justify-between gap-3 text-sm">
+                            <span className="font-semibold text-[#1B2B50]">{uploadStageLabel || "Preparando archivo..."}</span>
+                            <span className="text-slate-400">{uploadProgress}%</span>
+                          </div>
+                          <Progress value={uploadProgress} size="sm" color="primary" className="bg-slate-100 [&>div]:bg-[#31456F]" />
+                        </div>
+                      ) : null}
+                      {cvFile ? (
+                        <FilePreview
+                          file={cvFile}
+                          title="Vista previa del archivo"
+                          description="Se muestra una vista previa cuando el navegador puede renderizar el archivo. Para documentos Office, la vista completa queda disponible luego de subirlo."
+                        />
+                      ) : null}
                     </div>
-                    <div className="mt-2 text-sm leading-6 text-slate-500">
-                      PDF, DOC, DOCX o TXT. Máximo 10MB.
+
+                    <div className="grid gap-6 md:grid-cols-2">
+                      <div className="grid gap-2">
+                        <Label>LinkedIn (opcional)</Label>
+                        <div className="relative">
+                          <Input placeholder="https://linkedin.com/in/..." color={linkedinMeta.color} className="pr-10" {...register("linkedinUrl")} />
+                          {linkedinMeta.icon ? <linkedinMeta.icon className={`pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 ${errors.linkedinUrl ? "text-destructive" : "text-emerald-600"}`} /> : null}
+                        </div>
+                        {linkedinMeta.helper ? <p className={`text-sm ${linkedinMeta.helperClassName}`}>{linkedinMeta.helper}</p> : null}
+                      </div>
+                      <div className="grid gap-2">
+                        <Label>Portfolio (opcional)</Label>
+                        <div className="relative">
+                          <Input placeholder="https://..." color={portfolioMeta.color} className="pr-10" {...register("portfolioUrl")} />
+                          {portfolioMeta.icon ? <portfolioMeta.icon className={`pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 ${errors.portfolioUrl ? "text-destructive" : "text-emerald-600"}`} /> : null}
+                        </div>
+                        {portfolioMeta.helper ? <p className={`text-sm ${portfolioMeta.helperClassName}`}>{portfolioMeta.helper}</p> : null}
+                      </div>
+                    </div>
+
+                    <div className="grid gap-2">
+                      <Label>Mensaje para la institucion (opcional)</Label>
+                      <Textarea rows={5} placeholder="Contanos brevemente tu interes, experiencia o motivacion" {...register("message")} />
+                      <div className="text-xs text-slate-400">Mensaje cargado: {String(messageValue || "").trim().length} caracteres</div>
                     </div>
                   </div>
-                  <span className="inline-flex items-center rounded-full bg-[#1B2B50] px-4 py-2 text-xs font-extrabold uppercase tracking-[0.16em] text-white transition group-hover:bg-[#31456F]">
-                    Seleccionar archivo
-                  </span>
-                </button>
-                {cvRestorationNeeded && !cvFile ? (
-                  <p className="text-sm text-amber-700">
-                    Recuperamos tu borrador, pero por seguridad tenes que volver a adjuntar la documentacion antes de enviarla.
-                  </p>
                 ) : null}
-                {cvFile ? (
-                  <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm">
-                    <div className="min-w-0">
-                      <div className="truncate font-semibold text-emerald-800">{cvFile.name}</div>
-                      <div className="text-emerald-700">{formatBytes(cvFile.size)}</div>
+
+                {currentStep === 2 ? (
+                  <div className="grid gap-6">
+                    <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-6">
+                      <div className="text-base font-bold text-[#1B2B50]">Resumen antes de enviar</div>
+                      <div className="mt-4 grid gap-3 text-sm text-slate-600 md:grid-cols-2">
+                        <div>
+                          <span className="font-semibold text-slate-900">Nombre:</span> {getValues("firstName")} {getValues("lastName")}
+                        </div>
+                        <div>
+                          <span className="font-semibold text-slate-900">Email:</span> {getValues("email")}
+                        </div>
+                        <div>
+                          <span className="font-semibold text-slate-900">Teléfono:</span> {getValues("phone")}
+                        </div>
+                        <div>
+                          <span className="font-semibold text-slate-900">Ubicación:</span> {getValues("city")}, {getValues("province")}
+                        </div>
+                        <div className="md:col-span-2">
+                          <span className="font-semibold text-slate-900">Documentacion:</span> {cvFile ? `${cvFile.name}${formatBytes(cvFile.size) ? ` · ${formatBytes(cvFile.size)}` : ""}` : "No adjuntada"}
+                        </div>
+                      </div>
                     </div>
-                    <Button type="button" variant="outline" size="sm" onClick={openFilePicker}>
-                      Cambiar archivo
-                    </Button>
-                  </div>
-                ) : null}
-                {errors.cvFile ? <p className="text-sm text-destructive">{errors.cvFile.message}</p> : null}
-                {showUploadProgress ? (
-                  <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                    <div className="mb-2 flex items-center justify-between gap-3 text-sm">
-                      <span className="font-semibold text-[#1B2B50]">{uploadStageLabel || "Preparando archivo..."}</span>
-                      <span className="text-slate-400">{uploadProgress}%</span>
-                    </div>
-                    <Progress value={uploadProgress} size="sm" color="primary" className="bg-slate-100 [&>div]:bg-[#31456F]" />
-                  </div>
-                ) : null}
-                {cvFile ? (
-                  <FilePreview
-                    file={cvFile}
-                    title="Vista previa del archivo"
-                    description="Se muestra una vista previa cuando el navegador puede renderizar el archivo. Para documentos Office, la vista completa queda disponible luego de subirlo."
-                  />
-                ) : null}
-              </div>
 
-              <div className="grid gap-6 md:grid-cols-2">
-                <div className="grid gap-2">
-                  <Label>LinkedIn (opcional)</Label>
-                  <div className="relative">
-                    <Input placeholder="https://linkedin.com/in/..." color={linkedinMeta.color} className="pr-10" {...register("linkedinUrl")} />
-                    {linkedinMeta.icon ? <linkedinMeta.icon className={`pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 ${errors.linkedinUrl ? "text-destructive" : "text-emerald-600"}`} /> : null}
-                  </div>
-                  {linkedinMeta.helper ? <p className={`text-sm ${linkedinMeta.helperClassName}`}>{linkedinMeta.helper}</p> : null}
-                </div>
-                <div className="grid gap-2">
-                  <Label>Portfolio (opcional)</Label>
-                  <div className="relative">
-                    <Input placeholder="https://..." color={portfolioMeta.color} className="pr-10" {...register("portfolioUrl")} />
-                    {portfolioMeta.icon ? <portfolioMeta.icon className={`pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 ${errors.portfolioUrl ? "text-destructive" : "text-emerald-600"}`} /> : null}
-                  </div>
-                  {portfolioMeta.helper ? <p className={`text-sm ${portfolioMeta.helperClassName}`}>{portfolioMeta.helper}</p> : null}
-                </div>
-              </div>
+                    <div className="rounded-[28px] border border-[#DCE6F7] bg-[linear-gradient(180deg,#FFFFFF_0%,#F7FAFF_100%)] p-6 shadow-[0_10px_30px_rgba(37,99,235,.06)]">
+                      <div className="flex items-start gap-3">
+                        <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#EEF4FF] text-[#31456F] shadow-[0_10px_24px_rgba(37,99,235,.14)] ring-4 ring-[#EEF4FF]/80">
+                          <ShieldCheck className="h-5 w-5" />
+                        </span>
+                        <div className="grid gap-1">
+                          <div className="text-base font-bold text-[#1B2B50]">Confirmación y seguridad</div>
+                          <p className="text-sm leading-6 text-slate-500">
+                            Revisa el consentimiento final antes de enviar. Buscamos una experiencia clara, breve y confiable.
+                          </p>
+                        </div>
+                      </div>
 
-              <div className="grid gap-2">
-                <Label>Mensaje para la institucion (opcional)</Label>
-                <Textarea rows={5} placeholder="Contanos brevemente tu interes, experiencia o motivacion" {...register("message")} />
-                <div className="text-xs text-slate-400">Mensaje cargado: {String(messageValue || "").trim().length} caracteres</div>
-              </div>
-            </div>
-          ) : null}
+                      <div className="mt-5 grid gap-4 md:grid-cols-2">
+                        <div className="rounded-[22px] border border-slate-200 bg-white p-5">
+                          <div className="flex items-start gap-3">
+                            <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#EEF5FF] text-[#31456F]">
+                              <ShieldCheck className="h-4 w-4" />
+                            </span>
+                            <div>
+                              <div className="text-sm font-bold text-slate-900">Seguridad de datos</div>
+                              <p className="mt-2 text-xs leading-6 text-slate-500">Tu informacion se comparte solo con la institucion para evaluar esta inscripcion.</p>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="rounded-[22px] border border-slate-200 bg-white p-5">
+                          <div className="flex items-start gap-3">
+                            <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#FFF7ED] text-[#F08A00]">
+                              <FileText className="h-4 w-4" />
+                            </span>
+                            <div>
+                              <div className="text-sm font-bold text-slate-900">Proceso validado</div>
+                              <p className="mt-2 text-xs leading-6 text-slate-500">Tu documentacion, tus datos y tus enlaces se enviaran en una unica confirmacion final.</p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
 
-          {currentStep === 2 ? (
-            <div className="grid gap-6">
-              <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-6">
-                <div className="text-base font-bold text-[#1B2B50]">Resumen antes de enviar</div>
-                <div className="mt-4 grid gap-3 text-sm text-slate-600 md:grid-cols-2">
-                  <div>
-                    <span className="font-semibold text-slate-900">Nombre:</span> {getValues("firstName")} {getValues("lastName")}
-                  </div>
-                  <div>
-                    <span className="font-semibold text-slate-900">Email:</span> {getValues("email")}
-                  </div>
-                  <div>
-                    <span className="font-semibold text-slate-900">Teléfono:</span> {getValues("phone")}
-                  </div>
-                  <div>
-                    <span className="font-semibold text-slate-900">Ubicación:</span> {getValues("city")}, {getValues("province")}
-                  </div>
-                  <div className="md:col-span-2">
-                    <span className="font-semibold text-slate-900">Documentacion:</span> {cvFile ? `${cvFile.name}${formatBytes(cvFile.size) ? ` · ${formatBytes(cvFile.size)}` : ""}` : "No adjuntada"}
-                  </div>
-                </div>
-              </div>
+                      <div className="mt-5 grid gap-3">
+                        <div className="rounded-[20px] border border-slate-200 bg-white p-4">
+                          <div className="flex items-start gap-3">
+                            <Checkbox
+                              id="acceptedTerms"
+                              checked={Boolean(acceptedTermsValue)}
+                              onCheckedChange={(value) => setValue("acceptedTerms", Boolean(value), { shouldValidate: true, shouldDirty: true })}
+                              className="mt-0.5"
+                            />
+                            <div className="grid gap-1">
+                              <Label htmlFor="acceptedTerms" className="text-sm font-semibold text-slate-900">
+                                Acepto términos y condiciones
+                              </Label>
+                              <p className="text-xs leading-6 text-slate-500">Autorizo el uso de la plataforma y el envio de mis datos para esta inscripcion.</p>
+                              {errors.acceptedTerms ? <p className="text-sm text-destructive">{errors.acceptedTerms.message}</p> : null}
+                            </div>
+                          </div>
+                        </div>
 
-              <div className="rounded-[28px] border border-[#DCE6F7] bg-[linear-gradient(180deg,#FFFFFF_0%,#F7FAFF_100%)] p-6 shadow-[0_10px_30px_rgba(37,99,235,.06)]">
-                <div className="flex items-start gap-3">
-                  <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#EEF4FF] text-[#31456F] shadow-[0_10px_24px_rgba(37,99,235,.14)] ring-4 ring-[#EEF4FF]/80">
-                    <ShieldCheck className="h-5 w-5" />
-                  </span>
-                  <div className="grid gap-1">
-                    <div className="text-base font-bold text-[#1B2B50]">Confirmación y seguridad</div>
-                    <p className="text-sm leading-6 text-slate-500">
-                      Revisa el consentimiento final antes de enviar. Buscamos una experiencia clara, breve y confiable.
-                    </p>
-                  </div>
-                </div>
+                        <div className="rounded-[20px] border border-slate-200 bg-white p-4">
+                          <div className="flex items-start gap-3">
+                            <Checkbox
+                              id="acceptedSecurity"
+                              checked={Boolean(acceptedSecurityValue)}
+                              onCheckedChange={(value) => setValue("acceptedSecurity", Boolean(value), { shouldValidate: true, shouldDirty: true })}
+                              className="mt-0.5"
+                            />
+                            <div className="grid gap-1">
+                              <Label htmlFor="acceptedSecurity" className="text-sm font-semibold text-slate-900">
+                                Acepto protocolos de seguridad
+                              </Label>
+                              <p className="text-xs leading-6 text-slate-500">Confirmo que la información cargada es real y comprendo las pautas básicas de protección de datos.</p>
+                              {errors.acceptedSecurity ? <p className="text-sm text-destructive">{errors.acceptedSecurity.message}</p> : null}
+                            </div>
+                          </div>
+                        </div>
 
-                <div className="mt-5 grid gap-4 md:grid-cols-2">
-                  <div className="rounded-[22px] border border-slate-200 bg-white p-5">
-                    <div className="flex items-start gap-3">
-                      <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#EEF5FF] text-[#31456F]">
-                        <ShieldCheck className="h-4 w-4" />
-                      </span>
-                      <div>
-                        <div className="text-sm font-bold text-slate-900">Seguridad de datos</div>
-                        <p className="mt-2 text-xs leading-6 text-slate-500">Tu informacion se comparte solo con la institucion para evaluar esta inscripcion.</p>
+                        <div className="flex flex-wrap gap-2 pt-1">
+                          <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-600">
+                            Términos de uso
+                          </span>
+                          <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-600">
+                            Política de privacidad
+                          </span>
+                        </div>
                       </div>
                     </div>
                   </div>
-                  <div className="rounded-[22px] border border-slate-200 bg-white p-5">
-                    <div className="flex items-start gap-3">
-                      <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#FFF7ED] text-[#F08A00]">
-                        <FileText className="h-4 w-4" />
-                      </span>
-                      <div>
-                        <div className="text-sm font-bold text-slate-900">Proceso validado</div>
-                        <p className="mt-2 text-xs leading-6 text-slate-500">Tu documentacion, tus datos y tus enlaces se enviaran en una unica confirmacion final.</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-5 grid gap-3">
-                  <div className="rounded-[20px] border border-slate-200 bg-white p-4">
-                    <div className="flex items-start gap-3">
-                      <Checkbox
-                        id="acceptedTerms"
-                        checked={Boolean(acceptedTermsValue)}
-                        onCheckedChange={(value) => setValue("acceptedTerms", Boolean(value), { shouldValidate: true, shouldDirty: true })}
-                        className="mt-0.5"
-                      />
-                      <div className="grid gap-1">
-                        <Label htmlFor="acceptedTerms" className="text-sm font-semibold text-slate-900">
-                          Acepto términos y condiciones
-                        </Label>
-                        <p className="text-xs leading-6 text-slate-500">Autorizo el uso de la plataforma y el envio de mis datos para esta inscripcion.</p>
-                        {errors.acceptedTerms ? <p className="text-sm text-destructive">{errors.acceptedTerms.message}</p> : null}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="rounded-[20px] border border-slate-200 bg-white p-4">
-                    <div className="flex items-start gap-3">
-                      <Checkbox
-                        id="acceptedSecurity"
-                        checked={Boolean(acceptedSecurityValue)}
-                        onCheckedChange={(value) => setValue("acceptedSecurity", Boolean(value), { shouldValidate: true, shouldDirty: true })}
-                        className="mt-0.5"
-                      />
-                      <div className="grid gap-1">
-                        <Label htmlFor="acceptedSecurity" className="text-sm font-semibold text-slate-900">
-                          Acepto protocolos de seguridad
-                        </Label>
-                        <p className="text-xs leading-6 text-slate-500">Confirmo que la información cargada es real y comprendo las pautas básicas de protección de datos.</p>
-                        {errors.acceptedSecurity ? <p className="text-sm text-destructive">{errors.acceptedSecurity.message}</p> : null}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-wrap gap-2 pt-1">
-                    <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-600">
-                      Términos de uso
-                    </span>
-                    <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-600">
-                      Política de privacidad
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          ) : null}
+                ) : null}
               </div>
 
               <div className="mt-6 flex flex-col gap-3 border-t border-slate-200 pt-5 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-              {currentStep > 0 ? (
-                <Button type="button" variant="outline" onClick={goBack}>
-                  Volver
-                </Button>
-              ) : isModal ? (
-                <Button type="button" variant="ghost" onClick={onClose} className="justify-start px-0 text-[#31456F] hover:text-[#1B2B50]">
-                  <ArrowLeft className="mr-2 h-4 w-4" />
-                  Seguir explorando
-                </Button>
-              ) : (
-                <Link
-                  href={`/${lang}/cursos/${job.slug}`}
-                  className="inline-flex items-center gap-2 text-sm font-semibold text-[#31456F] transition hover:text-[#1B2B50]"
-                >
-                  <ArrowLeft className="h-4 w-4" />
-                  Volver al curso
-                </Link>
-              )}
-              <div className="text-xs leading-5 text-slate-500">
-                {draftReady ? "Tus datos quedan guardados temporalmente en este dispositivo." : "Preparando borrador temporal..."}
-              </div>
-            </div>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                  {currentStep > 0 ? (
+                    <Button type="button" variant="outline" onClick={goBack}>
+                      Volver
+                    </Button>
+                  ) : isModal ? (
+                    <Button type="button" variant="ghost" onClick={onClose} className="justify-start px-0 text-[#31456F] hover:text-[#1B2B50]">
+                      <ArrowLeft className="mr-2 h-4 w-4" />
+                      Seguir explorando
+                    </Button>
+                  ) : (
+                    <Link
+                      href={`/${lang}/cursos/${job.slug}`}
+                      className="inline-flex items-center gap-2 text-sm font-semibold text-[#31456F] transition hover:text-[#1B2B50]"
+                    >
+                      <ArrowLeft className="h-4 w-4" />
+                      Volver al curso
+                    </Link>
+                  )}
+                  <div className="text-xs leading-5 text-slate-500">
+                    {draftReady ? "Tus datos quedan guardados temporalmente en este dispositivo." : "Preparando borrador temporal..."}
+                  </div>
+                </div>
 
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-              {currentStep < steps.length - 1 ? (
-                <Button type="button" onClick={goNext}>
-                  Continuar
-                </Button>
-              ) : (
-                <Button type="submit" className={submitting ? "pointer-events-none" : ""}>
-                  {submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                  {submitting ? "Enviando..." : "Enviar inscripcion"}
-                </Button>
-              )}
-            </div>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                  {currentStep < steps.length - 1 ? (
+                    <Button type="button" onClick={goNext}>
+                      Continuar
+                    </Button>
+                  ) : (
+                    <Button type="submit" className={submitting ? "pointer-events-none" : ""}>
+                      {submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                      {submitting ? "Enviando..." : "Enviar inscripcion"}
+                    </Button>
+                  )}
+                </div>
               </div>
             </div>
 
