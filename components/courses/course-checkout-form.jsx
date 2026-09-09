@@ -562,10 +562,21 @@ export default function CourseCheckoutForm({ lang, job, variant = "modal", onClo
                     <Landmark className="h-3.5 w-3.5 text-[#1B2B50]" />
                     {job?.companyName || "ACAV"}
                   </span>
-                  <span className="h-1 w-1 rounded-full bg-slate-300" />
-                  <span className="font-semibold text-[#0F172A]">
-                    {amount > 0 ? formatCurrency(amount) : "Gratuito"}
-                  </span>
+                  {job?.oldPrice && Number(job.oldPrice) !== Number(job?.price) ? (
+                    <>
+                      <span className="h-1 w-1 rounded-full bg-slate-300" />
+                      <span className="text-[11px] text-slate-500">{formatCurrency(job.oldPrice)} <span className="font-semibold text-slate-400">Público general</span></span>
+                      <span className="h-1 w-1 rounded-full bg-slate-300" />
+                      <span className="font-semibold text-[#1B2B50]">{formatCurrency(amount)} <span className="text-[10px] font-semibold text-[#1B2B50]/70">Socios</span></span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="h-1 w-1 rounded-full bg-slate-300" />
+                      <span className="font-semibold text-[#0F172A]">
+                        {amount > 0 ? formatCurrency(amount) : "Gratuito"}
+                      </span>
+                    </>
+                  )}
                   {job?.duration ? (
                     <>
                       <span className="h-1 w-1 rounded-full bg-slate-300" />
