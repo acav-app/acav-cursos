@@ -565,7 +565,7 @@ export default function CourseCheckoutForm({ lang, job, variant = "modal", onClo
                   {job?.oldPrice && Number(job.oldPrice) !== Number(job?.price) ? (
                     <>
                       <span className="h-1 w-1 rounded-full bg-slate-300" />
-                      <span className="text-[11px] text-slate-500">{formatCurrency(job.oldPrice)} <span className="font-semibold text-slate-400">Público general</span></span>
+                      <span className="text-sm font-bold text-[#1B2B50]">{formatCurrency(job.oldPrice)} <span className="text-[10px] font-semibold text-[#1B2B50]/70">Público general</span></span>
                       <span className="h-1 w-1 rounded-full bg-slate-300" />
                       <span className="font-semibold text-[#1B2B50]">{formatCurrency(amount)} <span className="text-[10px] font-semibold text-[#1B2B50]/70">Socios</span></span>
                     </>
@@ -998,7 +998,7 @@ export default function CourseCheckoutForm({ lang, job, variant = "modal", onClo
                     <div className="text-right">
                       {requiresPayment && job?.oldPrice && Number(job.oldPrice) !== Number(job?.price) ? (
                         <div className="space-y-0.5">
-                           <div className="text-[11px] text-slate-500">{formatCurrency(job.oldPrice)} <span className="font-semibold text-slate-400">Público general</span></div>
+                           <div className="text-sm font-bold text-[#1B2B50]">{formatCurrency(job.oldPrice)} <span className="text-[10px] font-semibold text-[#1B2B50]/70">Público general</span></div>
                           <div className="text-sm font-bold text-[#1B2B50]">{formatCurrency(amount)} <span className="text-[10px] font-semibold text-[#1B2B50]/70">Socios</span></div>
                         </div>
                       ) : (
