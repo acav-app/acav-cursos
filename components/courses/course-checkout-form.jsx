@@ -452,13 +452,12 @@ export default function CourseCheckoutForm({ lang, job, variant = "modal", onClo
 
         <div className="mx-auto flex w-full max-w-[620px] flex-col items-center text-center">
           <div
-            className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-[11px] font-bold ${
-              !requiresPayment
-                ? "bg-[#ECFDF3] text-[#127A45]"
-                : hasReceipt
-                  ? "bg-[#FFF8E6] text-[#92610C]"
-                  : "bg-[#EEF4FF] text-[#2356B8]"
-            }`}
+            className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-[11px] font-bold ${!requiresPayment
+              ? "bg-[#ECFDF3] text-[#127A45]"
+              : hasReceipt
+                ? "bg-[#FFF8E6] text-[#92610C]"
+                : "bg-[#EEF4FF] text-[#2356B8]"
+              }`}
           >
             {!requiresPayment ? (
               <>
@@ -790,8 +789,17 @@ export default function CourseCheckoutForm({ lang, job, variant = "modal", onClo
                         <div className="mt-1 font-semibold text-[#0F172A]">{job.companyName || "ACAV"}</div>
                       </div>
                       <div className="rounded-[16px] border border-[#2356B8]/30 bg-gradient-to-br from-[#EEF4FF] to-white p-4">
-                        <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#1B2B50]/70">Importe a transferir</div>
-                        <div className="mt-1 text-[22px] font-bold tracking-tight text-[#1B2B50]">{formatCurrency(amount)}</div>
+                        <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#1B2B50]/70">Valores</div>
+                        <div className="mt-2 space-y-1">
+                          {job?.oldPrice && Number(job.oldPrice) !== Number(job?.price) ? (
+                            <>
+                              <div className="text-xs">{formatCurrency(job.oldPrice)} <span className="font-semibold text-slate-400">Público general</span></div>
+                              <div className="text-xs font-bold tracking-tight text-[#1B2B50]">{formatCurrency(amount)} <span className="text-xs font-semibold text-[#1B2B50]/70">Socios</span></div>
+                            </>
+                          ) : (
+                            <div className="text-[22px] font-bold tracking-tight text-[#1B2B50]">{amount > 0 ? formatCurrency(amount) : "Gratuito"}</div>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -937,16 +945,14 @@ export default function CourseCheckoutForm({ lang, job, variant = "modal", onClo
                       </div>
                     ) : (
                       <label
-                        className={`group flex cursor-pointer flex-col items-center justify-center gap-3 rounded-[18px] border border-dashed px-6 py-7 text-center transition ${
-                          receiptUploading
-                            ? "border-amber-300 bg-amber-50/50"
-                            : "border-[#DCE6F7] bg-gradient-to-br from-[#F8FBFF] to-white hover:border-[#2356B8]/40 hover:bg-[#EEF4FF]/60"
-                        }`}
+                        className={`group flex cursor-pointer flex-col items-center justify-center gap-3 rounded-[18px] border border-dashed px-6 py-7 text-center transition ${receiptUploading
+                          ? "border-amber-300 bg-amber-50/50"
+                          : "border-[#DCE6F7] bg-gradient-to-br from-[#F8FBFF] to-white hover:border-[#2356B8]/40 hover:bg-[#EEF4FF]/60"
+                          }`}
                       >
                         <span
-                          className={`inline-flex h-12 w-12 items-center justify-center rounded-2xl ${
-                            receiptUploading ? "bg-white text-amber-600 ring-1 ring-amber-200" : "bg-white text-[#1B2B50] ring-1 ring-[#DCE6F7]"
-                          }`}
+                          className={`inline-flex h-12 w-12 items-center justify-center rounded-2xl ${receiptUploading ? "bg-white text-amber-600 ring-1 ring-amber-200" : "bg-white text-[#1B2B50] ring-1 ring-[#DCE6F7]"
+                            }`}
                         >
                           {receiptUploading ? (
                             <Loader2 className="h-5 w-5 animate-spin" />
@@ -1002,25 +1008,32 @@ export default function CourseCheckoutForm({ lang, job, variant = "modal", onClo
                     </Badge>
                   )}
                 </div>
-                <div className="grid gap-3 text-sm md:grid-cols-2">
-                  <div className="rounded-[16px] border border-[#E5EAF2] bg-[#FAFBFD] p-4">
-                    <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">Curso</div>
-                    <div className="mt-1 font-semibold text-[#0F172A]">{job.title}</div>
-                    {job.duration ? <div className="mt-1 text-xs text-slate-500">{job.duration}</div> : null}
+                <div className="rounded-[20px] border border-[#E5EAF2] bg-white divide-y divide-[#E5EAF2]">
+                  <div className="flex items-center justify-between gap-4 px-5 py-3">
+                    <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Curso</div>
+                    <div className="text-sm font-semibold text-right text-[#0F172A]">{job.title}</div>
                   </div>
-                  <div className="rounded-[16px] border border-[#E5EAF2] bg-[#FAFBFD] p-4">
-                    <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">Alumno</div>
-                    <div className="mt-1 font-semibold text-[#0F172A]">{`${firstNameValue} ${lastNameValue}`.trim()}</div>
-                    <div className="mt-1 truncate text-xs text-slate-500">{emailValue}</div>
+                  <div className="flex items-center justify-between gap-4 px-5 py-3">
+                    <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Alumno</div>
+                    <div className="text-sm font-semibold text-right text-[#0F172A]">{`${firstNameValue} ${lastNameValue}`.trim()}</div>
                   </div>
-                  <div className="rounded-[16px] border border-[#E5EAF2] bg-[#FAFBFD] p-4">
-                    <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">Institución</div>
-                    <div className="mt-1 font-semibold text-[#0F172A]">{job.companyName || "ACAV"}</div>
+                  <div className="flex items-center justify-between gap-4 px-5 py-3">
+                    <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Institución</div>
+                    <div className="text-sm font-semibold text-right text-[#0F172A]">{job.companyName || "ACAV"}</div>
                   </div>
-                  <div className={`rounded-[16px] border p-4 ${requiresPayment ? "border-[#2356B8]/30 bg-gradient-to-br from-[#EEF4FF] to-white" : "border-emerald-200 bg-gradient-to-br from-emerald-50 to-white"}`}>
-                    <div className={`text-[11px] font-semibold uppercase tracking-[0.16em] ${requiresPayment ? "text-[#1B2B50]/70" : "text-emerald-700"}`}>Importe</div>
-                    <div className={`mt-1 text-[22px] font-bold tracking-tight ${requiresPayment ? "text-[#1B2B50]" : "text-emerald-800"}`}>
-                      {amount > 0 ? formatCurrency(amount) : "Gratuito"}
+                  <div className={`flex items-center justify-between gap-4 px-5 py-3 ${requiresPayment ? "" : "bg-emerald-50/50"}`}>
+                    <div className={`text-xs font-semibold uppercase tracking-[0.16em] ${requiresPayment ? "text-[#1B2B50]/70" : "text-emerald-700"}`}>Valores</div>
+                    <div className="text-right">
+                      {requiresPayment && job?.oldPrice && Number(job.oldPrice) !== Number(job?.price) ? (
+                        <div className="space-y-0.5">
+                          <div className="text-[11px] text-slate-500 line-through">{formatCurrency(job.oldPrice)} <span className="font-semibold text-slate-400">Público general</span></div>
+                          <div className="text-sm font-bold text-[#1B2B50]">{formatCurrency(amount)} <span className="text-[10px] font-semibold text-[#1B2B50]/70">Socios</span></div>
+                        </div>
+                      ) : (
+                        <div className={`text-sm font-bold ${requiresPayment ? "text-[#1B2B50]" : "text-emerald-800"}`}>
+                          {amount > 0 ? formatCurrency(amount) : "Gratuito"}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1168,7 +1181,7 @@ export default function CourseCheckoutForm({ lang, job, variant = "modal", onClo
                   <Button
                     type="button"
                     variant="outline"
-                    onClick={currentStep > 0 ? goBack : onClose || (() => {})}
+                    onClick={currentStep > 0 ? goBack : onClose || (() => { })}
                     className="h-11 rounded-xl border-[#D7DEEA] px-6 text-[#344054]"
                   >
                     {currentStep > 0 ? "Volver" : "Cerrar"}
