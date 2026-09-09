@@ -275,15 +275,15 @@ export async function updateEnrollment(id: string, input: unknown) {
       reviewComment: parsed.reviewComment,
       reviewedBy: parsed.reviewedBy,
       reviewedAt: parsed.paymentStatus ? reviewNow : undefined,
-      receiptUrl: parsed.paymentReceiptUrl || undefined,
+      receiptUrl: parsed.paymentReceiptUrl ?? undefined,
     });
 
     if (Object.keys(nextPaymentUpdate).length > 0) {
       const updatedPayment = await updatePayment(current.paymentId, nextPaymentUpdate);
       payload.payment = updatedPayment;
       payload.paymentStatus = updatedPayment.status;
-      payload.paymentReceiptUrl = parsed.paymentReceiptUrl || updatedPayment.receiptUrl || current.paymentReceiptUrl || undefined;
-      payload.paymentReference = parsed.paymentReference || updatedPayment.reference || current.paymentReference || undefined;
+      payload.paymentReceiptUrl = parsed.paymentReceiptUrl ?? updatedPayment.receiptUrl ?? current.paymentReceiptUrl ?? undefined;
+      payload.paymentReference = parsed.paymentReference ?? updatedPayment.reference ?? current.paymentReference ?? undefined;
     }
   }
 

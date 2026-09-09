@@ -56,8 +56,13 @@ const OptionalString = z.preprocess(
 );
 
 const OptionalUrl = z.preprocess(
-  (value) => (value === "" || value === null || value === undefined ? undefined : value),
+  (value) => (value === null || value === undefined ? undefined : value),
   z.string().url().optional()
+);
+
+const OptionalUrlAllowEmpty = z.preprocess(
+  (value) => (value === null || value === undefined ? undefined : value),
+  z.string().url().optional().or(z.literal(""))
 );
 
 const OptionalEmail = z.preprocess(
@@ -504,8 +509,7 @@ const EnrollmentBaseSchema = z.object({
   paymentStatus: PaymentStatusSchema.optional(),
   paymentMethod: PaymentMethodSchema.optional(),
   paymentReference: OptionalString.optional(),
-  paymentReceiptUrl: OptionalUrl.optional(),
-  paymentAmount: OptionalNumber.optional(),
+  paymentReceiptUrl: OptionalUrlAllowEmpty.optional(),
   paymentCurrency: OptionalString.optional(),
   courseStatus: CourseCompletionStatusSchema.optional(),
   manualScore: z.number().min(0).max(100).optional(),
@@ -626,7 +630,7 @@ export const EnrollmentUpdateSchema = z.object({
   certificateId: OptionalString.optional(),
   certificateIssuedAt: CourseIsoDateString.optional(),
   paymentId: OptionalString.optional(),
-  paymentReceiptUrl: OptionalUrl.optional(),
+  paymentReceiptUrl: OptionalUrlAllowEmpty.optional(),
 });
 
 export const EnrollmentSchema = EnrollmentBaseSchema.extend({
@@ -637,8 +641,8 @@ export const EnrollmentSchema = EnrollmentBaseSchema.extend({
       amount: OptionalNumber.optional(),
       currency: OptionalString.optional(),
       method: PaymentMethodSchema.optional(),
-      receiptUrl: OptionalUrl.optional(),
-      reference: OptionalString.optional(),
+  receiptUrl: OptionalUrlAllowEmpty.optional(),
+  reference: OptionalString.optional(),
       status: PaymentStatusSchema.optional(),
       reviewComment: OptionalString.optional(),
       reviewedBy: OptionalString.optional(),
@@ -679,7 +683,7 @@ export const PaymentUpdateSchema = z.object({
   amount: z.number().nonnegative().optional(),
   currency: z.string().min(1).optional(),
   method: PaymentMethodSchema.optional(),
-  receiptUrl: OptionalUrl.optional(),
+  receiptUrl: OptionalUrlAllowEmpty.optional(),
   reference: OptionalString.optional(),
   status: PaymentStatusSchema.optional(),
   reviewComment: OptionalString.optional(),

@@ -587,7 +587,7 @@ export default function DashboardPagosPage() {
       const payload = {
         paymentStatus: editPaymentStatus || undefined,
         reviewComment: editReviewComment?.trim() || undefined,
-        paymentReceiptUrl: editReceiptUrl?.trim() || undefined,
+        paymentReceiptUrl: typeof editReceiptUrl === "string" ? editReceiptUrl.trim() : "",
         reviewedBy: user?.email || user?.uid || "admin",
       };
       await authedFetch(user, `/api/enrollments/${editingPaymentId}`, {
