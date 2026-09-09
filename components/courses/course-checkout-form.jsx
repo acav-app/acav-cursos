@@ -1010,7 +1010,7 @@ export default function CourseCheckoutForm({ lang, job, variant = "modal", onClo
                   </div>
                 </div>
 
-                {requiresPayment ? (
+                {/* {requiresPayment ? (
                   <div className="mt-4 grid gap-3 md:grid-cols-2">
                     <div className="grid gap-2">
                       <Label className="flex items-center gap-1.5">
@@ -1049,7 +1049,7 @@ export default function CourseCheckoutForm({ lang, job, variant = "modal", onClo
                       </div>
                     </div>
                   </div>
-                ) : null}
+                ) : null} */}
               </div>
 
               <div className="rounded-[20px] border border-[#DCE6F7] bg-[#F8FBFF] p-5">
