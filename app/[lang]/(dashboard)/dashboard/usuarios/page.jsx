@@ -51,7 +51,6 @@ export default function DashboardUsuariosPage() {
   const [saving, setSaving] = useState(false);
   const [users, setUsers] = useState([]);
   const [companies, setCompanies] = useState([]);
-  const [query, setQuery] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [editing, setEditing] = useState(null);

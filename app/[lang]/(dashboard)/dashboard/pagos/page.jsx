@@ -47,6 +47,7 @@ import { useAuth } from "@/provider/auth.provider";
 import { authedFetch, asArray } from "@/lib/auth/authed-fetch";
 import { useLocalizedPath } from "@/lib/utils";
 import { useCourseActor } from "@/components/courses/dashboard/use-course-actor";
+import { fuzzySearchObject, normalizeSearchText } from "@/lib/courses/utils";
 import { DashboardPageShellSkeleton } from "@/components/courses/dashboard/page-skeletons";
 import {
   PAYMENT_STATUSES,
@@ -229,23 +230,27 @@ export default function DashboardPagosPage() {
   );
 
   const filtered = useMemo(() => {
-    const normalizedQuery = String(query || "").trim().toLowerCase();
-
     return rows
       .filter((row) => (paymentState ? row.paymentMeta.label === paymentState : true))
       .filter((row) => (courseId ? String(row.courseId || row.jobId || "") === courseId : true))
       .filter((row) => (institutionId ? String(row.institutionId || row.companyId || "") === institutionId : true))
-      .filter((row) => {
-        if (!normalizedQuery) return true;
-
-        return [
-          row.jobTitle,
-          row.companyName,
-          row.email,
-          row.candidateName,
-          [row.firstName, row.lastName].filter(Boolean).join(" "),
-        ].some((value) => String(value || "").toLowerCase().includes(normalizedQuery));
-      });
+      .filter((row) =>
+        fuzzySearchObject(query, row, [
+          "jobTitle",
+          "courseTitle",
+          "companyName",
+          "institutionName",
+          "email",
+          "candidateName",
+          "firstName",
+          "lastName",
+          "studentName",
+          "paymentReference",
+          "paymentMethod",
+          "documentNumber",
+          "phone",
+        ])
+      );
   }, [courseId, institutionId, paymentState, query, rows]);
 
   const summary = useMemo(() => {

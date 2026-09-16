@@ -20,6 +20,7 @@ import { useAuth } from "@/provider/auth.provider";
 import { authedFetch, asArray } from "@/lib/auth/authed-fetch";
 import { useLocalizedPath } from "@/lib/utils";
 import { useCourseActor } from "@/components/courses/dashboard/use-course-actor";
+import { fuzzySearchObject } from "@/lib/courses/utils";
 import { EDUCATIONAL_ENROLLMENT_STATUSES } from "@/lib/courses/constants";
 import { resolveEducationalStatusMeta, resolvePaymentStatusMeta } from "@/lib/courses/status-meta";
 import { DashboardPageShellSkeleton } from "@/components/courses/dashboard/page-skeletons";
@@ -39,7 +40,7 @@ export default function DashboardInscripcionesPage() {
   const [courses, setCourses] = useState([]);
   const [institutions, setInstitutions] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [queryEmail, setQueryEmail] = useState("");
+  const [query, setQuery] = useState("");
   const [status, setStatus] = useState("");
   const [courseId, setCourseId] = useState("");
   const [institutionId, setInstitutionId] = useState("");
@@ -116,14 +117,13 @@ export default function DashboardInscripcionesPage() {
   };
 
   const filtered = useMemo(() => {
-    const email = String(queryEmail || "").trim().toLowerCase();
     const from = fromDate ? new Date(`${fromDate}T00:00:00.000Z`).getTime() : null;
     const to = toDate ? new Date(`${toDate}T23:59:59.999Z`).getTime() : null;
     return applications
       .filter((application) => (status ? application.status === status : true))
       .filter((application) => (courseId ? (application.courseId || application.jobId) === courseId : true))
       .filter((application) => (institutionId ? (application.institutionId || application.companyId) === institutionId : true))
-      .filter((application) => (email ? String(application.email || "").toLowerCase().includes(email) : true))
+       .filter((application) => (query ? fuzzySearchObject(query, application, searchableColumnKeys) : true))
       .filter((application) => {
         if (!from && !to) return true;
         const createdAt = new Date(String(application.createdAt || "")).getTime();
@@ -132,11 +132,11 @@ export default function DashboardInscripcionesPage() {
         if (to && createdAt > to) return false;
         return true;
       });
-  }, [applications, status, courseId, institutionId, queryEmail, fromDate, toDate]);
+  }, [applications, status, courseId, institutionId, query, fromDate, toDate, searchableColumnKeys]);
 
-  const hasActiveFilters = Boolean(queryEmail || status || courseId || institutionId || fromDate || toDate);
+  const hasActiveFilters = Boolean(query || status || courseId || institutionId || fromDate || toDate);
   const resetFilters = () => {
-    setQueryEmail("");
+    setQuery("");
     setStatus("");
     setCourseId("");
     setInstitutionId("");
@@ -435,9 +435,9 @@ export default function DashboardInscripcionesPage() {
         </div>
         <div className="mt-4 grid gap-3 md:grid-cols-3">
           <Input
-            value={queryEmail}
-            onChange={(e) => setQueryEmail(e.target.value)}
-            placeholder="Buscar por email"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Buscar por alumno, email, DNI, curso, institución..."
             className="h-11 rounded-2xl bg-white"
           />
           <Select value={status} onValueChange={(value) => setStatus(value === "all" ? "" : value)}>

@@ -26,6 +26,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { fuzzyMatch } from "@/lib/courses/utils";
 import {
   ChevronLeft,
   ChevronRight,
@@ -166,8 +167,8 @@ export function DataTableEnhanced(props) {
       if (query) {
         let matchesGlobal = false;
         for (let k = 0; k < searchKeys.length; k++) {
-          const haystack = universalStringify(getNestedValue(row, searchKeys[k])).toLowerCase();
-          if (haystack.includes(query)) {
+          const haystack = universalStringify(getNestedValue(row, searchKeys[k]));
+          if (fuzzyMatch(query, haystack)) {
             matchesGlobal = true;
             break;
           }
@@ -180,9 +181,9 @@ export function DataTableEnhanced(props) {
         const column = headerColumns.find((c) => c.id === entry[0]);
         if (!column) continue;
         const accessor = column.accessorKey || column.id;
-        const needle = String(entry[1]).toLowerCase();
-        const haystack = universalStringify(getNestedValue(row, accessor)).toLowerCase();
-        if (!haystack.includes(needle)) return false;
+        const needle = String(entry[1]);
+        const haystack = universalStringify(getNestedValue(row, accessor));
+        if (!fuzzyMatch(needle, haystack)) return false;
       }
       return true;
     });
