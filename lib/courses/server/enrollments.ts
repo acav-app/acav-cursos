@@ -147,7 +147,12 @@ export async function createEnrollment(input: unknown) {
   if (!province) throw err(400, "province_required");
 
   const studentName = `${firstName} ${lastName}`.trim();
-  const paymentAmount = Number(parsed.paymentAmount ?? parsed.amount ?? course.price ?? 0) || 0;
+  const isMemberStudent = Boolean(profileSnapshot?.isMember);
+  const memberPrice = Number(course.price ?? 0) || 0;
+  const publicPrice = Number(course.oldPrice ?? course.price ?? 0) || 0;
+  const expectedPaymentAmount = course.freeCourse ? 0 : isMemberStudent ? memberPrice : publicPrice;
+  const priceTier = isMemberStudent ? "member" : "public";
+  const paymentAmount = expectedPaymentAmount;
   const paymentCurrency = String(parsed.paymentCurrency || parsed.currency || "ARS").trim() || "ARS";
   const paymentMethod = String(parsed.paymentMethod || (paymentAmount > 0 ? "transferencia" : "manual")).trim();
   const paymentReference = String(parsed.paymentReference || "").trim();
@@ -214,6 +219,10 @@ export async function createEnrollment(input: unknown) {
       paymentAmount: paymentAmount || undefined,
       paymentCurrency,
       paymentMethod,
+      isMember: isMemberStudent,
+      priceTier,
+      memberPrice: memberPrice || undefined,
+      publicPrice: publicPrice || undefined,
       paymentReference: paymentReference || undefined,
       paymentReceiptUrl: paymentReceiptUrl || undefined,
       payment: payment || undefined,
@@ -226,6 +235,126 @@ export async function createEnrollment(input: unknown) {
 
   await ref.set(payload);
   return { id: ref.id, ...(payload as any) } as Enrollment;
+}
+
+export type EnrollmentReconciliationResult = {
+  id: string;
+  email: string;
+  courseTitle: string;
+  previousAmount: number | null;
+  reconciledAmount: number;
+  priceTier: "member" | "public";
+  changed: boolean;
+};
+
+export async function reconcileEnrollmentAmounts(input: {
+  ids?: string[];
+  reviewedBy?: string;
+}): Promise<{ reconciled: EnrollmentReconciliationResult[] }> {
+  const db = getAdminDb();
+  const now = nowIso();
+  const trimmedIds = Array.isArray(input?.ids)
+    ? Array.from(new Set(input.ids.map((id) => String(id || "").trim()).filter(Boolean)))
+    : [];
+  const reconciled: EnrollmentReconciliationResult[] = [];
+
+  for (const id of trimmedIds) {
+    const ref = db.collection(COURSE_COLLECTIONS.enrollments).doc(String(id));
+    const snap = await ref.get();
+    if (!snap.exists) continue;
+    const current = toEnrollment(snap);
+
+    const courseId = String(current.courseId || current.jobId || "").trim();
+    const course = courseId ? await getCourseById(courseId).catch(() => null) : null;
+    if (!course) continue;
+
+    const userId = String(current.userId || "").trim();
+    const profile = userId ? await getPortalUserProfileByUid(userId).catch(() => null) : null;
+    const snapshotMember = typeof (current as Record<string, unknown>).isMember === "boolean"
+      ? Boolean((current as Record<string, unknown>).isMember)
+      : null;
+    const isMemberStudent = snapshotMember ?? Boolean(profile?.isMember);
+
+    if (course.freeCourse) {
+      const previous = typeof current.paymentAmount === "number" ? current.paymentAmount : null;
+      const changed = previous !== 0 && previous !== null;
+      await ref.set(
+        removeUndefined({
+          paymentAmount: 0,
+          isMember: isMemberStudent,
+          priceTier: isMemberStudent ? "member" : "public",
+          memberPrice: Number(course.price ?? 0) || undefined,
+          publicPrice: Number(course.oldPrice ?? course.price ?? 0) || undefined,
+          updatedAt: now,
+        }),
+        { merge: true }
+      );
+      reconciled.push({
+        id: String(current.id),
+        email: String(current.email || ""),
+        courseTitle: String(current.courseTitle || current.jobTitle || ""),
+        previousAmount: previous,
+        reconciledAmount: 0,
+        priceTier: isMemberStudent ? "member" : "public",
+        changed,
+      });
+      continue;
+    }
+
+    const memberPrice = Number(course.price ?? 0) || 0;
+    const publicPrice = Number(course.oldPrice ?? course.price ?? 0) || 0;
+    const expectedAmount = isMemberStudent ? memberPrice : publicPrice;
+    const previous = typeof current.paymentAmount === "number" ? current.paymentAmount : null;
+    const changed = previous !== expectedAmount;
+
+    await ref.set(
+      removeUndefined({
+        paymentAmount: expectedAmount,
+        paymentId: current.paymentId || undefined,
+        isMember: isMemberStudent,
+        priceTier: isMemberStudent ? "member" : "public",
+        memberPrice: memberPrice || undefined,
+        publicPrice: publicPrice || undefined,
+        paymentStatus: current.paymentStatus === "approved" ? current.paymentStatus : current.paymentStatus,
+        updatedAt: now,
+      }),
+      { merge: true }
+    );
+
+    if (current.paymentId) {
+      await updatePayment(current.paymentId, { amount: expectedAmount }).catch(() => null);
+    } else if (expectedAmount > 0) {
+      const payment = await createPayment({
+        enrollmentId: String(current.id),
+        amount: expectedAmount,
+        currency: String(current.paymentCurrency || "ARS"),
+        method: "transferencia",
+        status: String(current.paymentStatus || "pending"),
+      }).catch(() => null);
+      if (payment) {
+        await ref.set(
+          removeUndefined({
+            paymentId: payment.id,
+            payment: payment,
+            updatedAt: nowIso(),
+          }),
+          { merge: true }
+        );
+      }
+    }
+
+    reconciled.push({
+      id: String(current.id),
+      email: String(current.email || ""),
+      courseTitle: String(current.courseTitle || current.jobTitle || ""),
+      previousAmount: previous,
+      reconciledAmount: expectedAmount,
+      priceTier: isMemberStudent ? "member" : "public",
+      changed,
+    });
+  }
+
+  return { reconciled };
 }
 
 export async function updateEnrollment(id: string, input: unknown) {

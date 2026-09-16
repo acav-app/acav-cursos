@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import {
   ArrowUpRight,
+  AlertCircle,
   CheckCircle2,
   Clock3,
   CreditCard,
@@ -47,7 +48,7 @@ import { useAuth } from "@/provider/auth.provider";
 import { authedFetch, asArray } from "@/lib/auth/authed-fetch";
 import { useLocalizedPath } from "@/lib/utils";
 import { useCourseActor } from "@/components/courses/dashboard/use-course-actor";
-import { fuzzySearchObject, normalizeSearchText } from "@/lib/courses/utils";
+import { fuzzySearchObject } from "@/lib/courses/utils";
 import { DashboardPageShellSkeleton } from "@/components/courses/dashboard/page-skeletons";
 import {
   PAYMENT_STATUSES,
@@ -103,15 +104,35 @@ function paymentStatusLabel(value) {
   return labels[normalized] || titleCase(value);
 }
 
-function resolvePaymentMeta(enrollment) {
+function resolveAmountVerification(enrollment, course) {
+  const recorded = Number(
+    enrollment?.paymentAmount ?? enrollment?.payment?.amount ?? enrollment?.amount ?? enrollment?.coursePrice ?? enrollment?.price
+  );
+  const hasRecorded = Number.isFinite(recorded);
+  const snapshotMember = typeof enrollment?.isMember === "boolean" ? enrollment.isMember : null;
+  const memberPrice = Number(enrollment?.memberPrice ?? course?.price ?? NaN);
+  const publicPrice = Number(enrollment?.publicPrice ?? (course?.oldPrice ?? course?.price) ?? NaN);
+
+  let isMember = snapshotMember;
+  if (isMember === null && hasRecorded && Number.isFinite(memberPrice) && Number.isFinite(publicPrice) && memberPrice !== publicPrice) {
+    if (recorded === memberPrice) isMember = true;
+    else if (recorded === publicPrice) isMember = false;
+  }
+
+  const expectedAmount = isMember === true ? memberPrice : isMember === false ? publicPrice : null;
+  const tierLabel = isMember === true ? "Socio ACAV" : isMember === false ? "Público general" : null;
+  const hasMismatch =
+    hasRecorded &&
+    expectedAmount != null &&
+    Number.isFinite(expectedAmount) &&
+    recorded !== expectedAmount;
+
+  return { recorded, hasRecorded, isMember, tierLabel, memberPrice, publicPrice, expectedAmount, hasMismatch };
+}
+
+function resolvePaymentMeta(enrollment, course) {
   const paymentStatus = String(enrollment?.paymentStatus || enrollment?.payment?.status || "").trim().toLowerCase();
-  const amount =
-    enrollment?.paymentAmount ??
-    enrollment?.payment?.amount ??
-    enrollment?.amount ??
-    enrollment?.coursePrice ??
-    enrollment?.price ??
-    "";
+  const amount = resolveAmountVerification(enrollment, course).recorded;
   const receiptUrl = String(enrollment?.paymentReceiptUrl || enrollment?.payment?.receiptUrl || "").trim();
   const paidAt = enrollment?.paidAt || enrollment?.payment?.paidAt || enrollment?.paymentDate || "";
   const enrollmentStatus = String(enrollment?.status || "").trim().toLowerCase();
@@ -174,6 +195,7 @@ export default function DashboardPagosPage() {
   const [enrollments, setEnrollments] = useState([]);
   const [courses, setCourses] = useState([]);
   const [institutions, setInstitutions] = useState([]);
+  const [portalUsers, setPortalUsers] = useState([]);
   const [query, setQuery] = useState("");
   const [courseId, setCourseId] = useState("");
   const [institutionId, setInstitutionId] = useState("");
@@ -195,10 +217,11 @@ export default function DashboardPagosPage() {
       setLoading(true);
 
       try {
-        const [enrollmentsData, coursesData, institutionsData] = await Promise.all([
+        const [enrollmentsData, coursesData, institutionsData, usersData] = await Promise.all([
           authedFetch(user, "/api/enrollments", { method: "GET" }),
           authedFetch(user, "/api/courses", { method: "GET" }),
           authedFetch(user, "/api/institutions", { method: "GET" }),
+          authedFetch(user, "/api/courses/users", { method: "GET" }).catch(() => null),
         ]);
 
         if (!alive) return;
@@ -206,6 +229,7 @@ export default function DashboardPagosPage() {
         setEnrollments(asArray(enrollmentsData?.enrollments));
         setCourses(asArray(coursesData?.courses));
         setInstitutions(asArray(institutionsData?.institutions));
+        setPortalUsers(asArray(usersData?.users));
       } catch (error) {
         toast.error(error?.message || "No pudimos cargar el módulo de pagos.", { position: "top-right" });
       } finally {
@@ -220,13 +244,47 @@ export default function DashboardPagosPage() {
     };
   }, [user]);
 
+  const courseById = useMemo(() => {
+    const map = new Map();
+    courses.forEach((course) => map.set(String(course?.id || ""), course));
+    return map;
+  }, [courses]);
+
+  const membershipByUserId = useMemo(() => {
+    const map = new Map();
+    portalUsers.forEach((u) => {
+      const uid = String(u?.uid || u?.id || "").trim();
+      const email = String(u?.email || "").trim().toLowerCase();
+      if (uid) map.set(`uid:${uid}`, Boolean(u?.isMember));
+      if (email) map.set(`email:${email}`, Boolean(u?.isMember));
+    });
+    return map;
+  }, [portalUsers]);
+
   const rows = useMemo(
     () =>
-      enrollments.map((enrollment) => ({
-        ...enrollment,
-        paymentMeta: resolvePaymentMeta(enrollment),
-      })),
-    [enrollments]
+      enrollments.map((enrollment) => {
+        const course = courseById.get(String(enrollment?.courseId || enrollment?.jobId || "")) || null;
+        const enriched = { ...enrollment };
+        const isMemberKnown =
+          typeof enriched.isMember === "boolean"
+            ? enriched.isMember
+            : (
+                membershipByUserId.get(`uid:${String(enriched.userId || "").trim()}`) ??
+                membershipByUserId.get(`email:${String(enriched.email || "").trim().toLowerCase()}`) ??
+                null
+              );
+        if (isMemberKnown !== null && isMemberKnown !== undefined && typeof enriched.isMember !== "boolean") {
+          enriched.isMember = isMemberKnown === true;
+        }
+        return {
+          ...enriched,
+          courseData: course,
+          amountInfo: resolveAmountVerification(enriched, course),
+          paymentMeta: resolvePaymentMeta(enriched, course),
+        };
+      }),
+    [enrollments, courseById, membershipByUserId]
   );
 
   const filtered = useMemo(() => {
@@ -324,12 +382,34 @@ export default function DashboardPagosPage() {
         accessorKey: "paymentAmount",
         enableSorting: true,
         meta: { enableColumnFilter: false },
-        size: 160,
-        cell: ({ row }) => (
-          <div className="text-sm font-semibold text-[#0F172A]">
-            {row.original.paymentMeta.amountLabel}
-          </div>
-        ),
+        size: 200,
+        cell: ({ row }) => {
+          const info = row.original.amountInfo;
+          return (
+            <div className="grid gap-1">
+              <div className="text-sm font-semibold text-[#0F172A]">
+                {row.original.paymentMeta.amountLabel}
+              </div>
+              {info?.tierLabel ? (
+                <span
+                  className={`inline-flex w-fit items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                    info.isMember
+                      ? "bg-[#EEF4FF] text-[#2356B8]"
+                      : "bg-slate-100 text-[#475569]"
+                  }`}
+                >
+                  {info.isMember ? "Socio ACAV" : "Público general"}
+                </span>
+              ) : null}
+              {info?.hasMismatch ? (
+                <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
+                  <AlertCircle className="h-3 w-3" />
+                  Corresponde {formatCurrency(info.expectedAmount)}
+                </span>
+              ) : null}
+            </div>
+          );
+        },
       },
       {
         id: "status",
@@ -809,6 +889,32 @@ export default function DashboardPagosPage() {
                   Estado pago: {titleCase(editingRow?.paymentStatus || "-")}
                 </Badge>
               </div>
+              {(() => {
+                const info = resolveAmountVerification(
+                  editingRow,
+                  courseById.get(String(editingRow?.courseId || editingRow?.jobId || "")) || null
+                );
+                if (!info.tierLabel) return null;
+                return (
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    <Badge
+                      variant="outline"
+                      className={`rounded-full text-[11px] ${
+                        info.hasMismatch
+                          ? "border-amber-300 bg-amber-50 text-amber-700"
+                          : "border-emerald-200 bg-emerald-50 text-emerald-700"
+                      }`}
+                    >
+                      Tarifa {info.tierLabel}: {formatCurrency(info.expectedAmount ?? 0)}
+                    </Badge>
+                    {info.hasMismatch ? (
+                      <Badge variant="outline" className="rounded-full border-amber-300 bg-amber-50 text-[11px] text-amber-700">
+                        Registrado: {formatCurrency(info.recorded)} — verificar
+                      </Badge>
+                    ) : null}
+                  </div>
+                );
+              })()}
             </div>
 
             <div className="space-y-2">

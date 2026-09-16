@@ -22,7 +22,7 @@ import { useLocalizedPath } from "@/lib/utils";
 import { useCourseActor } from "@/components/courses/dashboard/use-course-actor";
 import { fuzzySearchObject } from "@/lib/courses/utils";
 import { EDUCATIONAL_ENROLLMENT_STATUSES } from "@/lib/courses/constants";
-import { resolveEducationalStatusMeta, resolvePaymentStatusMeta } from "@/lib/courses/status-meta";
+import { resolveEducationalStatusMeta, resolveCourseCompletionStatusMeta } from "@/lib/courses/status-meta";
 import { DashboardPageShellSkeleton } from "@/components/courses/dashboard/page-skeletons";
 
 function dateLabel(iso) {
@@ -115,6 +115,34 @@ export default function DashboardInscripcionesPage() {
       setActionLoadingId("");
     }
   };
+
+  const searchableColumnKeys = useMemo(
+    () => [
+      "email",
+      "firstName",
+      "lastName",
+      "studentName",
+      "candidateName",
+      "phone",
+      "city",
+      "province",
+      "courseId",
+      "courseTitle",
+      "jobId",
+      "jobTitle",
+      "institutionId",
+      "institutionName",
+      "companyId",
+      "companyName",
+      "status",
+      "courseStatus",
+      "manualScore",
+      "documentNumber",
+      "agency",
+      "employeeFileNumber",
+    ],
+    []
+  );
 
   const filtered = useMemo(() => {
     const from = fromDate ? new Date(`${fromDate}T00:00:00.000Z`).getTime() : null;
@@ -239,27 +267,39 @@ export default function DashboardInscripcionesPage() {
         },
       },
       {
-        id: "paymentStatus",
-        header: "Estado de pago",
-        accessorKey: "paymentStatus",
+        id: "courseStatus",
+        header: "Estado del curso",
+        accessorKey: "courseStatus",
         enableSorting: true,
         meta: { enableColumnFilter: true },
         size: 180,
         cell: ({ row }) => {
           const app = row.original;
-          const paymentMeta = resolvePaymentStatusMeta(
-            app.paymentStatus || app?.payment?.status || ""
-          );
-          const PayIcon = paymentMeta.Icon;
+          const scoreValue = Number(app?.manualScore ?? app?.score);
+          const hasScore = Number.isFinite(scoreValue);
+          const rawStatus = String(app.courseStatus || "").trim().toLowerCase();
+          const resolvedKey = ["approved", "reproved", "suspended"].includes(rawStatus)
+            ? rawStatus
+            : hasScore
+              ? (scoreValue >= 60 ? "approved" : "reproved")
+              : "in_progress";
+          const completionMeta = resolveCourseCompletionStatusMeta(resolvedKey);
+          const StatusIcon = completionMeta.Icon;
+          const label = resolvedKey === "in_progress" && !hasScore ? "Sin nota" : completionMeta.title;
           return (
-            <Badge
-              color={paymentMeta.tone}
-              variant="soft"
-              className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px]"
-            >
-              <PayIcon className="h-3 w-3" />
-              {paymentMeta.title}
-            </Badge>
+            <div className="grid gap-0.5">
+              <Badge
+                color={completionMeta.tone}
+                variant="soft"
+                className="inline-flex w-fit items-center gap-1.5 rounded-full px-3 py-1 text-[11px]"
+              >
+                <StatusIcon className="h-3 w-3" />
+                {label}
+              </Badge>
+              {hasScore ? (
+                <span className="text-[11px] text-[#64748B]">Nota {scoreValue}/100</span>
+              ) : null}
+            </div>
           );
         },
       },
@@ -359,33 +399,6 @@ export default function DashboardInscripcionesPage() {
     ];
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [actor?.role, actionLoadingId, buildLocalizedPath, router]);
-
-  const searchableColumnKeys = useMemo(
-    () => [
-      "email",
-      "firstName",
-      "lastName",
-      "studentName",
-      "candidateName",
-      "phone",
-      "city",
-      "province",
-      "courseId",
-      "courseTitle",
-      "jobId",
-      "jobTitle",
-      "institutionId",
-      "institutionName",
-      "companyId",
-      "companyName",
-      "status",
-      "paymentStatus",
-      "documentNumber",
-      "agency",
-      "employeeFileNumber",
-    ],
-    []
-  );
 
   if (actorLoading || loading) {
     return <DashboardPageShellSkeleton showHeaderAction={false} filterColumns={3} rowCount={6} />;

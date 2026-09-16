@@ -113,7 +113,10 @@ export default function CourseCheckoutForm({ lang, job, variant = "modal", onClo
   const [receiptUrl, setReceiptUrl] = useState("");
   const [receiptUploading, setReceiptUploading] = useState(false);
 
-  const amount = Number(job?.price || 0);
+  const isMember = Boolean(actor?.isMember);
+  const memberPrice = Number(job?.price || 0);
+  const publicPrice = Number(job?.oldPrice || job?.price || 0);
+  const amount = isMember ? memberPrice : publicPrice;
   const requiresPayment = !job?.freeCourse && amount > 0;
   const hasReceipt = Boolean(receiptUrl);
   const steps = useMemo(
@@ -565,9 +568,13 @@ export default function CourseCheckoutForm({ lang, job, variant = "modal", onClo
                   {job?.oldPrice && Number(job.oldPrice) !== Number(job?.price) ? (
                     <>
                       <span className="h-1 w-1 rounded-full bg-slate-300" />
-                      <span className="text-sm font-bold text-[#1B2B50]">{formatCurrency(job.oldPrice)} <span className="text-[10px] font-semibold text-[#1B2B50]/70">Público general</span></span>
+                      <span className={`text-sm ${isMember ? "text-[#667085]" : "font-bold text-[#1B2B50]"}`}>
+                        {formatCurrency(publicPrice)} <span className="text-[10px] font-semibold text-[#1B2B50]/70">Público general{isMember ? "" : " · tu tarifa"}</span>
+                      </span>
                       <span className="h-1 w-1 rounded-full bg-slate-300" />
-                      <span className="font-semibold text-[#1B2B50]">{formatCurrency(amount)} <span className="text-[10px] font-semibold text-[#1B2B50]/70">Socios</span></span>
+                      <span className={`font-semibold ${isMember ? "text-[#1B2B50]" : "text-[#667085]"}`}>
+                        {formatCurrency(memberPrice)} <span className="text-[10px] font-semibold text-[#1B2B50]/70">Socios{isMember ? " · tu tarifa" : ""}</span>
+                      </span>
                     </>
                   ) : (
                     <>
@@ -775,6 +782,28 @@ export default function CourseCheckoutForm({ lang, job, variant = "modal", onClo
             <div className="grid gap-6">
               {requiresPayment ? (
                 <>
+                  <div className="rounded-[20px] border border-[#DCE6F7] bg-gradient-to-br from-[#F8FBFF] to-white p-5">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+                          Importe a transferir
+                        </div>
+                        <div className="mt-1 text-3xl font-extrabold tracking-[-0.03em] text-[#1B2B50]">
+                          {formatCurrency(amount)}
+                        </div>
+                        <p className="mt-1 text-xs leading-5 text-[#667085]">
+                          {isMember
+                            ? "Tarifa Socio ACAV aplicada a tu cuenta."
+                            : job?.oldPrice && Number(job.oldPrice) !== Number(job?.price)
+                              ? "Tarifa Público general (no asociado)."
+                              : "Valor del curso."}
+                        </p>
+                      </div>
+                      <span className="inline-flex items-center gap-1.5 rounded-full border border-[#DCE6F7] bg-white px-3 py-1 text-[11px] font-bold text-[#1B2B50]">
+                        {isMember ? "Socio ACAV" : "Público general"}
+                      </span>
+                    </div>
+                  </div>
                   <div className="rounded-[20px] border border-[#E5EAF2] bg-white p-5">
                     <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                       <div>
@@ -998,8 +1027,8 @@ export default function CourseCheckoutForm({ lang, job, variant = "modal", onClo
                     <div className="text-right">
                       {requiresPayment && job?.oldPrice && Number(job.oldPrice) !== Number(job?.price) ? (
                         <div className="space-y-0.5">
-                           <div className="text-sm font-bold text-[#1B2B50]">{formatCurrency(job.oldPrice)} <span className="text-[10px] font-semibold text-[#1B2B50]/70">Público general</span></div>
-                          <div className="text-sm font-bold text-[#1B2B50]">{formatCurrency(amount)} <span className="text-[10px] font-semibold text-[#1B2B50]/70">Socios</span></div>
+                          <div className={`text-sm ${isMember ? "text-[#667085]" : "font-bold text-[#1B2B50]"}`}>{formatCurrency(publicPrice)} <span className="text-[10px] font-semibold text-[#1B2B50]/70">Público general{isMember ? "" : " · tu tarifa"}</span></div>
+                          <div className={`text-sm ${isMember ? "font-bold text-[#1B2B50]" : "text-[#667085]"}`}>{formatCurrency(memberPrice)} <span className="text-[10px] font-semibold text-[#1B2B50]/70">Socios{isMember ? " · tu tarifa" : ""}</span></div>
                         </div>
                       ) : (
                         <div className={`text-sm font-bold ${requiresPayment ? "text-[#1B2B50]" : "text-emerald-800"}`}>
