@@ -10,6 +10,7 @@ import {
   CheckCircle2,
   Clock3,
   CreditCard,
+  Download,
   Loader2,
   Receipt,
   RotateCcw,
@@ -55,6 +56,7 @@ import {
 } from "@/lib/courses/constants";
 import { uploadToR2 } from "@/components/courses/dashboard/upload";
 import { normalizePublicR2Url } from "@/lib/r2/normalize-public-url";
+import { datedExcelFilename, downloadExcel } from "@/lib/export/excel";
 
 function isImageReceipt(url) {
   const clean = String(url || "").split("?")[0].split("#")[0].toLowerCase();
@@ -196,6 +198,8 @@ export default function DashboardPagosPage() {
   const [courses, setCourses] = useState([]);
   const [institutions, setInstitutions] = useState([]);
   const [portalUsers, setPortalUsers] = useState([]);
+  const [tableFilteredRows, setTableFilteredRows] = useState([]);
+  const [exporting, setExporting] = useState(false);
   const [query, setQuery] = useState("");
   const [courseId, setCourseId] = useState("");
   const [institutionId, setInstitutionId] = useState("");
@@ -310,6 +314,67 @@ export default function DashboardPagosPage() {
         ])
       );
   }, [courseId, institutionId, paymentState, query, rows]);
+
+  const handleExport = async () => {
+    if (!tableFilteredRows.length) return;
+    setExporting(true);
+    try {
+      await downloadExcel({
+        filename: datedExcelFilename("pagos-acav"),
+        worksheetName: "Pagos",
+        columns: [
+          { header: "Fecha", key: "createdAt", width: 18 },
+          { header: "Alumno", key: "studentName", width: 28 },
+          { header: "Email", key: "email", width: 34 },
+          { header: "Teléfono", key: "phone", width: 20 },
+          { header: "Curso", key: "courseTitle", width: 34 },
+          { header: "Institución", key: "institutionName", width: 30 },
+          { header: "Importe registrado", key: "recordedAmount", width: 22 },
+          { header: "Moneda", key: "currency", width: 12 },
+          { header: "Tarifa", key: "tier", width: 20 },
+          { header: "Importe esperado", key: "expectedAmount", width: 22 },
+          { header: "Diferencia de conciliación", key: "hasMismatch", width: 26 },
+          { header: "Estado del pago", key: "paymentStatus", width: 22 },
+          { header: "Estado de inscripción", key: "enrollmentStatus", width: 24 },
+          { header: "Método", key: "paymentMethod", width: 20 },
+          { header: "Referencia", key: "paymentReference", width: 24 },
+        ],
+        rows: tableFilteredRows.map((item) => {
+          const fullName =
+            [item.firstName, item.lastName].filter(Boolean).join(" ").trim() ||
+            item.candidateName ||
+            item.studentName ||
+            "";
+          const amountInfo = item.amountInfo || {};
+          return {
+            createdAt: item.createdAt ? dateLabel(item.createdAt) : "",
+            studentName: fullName,
+            email: item.email,
+            phone: item.phone,
+            courseTitle: item.courseTitle || item.jobTitle,
+            institutionName: item.institutionName || item.companyName,
+            recordedAmount: amountInfo.hasRecorded ? amountInfo.recorded : "",
+            currency: item.paymentCurrency || item.payment?.currency || item.currency || "ARS",
+            tier: amountInfo.tierLabel || "",
+            expectedAmount:
+              amountInfo.expectedAmount !== null && amountInfo.expectedAmount !== undefined
+                ? amountInfo.expectedAmount
+                : "",
+            hasMismatch: amountInfo.hasMismatch ? "Sí" : "No",
+            paymentStatus: item.paymentMeta?.label || paymentStatusLabel(item.paymentStatus || item.payment?.status),
+            enrollmentStatus: titleCase(item.status),
+            paymentMethod: titleCase(item.paymentMethod || item.payment?.method, ""),
+            paymentReference: item.paymentReference || item.payment?.reference || "",
+          };
+        }),
+      });
+      toast.success("Excel de pagos descargado", { position: "top-right" });
+    } catch (error) {
+      toast.error(error?.message || "No se pudo generar el Excel de pagos", { position: "top-right" });
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const summary = useMemo(() => {
     const total = filtered.length;
@@ -834,6 +899,7 @@ export default function DashboardPagosPage() {
       <DataTableEnhanced
         data={filtered}
         columns={columns}
+        onFilteredDataChange={setTableFilteredRows}
         searchPlaceholder="Buscar pago por alumno, curso, email, DNI, teléfono o institución"
         searchableColumnKeys={searchableColumnKeys}
         defaultPageSize={20}
@@ -843,6 +909,14 @@ export default function DashboardPagosPage() {
         emptyTitle="No hay registros financieros para mostrar"
         emptySubtitle="Ajusta los filtros o espera nuevas inscripciones para revisar pagos."
         onRowClick={(row) => router.push(buildLocalizedPath(`/dashboard/inscripciones/${row.id}`))}
+        toolbarRight={
+          actor?.role === "admin" ? (
+            <Button type="button" size="sm" variant="outline" onClick={handleExport} disabled={exporting || !tableFilteredRows.length}>
+              <Download className="mr-1.5 h-4 w-4" />
+              {exporting ? "Preparando..." : "Exportar Excel"}
+            </Button>
+          ) : null
+        }
       />
 
       <Sheet open={Boolean(editingPaymentId && editingRow)} onOpenChange={(open) => !open && handleCloseEditPayment()}>
