@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
-import { ArrowUpRight, Award, GraduationCap, Loader2, MapPin, Phone, RotateCcw, Mail } from "lucide-react";
+import { ArrowUpRight, Award, Download, GraduationCap, Loader2, MapPin, Phone, RotateCcw, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -24,6 +24,7 @@ import { fuzzySearchObject } from "@/lib/courses/utils";
 import { EDUCATIONAL_ENROLLMENT_STATUSES } from "@/lib/courses/constants";
 import { resolveEducationalStatusMeta, resolveCourseCompletionStatusMeta } from "@/lib/courses/status-meta";
 import { DashboardPageShellSkeleton } from "@/components/courses/dashboard/page-skeletons";
+import { datedExcelFilename, downloadExcel } from "@/lib/export/excel";
 
 function dateLabel(iso) {
   const d = new Date(String(iso || ""));
@@ -47,6 +48,8 @@ export default function DashboardInscripcionesPage() {
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [actionLoadingId, setActionLoadingId] = useState("");
+  const [tableFilteredRows, setTableFilteredRows] = useState([]);
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -170,6 +173,69 @@ export default function DashboardInscripcionesPage() {
     setInstitutionId("");
     setFromDate("");
     setToDate("");
+  };
+
+  const handleExport = async () => {
+    if (!tableFilteredRows.length) return;
+    setExporting(true);
+    try {
+      await downloadExcel({
+        filename: datedExcelFilename("inscripciones-acav"),
+        worksheetName: "Inscripciones",
+        columns: [
+          { header: "Fecha", key: "createdAt", width: 23 },
+          { header: "Nombre", key: "studentName", width: 28 },
+          { header: "Email", key: "email", width: 32 },
+          { header: "Teléfono", key: "phone", width: 20 },
+          { header: "Ciudad", key: "city", width: 22 },
+          { header: "Provincia", key: "province", width: 22 },
+          { header: "Curso", key: "courseTitle", width: 34 },
+          { header: "Institución", key: "institutionName", width: 30 },
+          { header: "Estado de inscripción", key: "enrollmentStatus", width: 24 },
+          { header: "Estado de pago", key: "paymentStatus", width: 20 },
+          { header: "Estado de cursada", key: "courseStatus", width: 20 },
+          { header: "Progreso (%)", key: "progress", width: 16 },
+          { header: "Nota", key: "score", width: 12 },
+        ],
+        rows: tableFilteredRows.map((enrollment) => {
+          const studentName =
+            [enrollment.firstName, enrollment.lastName].filter(Boolean).join(" ").trim() ||
+            enrollment.studentName ||
+            enrollment.candidateName ||
+            "";
+          const paymentStatusLabels = {
+            pending: "Pendiente",
+            under_review: "En revisión",
+            approved: "Aprobado",
+            rejected: "Rechazado",
+          };
+          const rawCourseStatus = String(enrollment.courseStatus || "in_progress").trim().toLowerCase();
+          const courseStatus = ["approved", "reproved", "suspended"].includes(rawCourseStatus)
+            ? rawCourseStatus
+            : "in_progress";
+          return {
+            createdAt: enrollment.createdAt ? dateLabel(enrollment.createdAt) : "",
+            studentName,
+            email: enrollment.email,
+            phone: enrollment.phone,
+            city: enrollment.city,
+            province: enrollment.province,
+            courseTitle: enrollment.courseTitle || enrollment.jobTitle,
+            institutionName: enrollment.institutionName || enrollment.companyName,
+            enrollmentStatus: resolveEducationalStatusMeta(enrollment.status).title,
+            paymentStatus: paymentStatusLabels[enrollment.paymentStatus] || enrollment.paymentStatus || "",
+            courseStatus: resolveCourseCompletionStatusMeta(courseStatus).title,
+            progress: typeof enrollment.progress === "number" ? enrollment.progress : "",
+            score: enrollment.manualScore ?? enrollment.score ?? "",
+          };
+        }),
+      });
+      toast.success("Excel de inscripciones descargado", { position: "top-right" });
+    } catch (e) {
+      toast.error(e?.message || "No se pudo generar el Excel", { position: "top-right" });
+    } finally {
+      setExporting(false);
+    }
   };
 
   const columns = useMemo(() => {
@@ -526,6 +592,7 @@ export default function DashboardInscripcionesPage() {
       <DataTableEnhanced
         data={filtered}
         columns={columns}
+        onFilteredDataChange={setTableFilteredRows}
         searchPlaceholder="Buscar alumno, curso, DNI, estado, contacto o institución"
         searchableColumnKeys={searchableColumnKeys}
         defaultPageSize={20}
@@ -540,9 +607,15 @@ export default function DashboardInscripcionesPage() {
         }
         onRowClick={(row) => router.push(buildLocalizedPath(`/dashboard/inscripciones/${row.id}`))}
         toolbarRight={
-          <div className="hidden items-center gap-2 md:flex">
-            <Badge variant="soft" color="secondary">
-              Total {filtered.length}
+          <div className="flex items-center gap-2">
+            {actor?.role === "admin" ? (
+              <Button type="button" size="sm" variant="outline" onClick={handleExport} disabled={exporting || !tableFilteredRows.length}>
+                <Download className="mr-1.5 h-4 w-4" />
+                {exporting ? "Preparando..." : "Exportar Excel"}
+              </Button>
+            ) : null}
+            <Badge className="hidden md:inline-flex" variant="soft" color="secondary">
+              Total {tableFilteredRows.length}
             </Badge>
           </div>
         }

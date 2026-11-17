@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
-import { Plus } from "lucide-react";
+import { Download, Plus } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,6 +13,7 @@ import { normalizePublicR2Url } from "@/lib/r2/normalize-public-url";
 import { useLocalizedPath } from "@/lib/utils";
 import { useCourseActor } from "@/components/courses/dashboard/use-course-actor";
 import { DashboardPageShellSkeleton } from "@/components/courses/dashboard/page-skeletons";
+import { datedExcelFilename, downloadExcel } from "@/lib/export/excel";
 
 export default function DashboardInstitucionesPage() {
   const buildLocalizedPath = useLocalizedPath();
@@ -20,6 +21,7 @@ export default function DashboardInstitucionesPage() {
   const { actor, loading: actorLoading, error: actorError } = useCourseActor();
   const [institutions, setInstitutions] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
   const [query, setQuery] = useState("");
 
   useEffect(() => {
@@ -54,6 +56,50 @@ export default function DashboardInstitucionesPage() {
     );
   }, [institutions, query]);
 
+  const handleExport = async () => {
+    if (!filtered.length) return;
+    setExporting(true);
+    try {
+      await downloadExcel({
+        filename: datedExcelFilename("instituciones-acav"),
+        worksheetName: "Instituciones",
+        columns: [
+          { header: "Nombre", key: "name", width: 30 },
+          { header: "Razón social", key: "businessName", width: 30 },
+          { header: "CUIT", key: "cuit", width: 18 },
+          { header: "Email", key: "email", width: 32 },
+          { header: "Teléfono", key: "phone", width: 20 },
+          { header: "Rubro", key: "subRubro", width: 30 },
+          { header: "Ciudad", key: "city", width: 22 },
+          { header: "Provincia", key: "province", width: 22 },
+          { header: "Dirección", key: "address", width: 32 },
+          { header: "Socio ACAV", key: "isAcavMember", width: 14 },
+          { header: "Estado", key: "status", width: 18 },
+          { header: "Fecha de alta", key: "createdAt", width: 22 },
+        ],
+        rows: filtered.map((institution) => ({
+          name: institution.name,
+          businessName: institution.businessName,
+          cuit: institution.cuit,
+          email: institution.email,
+          phone: institution.phone,
+          subRubro: institution.customSubRubro || institution.subRubro,
+          city: institution.city,
+          province: institution.province,
+          address: institution.address,
+          isAcavMember: institution.isAcavMember ? "Sí" : "No",
+          status: institution.status,
+          createdAt: institution.createdAt ? new Date(institution.createdAt).toLocaleDateString("es-AR") : "",
+        })),
+      });
+      toast.success("Excel de instituciones descargado", { position: "top-right" });
+    } catch (e) {
+      toast.error(e?.message || "No se pudo generar el Excel", { position: "top-right" });
+    } finally {
+      setExporting(false);
+    }
+  };
+
   if (actorLoading || loading) {
     return <DashboardPageShellSkeleton showHeaderAction={actor?.role === "admin"} filterColumns={1} rowCount={5} />;
   }
@@ -84,12 +130,18 @@ export default function DashboardInstitucionesPage() {
         </div>
 
         {actor?.role === "admin" ? (
-          <Button asChild>
-            <Link href={buildLocalizedPath("/dashboard/instituciones/nueva")} className="inline-flex items-center gap-2">
-              <Plus className="h-4 w-4" />
-              Nueva institucion
-            </Link>
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" variant="outline" onClick={handleExport} disabled={exporting || !filtered.length}>
+              <Download className="mr-2 h-4 w-4" />
+              {exporting ? "Preparando..." : "Exportar Excel"}
+            </Button>
+            <Button asChild>
+              <Link href={buildLocalizedPath("/dashboard/instituciones/nueva")} className="inline-flex items-center gap-2">
+                <Plus className="h-4 w-4" />
+                Nueva institucion
+              </Link>
+            </Button>
+          </div>
         ) : null}
       </div>
 

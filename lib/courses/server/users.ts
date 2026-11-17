@@ -95,9 +95,12 @@ async function assertNoPortalUserConflicts(input: {
   void role;
 }
 
-export async function listPortalUsers() {
+export async function listPortalUsers(options: { limit?: number } = {}) {
   const db = getAdminDb();
-  const snap = await db.collection(COURSE_COLLECTIONS.userProfiles).orderBy("createdAt", "desc").limit(500).get();
+  let query = db.collection(COURSE_COLLECTIONS.userProfiles).orderBy("createdAt", "desc");
+  const limit = Number(options.limit ?? 500);
+  if (Number.isFinite(limit) && limit > 0) query = query.limit(limit);
+  const snap = await query.get();
   return snap.docs
     .map((doc) => ({ uid: doc.id, ...(doc.data() as any) }))
     .map((raw) => {

@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
-import { Loader2, Plus, Save, Award, Building2, Users2 } from "lucide-react";
+import { Download, Loader2, Plus, Save, Award, Building2, Users2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -28,6 +28,7 @@ import { authedFetch, asArray } from "@/lib/auth/authed-fetch";
 import { useCourseActor } from "@/components/courses/dashboard/use-course-actor";
 import { PORTAL_ROLES } from "@/lib/courses/constants";
 import { DashboardPageShellSkeleton } from "@/components/courses/dashboard/page-skeletons";
+import { datedExcelFilename, downloadExcel } from "@/lib/export/excel";
 
 function normalizeString(value) {
   return String(value || "").trim();
@@ -49,7 +50,9 @@ export default function DashboardUsuariosPage() {
   const { actor, loading: actorLoading, error: actorError } = useCourseActor();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [users, setUsers] = useState([]);
+  const [tableFilteredUsers, setTableFilteredUsers] = useState([]);
   const [companies, setCompanies] = useState([]);
   const [createOpen, setCreateOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
@@ -73,7 +76,7 @@ export default function DashboardUsuariosPage() {
     isActive: true,
   });
 
-  const refresh = async () => {
+  const refresh = useCallback(async () => {
     if (!user) return;
     const [usersData, companiesData] = await Promise.all([
       authedFetch(user, "/api/courses/users", { method: "GET" }),
@@ -81,7 +84,7 @@ export default function DashboardUsuariosPage() {
     ]);
     setUsers(asArray(usersData?.users));
     setCompanies(asArray(companiesData?.institutions));
-  };
+  }, [user]);
 
   useEffect(() => {
     let alive = true;
@@ -101,9 +104,70 @@ export default function DashboardUsuariosPage() {
     return () => {
       alive = false;
     };
-  }, [user]);
+  }, [user, refresh]);
 
   const filtered = useMemo(() => users, [users]);
+
+  const handleExportContacts = async () => {
+    const emails = Array.from(
+      new Set(
+        tableFilteredUsers
+          .filter((portalUser) => String(portalUser.role || "").toLowerCase() === "alumno")
+          .map((portalUser) => normalizeString(portalUser.email).toLowerCase())
+          .filter(Boolean)
+      )
+    );
+    if (!emails.length) {
+      toast.error("No hay alumnos con email en los resultados actuales", { position: "top-right" });
+      return;
+    }
+
+    try {
+      setExporting(true);
+      const data = await authedFetch(user, "/api/courses/exports/contacts", {
+        method: "POST",
+        body: JSON.stringify({ emails }),
+      });
+      const contacts = asArray(data?.contacts);
+      await downloadExcel({
+        filename: datedExcelFilename("contactos-alumnos-acav"),
+        worksheetName: "Contactos",
+        columns: [
+          { header: "Nombre", key: "firstName", width: 24 },
+          { header: "Apellido", key: "lastName", width: 26 },
+          { header: "Email", key: "email", width: 34 },
+          { header: "Teléfono", key: "phone", width: 20 },
+          { header: "Ciudad", key: "city", width: 22 },
+          { header: "Provincia", key: "province", width: 22 },
+          { header: "Socio ACAV", key: "isMember", width: 14 },
+          { header: "Estado de cuenta", key: "isActive", width: 18 },
+          { header: "Cursos asociados", key: "courses", width: 44 },
+          { header: "Cantidad de inscripciones", key: "enrollmentCount", width: 24 },
+          { header: "Última inscripción", key: "lastEnrollmentAt", width: 23 },
+        ],
+        rows: contacts.map((contact) => ({
+          firstName: contact.firstName,
+          lastName: contact.lastName,
+          email: contact.email,
+          phone: contact.phone,
+          city: contact.city,
+          province: contact.province,
+          isMember: contact.isMember ? "Sí" : "No",
+          isActive: contact.isActive,
+          courses: contact.courses,
+          enrollmentCount: contact.enrollmentCount,
+          lastEnrollmentAt: contact.lastEnrollmentAt
+            ? new Date(contact.lastEnrollmentAt).toLocaleDateString("es-AR")
+            : "",
+        })),
+      });
+      toast.success(`Excel descargado (${contacts.length} contactos)`, { position: "top-right" });
+    } catch (e) {
+      toast.error(e?.message || "No se pudo exportar los contactos", { position: "top-right" });
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const roleBadge = (roleValue) => {
     const role = normalizeString(roleValue).toLowerCase();
@@ -451,15 +515,27 @@ export default function DashboardUsuariosPage() {
           </p>
         </div>
 
-        <Button onClick={openCreate} className="inline-flex items-center gap-2">
-          <Plus className="h-4 w-4" />
-          Nuevo usuario
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handleExportContacts}
+            disabled={exporting || !tableFilteredUsers.some((portalUser) => String(portalUser.role || "").toLowerCase() === "alumno")}
+          >
+            <Download className="mr-2 h-4 w-4" />
+            {exporting ? "Preparando..." : "Exportar Excel"}
+          </Button>
+          <Button onClick={openCreate} className="inline-flex items-center gap-2">
+            <Plus className="h-4 w-4" />
+            Nuevo usuario
+          </Button>
+        </div>
       </div>
 
       <DataTableEnhanced
         data={filtered}
         columns={columns}
+        onFilteredDataChange={setTableFilteredUsers}
         searchPlaceholder="Buscar por nombre, email, DNI, rol, institucion o contacto"
         searchableColumnKeys={[
           "email",

@@ -492,6 +492,7 @@ const EnrollmentBaseSchema = z.object({
   institutionName: z.string().min(1).optional(),
   companyName: z.string().min(1).optional(),
   amount: z.number().nonnegative().optional(),
+  paymentAmount: z.number().nonnegative().optional(),
   currency: z.string().min(1).optional(),
   firstName: OptionalString.optional(),
   lastName: OptionalString.optional(),
@@ -630,6 +631,7 @@ export const EnrollmentUpdateSchema = z.object({
   certificateId: OptionalString.optional(),
   certificateIssuedAt: CourseIsoDateString.optional(),
   paymentId: OptionalString.optional(),
+  paymentReference: OptionalString.optional(),
   paymentReceiptUrl: OptionalUrlAllowEmpty.optional(),
 });
 

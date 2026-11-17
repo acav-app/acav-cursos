@@ -67,7 +67,7 @@ function normalizeEnrollment(enrollment: Record<string, any>) {
 }
 
 function toEnrollment(doc: FirebaseFirestore.QueryDocumentSnapshot | FirebaseFirestore.DocumentSnapshot) {
-  return normalizeEnrollment({ id: doc.id, ...(doc.data() as any) }) as Enrollment;
+  return normalizeEnrollment({ id: doc.id, ...(doc.data() as any) }) as unknown as Enrollment;
 }
 
 export async function listEnrollments(options: {

@@ -1,5 +1,5 @@
 "use client";
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   flexRender,
   getCoreRowModel,
@@ -93,6 +93,7 @@ export function DataTableEnhanced(props) {
     defaultPageSize = 20,
     pageSizes = DEFAULT_PAGE_SIZES,
     onRowClick,
+    onFilteredDataChange,
     compact = false,
     toolbarLeft,
     toolbarRight,
@@ -188,6 +189,12 @@ export function DataTableEnhanced(props) {
       return true;
     });
   }, [data, globalFilter, headerFilters, columns, getSearchableKeys, getHeaderFilterableKeys]);
+
+  useEffect(() => {
+    if (typeof onFilteredDataChange === "function") {
+      onFilteredDataChange(filteredData);
+    }
+  }, [filteredData, onFilteredDataChange]);
 
   const pagination = useMemo(() => ({ pageIndex, pageSize }), [pageIndex, pageSize]);
 
